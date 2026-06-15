@@ -85,18 +85,34 @@
                     </p>
                 @endif
 
-                @if ($canManage && $pendingGuests->isNotEmpty())
+                @if ($canManage)
                     <div class="border-t border-pitch-line pt-3">
-                        <div class="text-xs uppercase tracking-widest text-pitch-muted mb-2">Misafir oyuncular (sen işaretle)</div>
-                        <div class="flex flex-wrap gap-2">
-                            @foreach ($pendingGuests as $guest)
-                                <span class="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-pitch-bg border border-pitch-line text-sm">
-                                    {{ $guest->name }}
-                                    <button wire:click="guestRsvp({{ $guest->id }}, 'going')" class="text-bibB hover:underline text-xs font-semibold">geliyor</button>
-                                    <button wire:click="guestRsvp({{ $guest->id }}, 'not_going')" class="text-[#FF8A8A] hover:underline text-xs font-semibold">gelmiyor</button>
-                                </span>
-                            @endforeach
-                        </div>
+                        <button wire:click="$toggle('showManageRsvp')" class="text-xs uppercase tracking-widest text-bibB hover:underline">
+                            {{ $showManageRsvp ? '▾ Katılımı yönet (başkan)' : '▸ Katılımı yönet (başkan)' }}
+                        </button>
+                        <p class="text-xs text-pitch-muted mt-1">Gelemeyenler adına da işaretleyebilirsin (WhatsApp'tan toplayıp tek tek girme).</p>
+
+                        @if ($showManageRsvp)
+                            <div class="mt-3 space-y-1.5">
+                                @foreach ($roster as $player)
+                                    @php $st = $rsvpByPlayer[$player->id]->status ?? null; @endphp
+                                    <div class="flex items-center justify-between gap-3 bg-pitch-bg border border-pitch-line rounded-lg px-3 py-2">
+                                        <span class="text-sm">
+                                            {{ $player->name }}
+                                            @if ($player->isGuest())<span class="text-xs text-gold">(misafir)</span>@endif
+                                        </span>
+                                        <div class="flex gap-1 shrink-0">
+                                            <button wire:click="setPlayerRsvp({{ $player->id }}, 'going')"
+                                                    class="text-xs px-2.5 py-1 rounded-md border transition {{ $st === 'going' ? 'bg-[#2C7A48] border-[#3E9A60] text-pitch-ink' : 'border-pitch-line text-bibB hover:bg-pitch-surface2' }}">Geliyor</button>
+                                            <button wire:click="setPlayerRsvp({{ $player->id }}, 'maybe')"
+                                                    class="text-xs px-2.5 py-1 rounded-md border transition {{ $st === 'maybe' ? 'bg-gold border-gold text-pitch-bg' : 'border-pitch-line text-gold hover:bg-pitch-surface2' }}">Belki</button>
+                                            <button wire:click="setPlayerRsvp({{ $player->id }}, 'not_going')"
+                                                    class="text-xs px-2.5 py-1 rounded-md border transition {{ $st === 'not_going' ? 'bg-red-700 border-red-600 text-pitch-ink' : 'border-pitch-line text-[#FF8A8A] hover:bg-pitch-surface2' }}">Gelmiyor</button>
+                                        </div>
+                                    </div>
+                                @endforeach
+                            </div>
+                        @endif
                     </div>
                 @endif
             </div>

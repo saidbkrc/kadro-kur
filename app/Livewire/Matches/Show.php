@@ -28,6 +28,9 @@ class Show extends Component
     /** Elle takas: ilk tıklanan oyuncu */
     public ?int $swapArmed = null;
 
+    /** Başkanın katılım yönetimi paneli açık mı */
+    public bool $showManageRsvp = false;
+
     // Sonuç formu
     public bool $showResultForm = false;
 
@@ -63,8 +66,8 @@ class Show extends Component
         $this->match->refresh();
     }
 
-    /** Misafir oyuncunun katılımını başkan işaretler. */
-    public function guestRsvp(int $playerId, string $status): void
+    /** Başkan, gruptaki herhangi bir oyuncunun (misafir veya kayıtlı üye) katılımını işaretler. */
+    public function setPlayerRsvp(int $playerId, string $status): void
     {
         abort_unless($this->match->canManage(Auth::user()), 403);
         abort_unless(in_array($status, ['going', 'not_going', 'maybe'], true), 400);
@@ -73,8 +76,8 @@ class Show extends Component
             return;
         }
 
-        $guest = $this->match->group->players()->whereNull('user_id')->findOrFail($playerId);
-        $this->match->setRsvp($guest, $status);
+        $player = $this->match->group->players()->findOrFail($playerId);
+        $this->match->setRsvp($player, $status);
         $this->match->refresh();
     }
 
@@ -299,13 +302,9 @@ class Show extends Component
             ? 0.0
             : round($team->avg(fn (Rsvp $r) => $r->player->overall()), 1);
 
-        // RSVP vermemiş misafirler (başkan işaretleyebilsin)
-        $respondedIds = $rsvps->pluck('player_id');
-        $pendingGuests = $this->match->group->players()
-            ->whereNull('user_id')
-            ->whereNotIn('id', $respondedIds)
-            ->orderBy('name')
-            ->get();
+        // Başkanın katılım yönetimi: tüm kadro + her oyuncunun mevcut durumu
+        $roster = $this->match->group->players()->orderBy('name')->get();
+        $rsvpByPlayer = $rsvps->keyBy('player_id');
 
         $myVote = $this->match->mvpVotes()->where('voter_id', Auth::id())->first();
 
@@ -315,7 +314,8 @@ class Show extends Component
             'waitlist' => $waitlist,
             'maybe' => $rsvps->where('status', 'maybe')->values(),
             'notGoing' => $rsvps->where('status', 'not_going')->values(),
-            'pendingGuests' => $pendingGuests,
+            'roster' => $roster,
+            'rsvpByPlayer' => $rsvpByPlayer,
             'myPlayer' => $myPlayer,
             'myRsvp' => $myRsvp,
             'teamA' => $teamA,

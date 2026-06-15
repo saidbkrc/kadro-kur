@@ -148,6 +148,31 @@ class KadroFlowTest extends TestCase
         $this->assertSame(1, $match->rsvps()->where('player_id', $players[5]->id)->value('waitlist_position'));
     }
 
+    public function test_baskan_uye_ve_misafir_adina_rsvp_isaretler(): void
+    {
+        $owner = User::factory()->create();
+        $group = $this->makeGroup($owner);
+        $match = $this->makeMatch($group);
+
+        $member = $this->addMember($group);
+        $guest = $group->players()->create(['name' => 'Misafir', 'positions' => ['OS']]);
+
+        $component = Livewire::actingAs($owner)->test(Matches\Show::class, ['match' => $match]);
+
+        // Başkan hem kayıtlı üye hem misafir adına işaretler
+        $component->call('setPlayerRsvp', $member->id, 'going');
+        $component->call('setPlayerRsvp', $guest->id, 'going');
+
+        $this->assertSame('going', $match->rsvps()->where('player_id', $member->id)->value('status'));
+        $this->assertSame('going', $match->rsvps()->where('player_id', $guest->id)->value('status'));
+
+        // Başkan olmayan biri başkasının adına işaretleyemez
+        Livewire::actingAs($member->user)
+            ->test(Matches\Show::class, ['match' => $match])
+            ->call('setPlayerRsvp', $guest->id, 'not_going')
+            ->assertStatus(403);
+    }
+
     public function test_kadro_kurulur_kurallara_uyar_ve_oylamayla_onaylanir(): void
     {
         $owner = User::factory()->create();
