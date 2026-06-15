@@ -56,6 +56,11 @@ class Group extends Model
         return $this->hasMany(Rule::class);
     }
 
+    public function squadTemplates(): HasMany
+    {
+        return $this->hasMany(SquadTemplate::class);
+    }
+
     public function isMember(User $user): bool
     {
         return $this->members()->whereKey($user->id)->exists();

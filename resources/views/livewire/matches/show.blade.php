@@ -41,11 +41,9 @@
                             ⚖️ Kadroları Kur
                         </x-primary-button>
                     @endif
-                    @if (count($alternatives) > 1)
-                        <x-secondary-button wire:click="nextAlternative">
-                            Alternatif Kadro ({{ $altIndex + 1 }}/{{ count($alternatives) }})
-                        </x-secondary-button>
-                    @endif
+                    <x-secondary-button wire:click="$toggle('showTemplates')">
+                        🗂 Şablonlar
+                    </x-secondary-button>
                     <x-secondary-button wire:click="$toggle('showResultForm')">
                         {{ $showResultForm ? 'Vazgeç' : '📝 Sonucu Gir' }}
                     </x-secondary-button>
@@ -54,35 +52,93 @@
                     </x-danger-button>
                 </div>
                 <x-input-error :messages="$errors->get('squad')" />
+
+                {{-- Alternatif kadrolar arası gezinme --}}
+                @if (count($alternatives) > 1)
+                    <div class="flex items-center gap-2 flex-wrap pt-1">
+                        <span class="text-xs uppercase tracking-widest text-pitch-muted me-1">Alternatif kadro:</span>
+                        <button wire:click="prevAlternative" class="w-8 h-8 rounded-md border border-pitch-line hover:bg-pitch-surface2" title="Önceki">‹</button>
+                        @foreach ($alternatives as $i => $alt)
+                            <button wire:click="goToAlternative({{ $i }})"
+                                    class="w-8 h-8 rounded-md border text-sm font-semibold transition
+                                           {{ $altIndex === $i ? 'bg-bibB text-pitch-bg border-bibB' : 'border-pitch-line text-pitch-muted hover:bg-pitch-surface2' }}">
+                                {{ $i + 1 }}
+                            </button>
+                        @endforeach
+                        <button wire:click="nextAlternative" class="w-8 h-8 rounded-md border border-pitch-line hover:bg-pitch-surface2" title="Sonraki">›</button>
+                        <span class="text-xs text-pitch-muted ms-1">{{ $altIndex + 1 }}/{{ count($alternatives) }} — en dengeliden başlar</span>
+                    </div>
+                @endif
+
+                {{-- Kadro şablonları --}}
+                @if ($showTemplates)
+                    <div class="border border-pitch-line rounded-lg p-4 space-y-3 mt-1">
+                        <h4 class="font-display uppercase tracking-wider text-sm">Kadro Şablonları <span class="text-pitch-muted font-normal">({{ $templates->count() }}/{{ $maxTemplates }})</span></h4>
+                        <p class="text-xs text-pitch-muted">Sık oynayan sabit kadroyu kaydet, sonraki maçta tek tıkla yükle. Yüklenen kadro yine %60 oylamasına gider.</p>
+
+                        @if ($templates->isNotEmpty())
+                            <div class="space-y-1.5">
+                                @foreach ($templates as $tpl)
+                                    <div class="flex items-center justify-between gap-3 bg-pitch-bg border border-pitch-line rounded-lg px-3 py-2">
+                                        <span class="text-sm font-medium">{{ $tpl->name }} <span class="text-xs text-pitch-muted">({{ count($tpl->teams) }} oyuncu)</span></span>
+                                        <div class="flex gap-2 shrink-0">
+                                            <button wire:click="applyTemplate({{ $tpl->id }})" class="text-xs px-3 py-1.5 rounded-md bg-gradient-to-b from-[#2C7A48] to-[#1F5A35] border border-[#3E9A60] font-semibold hover:brightness-125">Yükle</button>
+                                            <button wire:click="deleteTemplate({{ $tpl->id }})" wire:confirm="'{{ $tpl->name }}' şablonu silinsin mi?" class="text-xs px-3 py-1.5 rounded-md border border-[#6c3030] text-[#ffb3b3] hover:bg-red-900/30">Sil</button>
+                                        </div>
+                                    </div>
+                                @endforeach
+                            </div>
+                        @endif
+
+                        @if ($templates->count() < $maxTemplates)
+                            <div class="flex items-center gap-2 flex-wrap">
+                                <x-text-input wire:model="templateName" type="text" maxlength="40" class="w-56" placeholder="Şablon adı (örn. Çekirdek Kadro)" />
+                                <x-secondary-button wire:click="saveTemplate">Mevcut kadroyu kaydet</x-secondary-button>
+                            </div>
+                        @else
+                            <p class="text-xs text-gold">En fazla {{ $maxTemplates }} şablon — yeni kaydetmek için birini sil.</p>
+                        @endif
+                        <x-input-error :messages="$errors->get('template')" />
+                    </div>
+                @endif
+
+                @if ($templateNotice)
+                    <p class="text-sm text-bibB bg-bibB/10 border border-bibB/30 rounded-md p-3">{{ $templateNotice }}</p>
+                @endif
             @endif
         </div>
 
-        {{-- RSVP --}}
-        @if ($match->status === 'scheduled')
+        {{-- RSVP — kadro kurulduktan sonra kişisel "geliyor musun?" sorusu gizlenir --}}
+        @if ($match->status === 'scheduled' && ($match->squad_status === 'none' || $canManage))
             <div class="bg-pitch-surface border border-pitch-line rounded-xl p-6 space-y-3">
-                <h3 class="font-display uppercase tracking-wider text-lg font-semibold">Geliyor musun?</h3>
-                <div class="flex flex-wrap gap-2">
-                    <button wire:click="rsvp('going')"
-                            class="px-5 py-2.5 rounded-md font-semibold text-sm border transition
-                                   {{ $myRsvp?->status === 'going' ? 'bg-[#2C7A48] text-pitch-ink border-[#3E9A60]' : 'bg-transparent text-bibB border-pitch-line hover:bg-pitch-surface2' }}">
-                        ✅ Geliyorum
-                    </button>
-                    <button wire:click="rsvp('maybe')"
-                            class="px-5 py-2.5 rounded-md font-semibold text-sm border transition
-                                   {{ $myRsvp?->status === 'maybe' ? 'bg-gold text-pitch-bg border-gold' : 'bg-transparent text-gold border-pitch-line hover:bg-pitch-surface2' }}">
-                        🤔 Belki
-                    </button>
-                    <button wire:click="rsvp('not_going')"
-                            class="px-5 py-2.5 rounded-md font-semibold text-sm border transition
-                                   {{ $myRsvp?->status === 'not_going' ? 'bg-red-700 text-pitch-ink border-red-600' : 'bg-transparent text-[#FF8A8A] border-pitch-line hover:bg-pitch-surface2' }}">
-                        ❌ Gelmiyorum
-                    </button>
-                </div>
-                @if ($myRsvp?->status === 'going' && $myRsvp->waitlist_position !== null)
-                    <p class="text-sm text-gold bg-gold/10 border border-gold/30 rounded-md p-3">
-                        Kadro dolu — <strong>yedek listesinde {{ $myRsvp->waitlist_position }}. sıradasın.</strong>
-                        Biri çekilirse otomatik olarak kadroya geçersin.
-                    </p>
+                @if ($match->squad_status === 'none')
+                    <h3 class="font-display uppercase tracking-wider text-lg font-semibold">Geliyor musun?</h3>
+                    <div class="flex flex-wrap gap-2">
+                        <button wire:click="rsvp('going')"
+                                class="px-5 py-2.5 rounded-md font-semibold text-sm border transition
+                                       {{ $myRsvp?->status === 'going' ? 'bg-[#2C7A48] text-pitch-ink border-[#3E9A60]' : 'bg-transparent text-bibB border-pitch-line hover:bg-pitch-surface2' }}">
+                            ✅ Geliyorum
+                        </button>
+                        <button wire:click="rsvp('maybe')"
+                                class="px-5 py-2.5 rounded-md font-semibold text-sm border transition
+                                       {{ $myRsvp?->status === 'maybe' ? 'bg-gold text-pitch-bg border-gold' : 'bg-transparent text-gold border-pitch-line hover:bg-pitch-surface2' }}">
+                            🤔 Belki
+                        </button>
+                        <button wire:click="rsvp('not_going')"
+                                class="px-5 py-2.5 rounded-md font-semibold text-sm border transition
+                                       {{ $myRsvp?->status === 'not_going' ? 'bg-red-700 text-pitch-ink border-red-600' : 'bg-transparent text-[#FF8A8A] border-pitch-line hover:bg-pitch-surface2' }}">
+                            ❌ Gelmiyorum
+                        </button>
+                    </div>
+                    @if ($myRsvp?->status === 'going' && $myRsvp->waitlist_position !== null)
+                        <p class="text-sm text-gold bg-gold/10 border border-gold/30 rounded-md p-3">
+                            Kadro dolu — <strong>yedek listesinde {{ $myRsvp->waitlist_position }}. sıradasın.</strong>
+                            Biri çekilirse otomatik olarak kadroya geçersin.
+                        </p>
+                    @endif
+                @else
+                    <h3 class="font-display uppercase tracking-wider text-lg font-semibold">Katılım</h3>
+                    <p class="text-sm text-pitch-muted">Kadro kuruldu. Katılımı aşağıdan yönetebilir, gerekirse kadroyu yeniden kurabilirsin.</p>
                 @endif
 
                 @if ($canManage)
@@ -240,9 +296,15 @@
                                 @endforeach
                             </select>
                         </label>
-                        <span class="grow"></span>
+                    @endif
+                    <span class="grow"></span>
+                    @if ($canManage)
                         <x-secondary-button wire:click="resetLayout">Dizilişi Sıfırla</x-secondary-button>
                     @endif
+                    <button type="button" id="btnExportPng"
+                            class="inline-flex items-center px-4 py-2 bg-pitch-surface2 border border-pitch-line rounded-md font-semibold text-xs text-pitch-ink uppercase tracking-widest hover:brightness-125">
+                        🖼 PNG indir
+                    </button>
                 </div>
 
                 <svg id="pitchSvg" viewBox="0 0 {{ PitchLayout::W }} {{ PitchLayout::H }}" role="img" aria-label="Takım dizilişi"
@@ -472,6 +534,35 @@
         document.addEventListener('pointermove', onMove);
         document.addEventListener('pointerup', onUp);
         document.addEventListener('pointercancel', onUp);
+
+        // Saha dizilişini PNG olarak indir (SVG -> canvas -> PNG, 2x çözünürlük)
+        const exportPng = () => {
+            const svg = document.getElementById('pitchSvg');
+            if (!svg) return;
+            const svgStr = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${PW} ${PH}" width="${PW * 2}" height="${PH * 2}">${svg.innerHTML}</svg>`;
+            const url = URL.createObjectURL(new Blob([svgStr], { type: 'image/svg+xml;charset=utf-8' }));
+            const img = new Image();
+            img.onload = () => {
+                const c = document.createElement('canvas');
+                c.width = PW * 2;
+                c.height = PH * 2;
+                c.getContext('2d').drawImage(img, 0, 0, c.width, c.height);
+                URL.revokeObjectURL(url);
+                c.toBlob((blob) => {
+                    const a = document.createElement('a');
+                    a.href = URL.createObjectURL(blob);
+                    a.download = 'kadro-dizilis.png';
+                    a.click();
+                    URL.revokeObjectURL(a.href);
+                });
+            };
+            img.onerror = () => URL.revokeObjectURL(url);
+            img.src = url;
+        };
+
+        document.addEventListener('click', (e) => {
+            if (e.target.closest('#btnExportPng')) exportPng();
+        });
     </script>
     @endscript
 </div>

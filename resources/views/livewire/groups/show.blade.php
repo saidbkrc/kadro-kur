@@ -38,11 +38,11 @@
                 <form wire:submit="saveSettings" class="border border-pitch-line rounded-lg p-4 space-y-4">
                     <h3 class="font-display uppercase tracking-wider text-lg">Haftalık Maç Ayarları</h3>
                     <p class="text-sm text-pitch-muted">Bir kere ayarla, sistem her hafta maçı kendisi açsın — her hafta elle oluşturma derdi bitsin.</p>
-                    <div class="grid sm:grid-cols-2 lg:grid-cols-4 gap-4">
+                    <div class="grid sm:grid-cols-2 lg:grid-cols-4 gap-4 items-end">
                         <div>
                             <x-input-label for="matchDay" value="Maç günü" />
                             <select wire:model="matchDay" id="matchDay"
-                                    class="mt-1 block w-full bg-pitch-bg border-pitch-line text-pitch-ink focus:border-bibB focus:ring-bibB/40 rounded-md">
+                                    class="mt-1 block w-full h-11 bg-pitch-bg border-pitch-line text-pitch-ink focus:border-bibB focus:ring-bibB/40 rounded-md shadow-sm">
                                 <option value="">— seç —</option>
                                 @foreach ([1 => 'Pazartesi', 2 => 'Salı', 3 => 'Çarşamba', 4 => 'Perşembe', 5 => 'Cuma', 6 => 'Cumartesi', 7 => 'Pazar'] as $day => $label)
                                     <option value="{{ $day }}">{{ $label }}</option>
@@ -51,15 +51,15 @@
                         </div>
                         <div>
                             <x-input-label for="matchTime" value="Saat" />
-                            <x-text-input wire:model="matchTime" id="matchTime" type="time" class="mt-1 block w-full" />
+                            <x-text-input wire:model="matchTime" id="matchTime" type="time" class="mt-1 block w-full h-11" />
                         </div>
                         <div>
                             <x-input-label for="defaultLocation" value="Saha" />
-                            <x-text-input wire:model="defaultLocation" id="defaultLocation" type="text" class="mt-1 block w-full" placeholder="Yıldız Halı Saha" />
+                            <x-text-input wire:model="defaultLocation" id="defaultLocation" type="text" class="mt-1 block w-full h-11" placeholder="Yıldız Halı Saha" />
                         </div>
                         <div>
                             <x-input-label for="groupCapacity" value="Kapasite" />
-                            <x-text-input wire:model="groupCapacity" id="groupCapacity" type="number" min="4" max="24" class="mt-1 block w-full" />
+                            <x-text-input wire:model="groupCapacity" id="groupCapacity" type="number" min="4" max="24" class="mt-1 block w-full h-11" />
                         </div>
                     </div>
                     <label class="flex items-center gap-2 text-sm">

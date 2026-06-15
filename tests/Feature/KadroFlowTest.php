@@ -224,6 +224,67 @@ class KadroFlowTest extends TestCase
         $this->assertSame('none', $match->refresh()->squad_status);
     }
 
+    public function test_kadro_sablonu_kaydedilir_ve_yuklenir(): void
+    {
+        $owner = User::factory()->create();
+        $group = $this->makeGroup($owner);
+        $match = $this->makeMatch($group, capacity: 6);
+
+        $ownPlayer = $group->playerFor($owner);
+        $match->setRsvp($ownPlayer, 'going');
+        $players = collect(range(1, 5))->map(fn () => $this->addMember($group));
+        foreach ($players as $player) {
+            $match->setRsvp($player, 'going');
+        }
+
+        $component = Livewire::actingAs($owner)->test(Matches\Show::class, ['match' => $match]);
+
+        // Kadro kur + şablon olarak kaydet
+        $component->call('buildSquads')
+            ->set('templateName', 'Çekirdek Kadro')
+            ->call('saveTemplate')
+            ->assertHasNoErrors();
+
+        $this->assertDatabaseHas('squad_templates', ['group_id' => $group->id, 'name' => 'Çekirdek Kadro']);
+        $template = $group->squadTemplates()->first();
+        $this->assertCount(6, $template->teams);
+
+        // Yeni maçta şablonu yükle → oyuncular "going" + takımlı + oylamaya sunulu
+        $match2 = $this->makeMatch($group, capacity: 6);
+        Livewire::actingAs($owner)
+            ->test(Matches\Show::class, ['match' => $match2])
+            ->call('applyTemplate', $template->id)
+            ->assertHasNoErrors();
+
+        $match2->refresh();
+        $this->assertSame('voting', $match2->squad_status);
+        $this->assertSame(6, $match2->confirmedCount());
+        $this->assertSame(6, $match2->rsvps()->whereNotNull('team')->count());
+    }
+
+    public function test_sablon_grup_basina_uc_ile_sinirli(): void
+    {
+        $owner = User::factory()->create();
+        $group = $this->makeGroup($owner);
+
+        foreach (['A', 'B', 'C'] as $name) {
+            $group->squadTemplates()->create(['name' => $name, 'teams' => [1 => 'A']]);
+        }
+
+        $match = $this->makeMatch($group);
+        $match->setRsvp($group->playerFor($owner), 'going');
+        collect(range(1, 3))->each(fn () => $match->setRsvp($this->addMember($group), 'going'));
+
+        Livewire::actingAs($owner)
+            ->test(Matches\Show::class, ['match' => $match])
+            ->call('buildSquads')
+            ->set('templateName', 'Dördüncü')
+            ->call('saveTemplate')
+            ->assertHasErrors('template');
+
+        $this->assertSame(3, $group->squadTemplates()->count());
+    }
+
     public function test_sonuc_girilir_mvp_24_saat_acilir_oy_degistirilemez(): void
     {
         $owner = User::factory()->create();

@@ -31,6 +31,13 @@ class Show extends Component
     /** Başkanın katılım yönetimi paneli açık mı */
     public bool $showManageRsvp = false;
 
+    // Kadro şablonları
+    public bool $showTemplates = false;
+
+    public string $templateName = '';
+
+    public ?string $templateNotice = null;
+
     // Sonuç formu
     public bool $showResultForm = false;
 
@@ -101,13 +108,26 @@ class Show extends Component
 
     public function nextAlternative(): void
     {
+        $this->goToAlternative($this->altIndex + 1);
+    }
+
+    public function prevAlternative(): void
+    {
+        $this->goToAlternative($this->altIndex - 1);
+    }
+
+    /** Belirli bir alternatife geç (numaralı butonlar / ileri-geri). */
+    public function goToAlternative(int $index): void
+    {
         abort_unless($this->match->canManage(Auth::user()), 403);
 
-        if (count($this->alternatives) < 2) {
+        $count = count($this->alternatives);
+        if ($count < 2) {
             return;
         }
 
-        $this->altIndex = ($this->altIndex + 1) % count($this->alternatives);
+        // Döngüsel: sondan ileri başa, baştan geri sona
+        $this->altIndex = (($index % $count) + $count) % $count;
         $this->applyCurrentAlternative();
     }
 
@@ -169,6 +189,99 @@ class Show extends Component
     {
         $this->match->castSquadVote(Auth::user(), $approve);
         $this->match->refresh();
+    }
+
+    /* ---------- kadro şablonları ---------- */
+
+    /** Mevcut kadroyu (A/B atamasını) isimle şablon olarak kaydeder. Grup başına en fazla 3. */
+    public function saveTemplate(): void
+    {
+        abort_unless($this->match->canManage(Auth::user()), 403);
+
+        $assigned = $this->match->rsvps()->whereNotNull('team')->get();
+        if ($assigned->isEmpty()) {
+            $this->addError('template', 'Önce kadroyu kurmalısın.');
+
+            return;
+        }
+
+        $name = trim($this->templateName);
+        if ($name === '') {
+            $this->addError('template', 'Şablona bir isim ver.');
+
+            return;
+        }
+
+        $group = $this->match->group;
+        if ($group->squadTemplates()->count() >= \App\Models\SquadTemplate::MAX_PER_GROUP) {
+            $this->addError('template', 'En fazla '.\App\Models\SquadTemplate::MAX_PER_GROUP.' şablon tutabilirsin. Birini sil.');
+
+            return;
+        }
+
+        $group->squadTemplates()->create([
+            'name' => mb_substr($name, 0, 40),
+            'teams' => $assigned->pluck('team', 'player_id')->all(),
+        ]);
+
+        $this->reset('templateName');
+        $this->showTemplates = false;
+    }
+
+    public function deleteTemplate(int $templateId): void
+    {
+        abort_unless($this->match->canManage(Auth::user()), 403);
+
+        $this->match->group->squadTemplates()->whereKey($templateId)->delete();
+    }
+
+    /**
+     * Şablonu maça uygular: şablondaki (hâlâ grupta olan) oyuncular bu maça "geliyor"
+     * işaretlenir, A/B takımlarına yerleştirilir ve kadro %60 oylamasına sunulur (taslak).
+     * Grupta olmayan oyuncular atlanır; başkana kaç oyuncunun atlandığı bildirilir.
+     */
+    public function applyTemplate(int $templateId): void
+    {
+        abort_unless($this->match->canManage(Auth::user()), 403);
+
+        if ($this->match->status !== 'scheduled') {
+            return;
+        }
+
+        $template = $this->match->group->squadTemplates()->findOrFail($templateId);
+        $validPlayerIds = $this->match->group->players()->pluck('id');
+
+        $teamA = [];
+        $teamB = [];
+        $missing = 0;
+
+        foreach ($template->teams as $playerId => $team) {
+            if (! $validPlayerIds->contains((int) $playerId)) {
+                $missing++;
+
+                continue;
+            }
+
+            $player = $this->match->group->players()->find($playerId);
+            $this->match->setRsvp($player, 'going');
+
+            $team === 'A' ? $teamA[] = (int) $playerId : $teamB[] = (int) $playerId;
+        }
+
+        if ($teamA === [] && $teamB === []) {
+            $this->addError('template', 'Şablondaki oyuncuların hiçbiri artık grupta değil.');
+
+            return;
+        }
+
+        $this->match->applySquad($teamA, $teamB);
+        $this->match->refresh();
+        $this->showTemplates = false;
+        $this->alternatives = [];
+
+        $this->templateNotice = $missing > 0
+            ? "Şablon yüklendi. {$missing} oyuncu artık grupta olmadığı için atlandı — kadroyu elle tamamlayabilirsin."
+            : 'Şablon yüklendi, kadro oylamaya sunuldu.';
     }
 
     /* ---------- diziliş + saha ---------- */
@@ -316,6 +429,8 @@ class Show extends Component
             'notGoing' => $rsvps->where('status', 'not_going')->values(),
             'roster' => $roster,
             'rsvpByPlayer' => $rsvpByPlayer,
+            'templates' => $this->match->group->squadTemplates()->latest()->get(),
+            'maxTemplates' => \App\Models\SquadTemplate::MAX_PER_GROUP,
             'myPlayer' => $myPlayer,
             'myRsvp' => $myRsvp,
             'teamA' => $teamA,
