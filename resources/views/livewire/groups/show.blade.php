@@ -38,28 +38,28 @@
                 <form wire:submit="saveSettings" class="border border-pitch-line rounded-lg p-4 space-y-4">
                     <h3 class="font-display uppercase tracking-wider text-lg">Haftalık Maç Ayarları</h3>
                     <p class="text-sm text-pitch-muted">Bir kere ayarla, sistem her hafta maçı kendisi açsın — her hafta elle oluşturma derdi bitsin.</p>
+                    @php $fieldClasses = 'block w-full bg-pitch-bg border-pitch-line text-pitch-ink placeholder-pitch-muted/60 focus:border-bibB focus:ring-bibB/40 rounded-md shadow-sm'; @endphp
                     <div class="grid sm:grid-cols-2 lg:grid-cols-4 gap-4">
-                        <div class="flex flex-col">
-                            <x-input-label for="matchDay" value="Maç günü" class="h-4" />
-                            <select wire:model="matchDay" id="matchDay"
-                                    class="mt-1 block w-full h-11 bg-pitch-bg border-pitch-line text-pitch-ink focus:border-bibB focus:ring-bibB/40 rounded-md shadow-sm">
+                        <div>
+                            <label for="matchDay" class="block font-semibold text-xs uppercase tracking-widest text-pitch-muted mb-1.5">Maç günü</label>
+                            <select wire:model="matchDay" id="matchDay" style="height:2.625rem" class="{{ $fieldClasses }}">
                                 <option value="">— seç —</option>
                                 @foreach ([1 => 'Pazartesi', 2 => 'Salı', 3 => 'Çarşamba', 4 => 'Perşembe', 5 => 'Cuma', 6 => 'Cumartesi', 7 => 'Pazar'] as $day => $label)
                                     <option value="{{ $day }}">{{ $label }}</option>
                                 @endforeach
                             </select>
                         </div>
-                        <div class="flex flex-col">
-                            <x-input-label for="matchTime" value="Saat" class="h-4" />
-                            <x-text-input wire:model="matchTime" id="matchTime" type="time" class="mt-1 block w-full h-11" />
+                        <div>
+                            <label for="matchTime" class="block font-semibold text-xs uppercase tracking-widest text-pitch-muted mb-1.5">Saat</label>
+                            <input wire:model="matchTime" id="matchTime" type="time" style="height:2.625rem" class="{{ $fieldClasses }}">
                         </div>
-                        <div class="flex flex-col">
-                            <x-input-label for="defaultLocation" value="Saha" class="h-4" />
-                            <x-text-input wire:model="defaultLocation" id="defaultLocation" type="text" class="mt-1 block w-full h-11" placeholder="Yıldız Halı Saha" />
+                        <div>
+                            <label for="defaultLocation" class="block font-semibold text-xs uppercase tracking-widest text-pitch-muted mb-1.5">Saha</label>
+                            <input wire:model="defaultLocation" id="defaultLocation" type="text" placeholder="Yıldız Halı Saha" style="height:2.625rem" class="{{ $fieldClasses }}">
                         </div>
-                        <div class="flex flex-col">
-                            <x-input-label for="groupCapacity" value="Kapasite" class="h-4" />
-                            <x-text-input wire:model="groupCapacity" id="groupCapacity" type="number" min="4" max="24" class="mt-1 block w-full h-11" />
+                        <div>
+                            <label for="groupCapacity" class="block font-semibold text-xs uppercase tracking-widest text-pitch-muted mb-1.5">Kapasite</label>
+                            <input wire:model="groupCapacity" id="groupCapacity" type="number" min="4" max="24" style="height:2.625rem" class="{{ $fieldClasses }}">
                         </div>
                     </div>
                     <label class="flex items-center gap-2 text-sm">
