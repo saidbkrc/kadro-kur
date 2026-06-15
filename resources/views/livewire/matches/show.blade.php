@@ -142,11 +142,11 @@
                 @endif
 
                 @if ($canManage)
-                    <div class="border-t border-pitch-line pt-3">
-                        <button wire:click="$toggle('showManageRsvp')" class="text-xs uppercase tracking-widest text-bibB hover:underline">
-                            {{ $showManageRsvp ? '▾ Katılımı yönet (başkan)' : '▸ Katılımı yönet (başkan)' }}
-                        </button>
-                        <p class="text-xs text-pitch-muted mt-1">Gelemeyenler adına da işaretleyebilirsin (WhatsApp'tan toplayıp tek tek girme).</p>
+                    <div class="border-t border-pitch-line pt-4">
+                        <x-secondary-button wire:click="$toggle('showManageRsvp')">
+                            👥 {{ $showManageRsvp ? 'Katılım yönetimini kapat' : 'Katılımı yönet (başkan)' }}
+                        </x-secondary-button>
+                        <p class="text-xs text-pitch-muted mt-2">Gelemeyenler adına da işaretleyebilirsin — WhatsApp'tan toplayıp tek tek girme derdi bitsin.</p>
 
                         @if ($showManageRsvp)
                             <div class="mt-3 space-y-1.5">
