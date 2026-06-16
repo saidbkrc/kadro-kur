@@ -33,6 +33,8 @@ class Show extends Component
 
     public ?int $guestNumber = null;
 
+    public string $guestFoot = 'right';
+
     // Oyuncu düzenleme (sadece başkan/admin)
     public ?int $editingPlayerId = null;
 
@@ -42,6 +44,8 @@ class Show extends Component
     public ?int $editNumber = null;
 
     public string $editName = '';
+
+    public string $editFoot = 'right';
 
     // Kural formu
     public ?int $ruleA = null;
@@ -120,6 +124,7 @@ class Show extends Component
             [
                 'guestName' => 'required|string|min:2|max:24',
                 'guestNumber' => 'nullable|integer|min:1|max:99',
+                'guestFoot' => 'required|in:'.implode(',', array_keys(\App\Support\Attributes::FEET)),
             ],
             [
                 'guestName.required' => 'Oyuncu adı zorunlu.',
@@ -131,9 +136,10 @@ class Show extends Component
             'name' => $this->guestName,
             'shirt_number' => $this->guestNumber,
             'positions' => ['OS'],
+            'foot' => $this->guestFoot,
         ]);
 
-        $this->reset('guestName', 'guestNumber', 'showGuestForm');
+        $this->reset('guestName', 'guestNumber', 'guestFoot', 'showGuestForm');
     }
 
     /** Misafir kaydını kayıtlı bir üyeyle eşleştirir; üyenin otomatik açılmış boş kaydı silinir. */
@@ -176,6 +182,7 @@ class Show extends Component
         $this->posOrder = $player->positions ?? [];
         $this->editNumber = $player->shirt_number;
         $this->editName = $player->name;
+        $this->editFoot = $player->foot ?? 'right';
     }
 
     /** Pozisyonlar serbestçe birleşir (KL + DEF gibi); tıklama sırası önceliği belirler. */
@@ -208,6 +215,7 @@ class Show extends Component
             [
                 'editName' => 'required|string|min:2|max:24',
                 'editNumber' => 'nullable|integer|min:1|max:99',
+                'editFoot' => 'required|in:'.implode(',', array_keys(\App\Support\Attributes::FEET)),
             ],
             [
                 'editName.required' => 'Oyuncu adı boş olamaz.',
@@ -219,9 +227,10 @@ class Show extends Component
             'name' => $this->editName,
             'positions' => $this->posOrder,
             'shirt_number' => $this->editNumber,
+            'foot' => $this->editFoot,
         ]);
 
-        $this->reset('editingPlayerId', 'posOrder', 'editNumber', 'editName');
+        $this->reset('editingPlayerId', 'posOrder', 'editNumber', 'editName', 'editFoot');
     }
 
     /* ---------- eşleşme kuralları ---------- */

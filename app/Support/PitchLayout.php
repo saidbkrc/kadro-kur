@@ -234,8 +234,14 @@ class PitchLayout
             : ['KL' => self::W - 60, 'DEF' => self::W - 175, 'OS' => self::W - 300, 'FV' => self::W - 430];
 
         $nodes = [];
-        $place = function (array $line, float $x) use (&$nodes): void {
-            usort($line, fn (array $a, array $b) => ($b['ovr'] ?? 0) <=> ($a['ovr'] ?? 0));
+        $place = function (array $line, float $x) use (&$nodes, $side): void {
+            // Hat içinde dikey sıra: solaklar sol kanada, sağ ayaklılar sağ kanada;
+            // aynı kanat tercihinde OVR yüksek olan öne. (Tek kişilik hatta etkisiz.)
+            usort($line, function (array $a, array $b) use ($side) {
+                return [self::flankKey($a, $side), -($a['ovr'] ?? 0)]
+                    <=> [self::flankKey($b, $side), -($b['ovr'] ?? 0)];
+            });
+
             $count = count($line);
             $spacing = $count > 1 ? min(125, (self::H - 130) / ($count - 1)) : 0;
 
@@ -251,6 +257,22 @@ class PitchLayout
         $place($fwd, $xs['FV']);
 
         return $nodes;
+    }
+
+    /**
+     * Kanat sıralama anahtarı (küçük = yukarı/ekranın üstü).
+     * A takımı sağa hücum eder: sol kanat üstte (küçük y), sağ kanat altta.
+     * B takımı sola hücum eder: yön ters döner. Çift ayak ortada.
+     */
+    protected static function flankKey(array $player, string $side): int
+    {
+        $foot = $player['foot'] ?? 'right';
+
+        $order = $side === 'A'
+            ? ['left' => 0, 'both' => 1, 'right' => 2]
+            : ['right' => 0, 'both' => 1, 'left' => 2];
+
+        return $order[$foot] ?? 1;
     }
 
     protected static function node(array $player, float $x, float $y): array

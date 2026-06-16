@@ -105,9 +105,9 @@ class EngineTest extends TestCase
         );
     }
 
-    private function pitchPlayer(int $id, array $positions, float $ovr = 6.0, array $attrs = []): array
+    private function pitchPlayer(int $id, array $positions, float $ovr = 6.0, array $attrs = [], string $foot = 'right'): array
     {
-        return ['id' => $id, 'name' => "P{$id}", 'number' => null, 'positions' => $positions, 'ovr' => $ovr, 'attrs' => $attrs];
+        return ['id' => $id, 'name' => "P{$id}", 'number' => null, 'positions' => $positions, 'foot' => $foot, 'ovr' => $ovr, 'attrs' => $attrs];
     }
 
     /** A takımında kaleci sütunundaki (x=60) düğüm. */
@@ -177,6 +177,28 @@ class EngineTest extends TestCase
         $keeper = $this->keeperNode(PitchLayout::layout($team, 'A', null));
         $this->assertNotNull($keeper, 'Kale asla boş kalmamalı');
         $this->assertSame(1, $keeper['id']); // en düşük OVR'li defans
+    }
+
+    public function test_ayaga_gore_kanat_yerlesimi(): void
+    {
+        // 3 defans: solak, çift, sağ ayak — aynı OVR
+        $team = [
+            $this->pitchPlayer(1, ['KL']),
+            $this->pitchPlayer(2, ['DEF'], 6.0, [], 'left'),
+            $this->pitchPlayer(3, ['DEF'], 6.0, [], 'both'),
+            $this->pitchPlayer(4, ['DEF'], 6.0, [], 'right'),
+            $this->pitchPlayer(5, ['FV']),
+        ];
+
+        // A takımı: sol kanat üstte (küçük y) → solak en üstte, sağ ayaklı en altta
+        $nodesA = collect(PitchLayout::layout($team, 'A', null))->keyBy('id');
+        $this->assertLessThan($nodesA[3]['y'], $nodesA[2]['y'], 'A: solak çiftin üstünde');
+        $this->assertLessThan($nodesA[4]['y'], $nodesA[3]['y'], 'A: çift sağ ayaklının üstünde');
+
+        // B takımı: yön ters → sağ ayaklı en üstte, solak en altta
+        $nodesB = collect(PitchLayout::layout($team, 'B', null))->keyBy('id');
+        $this->assertLessThan($nodesB[3]['y'], $nodesB[4]['y'], 'B: sağ ayaklı çiftin üstünde');
+        $this->assertLessThan($nodesB[2]['y'], $nodesB[3]['y'], 'B: çift solağın üstünde');
     }
 
     public function test_forvetsiz_takimda_en_iyi_ortasaha_forvete_cekilir(): void

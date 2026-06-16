@@ -170,6 +170,11 @@
                                       class="w-full sm:w-64" placeholder="Ad / Lakap (örn. Mahmut)" />
                         <x-text-input wire:model="guestNumber" id="guestNumber" type="number" min="1" max="99"
                                       class="w-28" placeholder="Forma No" />
+                        <select wire:model="guestFoot" class="bg-pitch-bg border-pitch-line text-pitch-ink rounded-md text-sm focus:border-bibB focus:ring-bibB/40">
+                            @foreach (\App\Support\Attributes::FEET as $value => $label)
+                                <option value="{{ $value }}">{{ $label }}</option>
+                            @endforeach
+                        </select>
                         <x-primary-button>+ Ekle</x-primary-button>
                     </div>
                     <x-input-error :messages="$errors->get('guestName')" />
@@ -209,6 +214,9 @@
                                                 {{ count($player->positions) > 1 ? ($i + 1).'·' : '' }}{{ $pos }}
                                             </span>
                                         @endforeach
+                                        <span class="text-[10.5px] font-bold tracking-wide px-2 py-0.5 rounded-full bg-pitch-bg border border-pitch-line text-bibB" title="{{ \App\Support\Attributes::FEET[$player->foot] ?? 'Sağ ayak' }}">
+                                            🦶 {{ $player->footBadge() }}
+                                        </span>
                                         <span class="text-xs text-pitch-muted ms-1">
                                             {{ $ovrPublic ? $player->ratingCount().' oylama' : $player->ratingCount().'/'.$minRatings.' oylama' }}
                                         </span>
@@ -266,6 +274,11 @@
                                 <div class="flex items-center gap-3 flex-wrap">
                                     <x-text-input wire:model="editName" type="text" maxlength="24" class="w-48" placeholder="Ad / Lakap" />
                                     <x-text-input wire:model="editNumber" type="number" min="1" max="99" class="w-28" placeholder="Forma No" />
+                                    <select wire:model="editFoot" class="bg-pitch-bg border-pitch-line text-pitch-ink rounded-md text-sm focus:border-bibB focus:ring-bibB/40" aria-label="Tercih edilen ayak">
+                                        @foreach (\App\Support\Attributes::FEET as $value => $label)
+                                            <option value="{{ $value }}">{{ $label }}</option>
+                                        @endforeach
+                                    </select>
                                     <x-primary-button wire:click="savePositions" type="button">Kaydet</x-primary-button>
                                     <x-secondary-button wire:click="$set('editingPlayerId', null)">Vazgeç</x-secondary-button>
                                 </div>

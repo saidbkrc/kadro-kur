@@ -10,6 +10,9 @@ class Attributes
 {
     public const POSITIONS = ['KL' => 'Kaleci', 'DEF' => 'Defans', 'OS' => 'Orta Saha', 'FV' => 'Forvet'];
 
+    /** Tercih edilen ayak — saha dizilişinde kanat yerleşimini belirler. */
+    public const FEET = ['right' => 'Sağ ayak', 'left' => 'Sol ayak', 'both' => 'Çift ayak'];
+
     public const FORMATIONS = ['3-1-2', '3-2-1', '2-3-1', '2-2-2', '2-1-3'];
 
     /** Genel özellikler — kaleciler dahil herkes için listelenir. */

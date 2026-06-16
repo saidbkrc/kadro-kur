@@ -463,6 +463,7 @@ class Show extends Component
             'name' => $r->player->name,
             'number' => $r->player->shirt_number,
             'positions' => $r->player->positions ?? [],
+            'foot' => $r->player->foot ?? 'right',
             'ovr' => $r->player->overall(),
             'ovr_public' => $r->player->overallIsPublic(),
             'attrs' => $r->player->averageAttributes(),

@@ -16,7 +16,7 @@ class Player extends Model
     /** Ortalama puanın görünür olması için gereken en az oylama sayısı (varsayılan; panelden değişebilir). */
     public const MIN_RATINGS_FOR_VISIBILITY = 5;
 
-    protected $fillable = ['group_id', 'user_id', 'name', 'shirt_number', 'positions'];
+    protected $fillable = ['group_id', 'user_id', 'name', 'shirt_number', 'positions', 'foot'];
 
     /** Panel ayarından okunur, yoksa varsayılan sabite düşer. */
     public static function minRatingsForVisibility(): int
@@ -69,6 +69,16 @@ class Player extends Model
     public function isGoalkeeper(): bool
     {
         return in_array('KL', $this->positions ?? [], true);
+    }
+
+    /** Tercih edilen ayağın kısa rozeti: sağ→R, sol→L, çift→R/L. */
+    public function footBadge(): string
+    {
+        return match ($this->foot) {
+            'left' => 'L',
+            'both' => 'R/L',
+            default => 'R',
+        };
     }
 
     /** Bu oyuncunun puanlanacağı özellikler: [key => etiket]. */
