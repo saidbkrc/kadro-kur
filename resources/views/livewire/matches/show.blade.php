@@ -260,10 +260,11 @@
                                             @if ($rsvp->player->shirt_number)<span class="text-pitch-muted text-xs font-normal">#{{ $rsvp->player->shirt_number }}</span>@endif
                                             @if ($myPlayer && $rsvp->player_id === $myPlayer->id)<span class="text-xs text-pitch-muted font-normal">(sen)</span>@endif
                                         </span>
-                                        <span class="ms-auto flex gap-1">
+                                        <span class="ms-auto flex gap-1 items-center">
                                             @foreach ($rsvp->player->positions ?? [] as $i => $pos)
                                                 <span class="text-[10px] font-bold px-1.5 py-0.5 rounded-full bg-pitch-bg border border-pitch-line {{ $pos === 'KL' ? 'text-gold' : 'text-pitch-muted' }}">{{ count($rsvp->player->positions) > 1 ? ($i + 1).'·' : '' }}{{ $pos }}</span>
                                             @endforeach
+                                            <span class="text-[10px] font-bold px-1.5 py-0.5 rounded-full bg-pitch-bg border border-pitch-line text-bibB" title="{{ \App\Support\Attributes::FEET[$rsvp->player->foot] ?? 'Sağ ayak' }}">🦶{{ $rsvp->player->footBadge() }}</span>
                                         </span>
                                     </li>
                                 @endforeach
