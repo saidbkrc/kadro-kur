@@ -85,33 +85,116 @@ class EngineTest extends TestCase
         $this->assertSame(in_array(1, $best['a'], true), in_array(2, $best['a'], true));
     }
 
-    public function test_dizilis_hesabi(): void
+    public function test_asil_kaleciler_dengelemede_ayri_takimlara_boluner(): void
     {
-        $team = [];
-        foreach ([['KL'], ['DEF'], ['DEF'], ['OS'], ['OS'], ['FV'], ['FV']] as $i => $positions) {
-            $team[] = [
-                'id' => $i + 1,
-                'name' => 'Oyuncu '.($i + 1),
-                'number' => null,
-                'positions' => $positions,
-                'ovr' => 6.0,
-                'attrs' => [],
-            ];
+        // id 1 ve 2 birincil kaleci, kalanlar orta saha
+        $players = [
+            ['id' => 1, 'positions' => ['KL'], 'ovr' => 6.0],
+            ['id' => 2, 'positions' => ['KL'], 'ovr' => 6.0],
+        ];
+        foreach ([3, 4, 5, 6] as $id) {
+            $players[] = ['id' => $id, 'positions' => ['OS'], 'ovr' => 6.0];
         }
 
-        // 3-1-2: kaleci + 3 def + 1 orta + 2 forvet = 7 node
+        $best = (new TeamBalancer)->balance($players)[0];
+
+        $this->assertNotSame(
+            in_array(1, $best['a'], true),
+            in_array(2, $best['a'], true),
+            'İki asıl kaleci ayrı takımlara düşmeli',
+        );
+    }
+
+    private function pitchPlayer(int $id, array $positions, float $ovr = 6.0, array $attrs = []): array
+    {
+        return ['id' => $id, 'name' => "P{$id}", 'number' => null, 'positions' => $positions, 'ovr' => $ovr, 'attrs' => $attrs];
+    }
+
+    /** A takımında kaleci sütunundaki (x=60) düğüm. */
+    private function keeperNode(array $nodes): ?array
+    {
+        foreach ($nodes as $node) {
+            if (abs($node['x'] - 60) < 0.5) {
+                return $node;
+            }
+        }
+
+        return null;
+    }
+
+    public function test_dizilis_kaleci_ve_forvet_kurallari(): void
+    {
+        // 7 kişilik takım, 3-1-2: kaleci + 3 def + 1 orta + 2 forvet = 7 node
+        $team = [];
+        foreach ([['KL'], ['DEF'], ['DEF'], ['OS'], ['OS'], ['FV'], ['FV']] as $i => $positions) {
+            $team[] = $this->pitchPlayer($i + 1, $positions);
+        }
         $nodes = PitchLayout::layout($team, 'A', '3-1-2');
         $this->assertCount(7, $nodes);
-
-        // A takımı sol yarıda
         foreach ($nodes as $node) {
-            $this->assertLessThan(PitchLayout::W / 2, $node['x']);
+            $this->assertLessThan(PitchLayout::W / 2, $node['x']); // A sol yarıda
         }
 
         // Elle taşınan konum korunur
-        $nodes = PitchLayout::layout($team, 'A', '3-1-2', [1 => ['x' => 333.0, 'y' => 111.0]]);
-        $moved = collect($nodes)->firstWhere('id', 1);
+        $moved = collect(PitchLayout::layout($team, 'A', '3-1-2', [1 => ['x' => 333.0, 'y' => 111.0]]))->firstWhere('id', 1);
         $this->assertSame(333.0, $moved['x']);
         $this->assertSame(111.0, $moved['y']);
+    }
+
+    public function test_iki_kaleci_ayni_takimda_yan_yana_durmaz(): void
+    {
+        // İki birincil kaleci aynı takımda; id1 daha iyi kaleci
+        $team = [
+            $this->pitchPlayer(1, ['KL'], 7.0, ['refleks' => 9, 'ucma' => 9, 'topkontrol' => 9, 'gkpas' => 9, 'pozalma' => 9]),
+            $this->pitchPlayer(2, ['KL'], 5.0),
+            $this->pitchPlayer(3, ['DEF']),
+            $this->pitchPlayer(4, ['OS']),
+            $this->pitchPlayer(5, ['FV']),
+        ];
+
+        $nodes = PitchLayout::layout($team, 'A', null);
+
+        // Kaleci sütununda tam 1 oyuncu, o da daha iyi kaleci (id1)
+        $atKeeper = array_filter($nodes, fn ($n) => abs($n['x'] - 60) < 0.5);
+        $this->assertCount(1, $atKeeper);
+        $this->assertSame(1, $this->keeperNode($nodes)['id']);
+
+        // Diğer kaleci (id2) saha içinde, kaleci sütununda değil
+        $two = collect($nodes)->firstWhere('id', 2);
+        $this->assertGreaterThan(60, $two['x']);
+    }
+
+    public function test_kalesiz_takimda_defans_kaleye_gecer(): void
+    {
+        // Hiç kaleci yok; id1 en düşük OVR'li defans → kaleye geçmeli
+        $team = [
+            $this->pitchPlayer(1, ['DEF'], 4.0),
+            $this->pitchPlayer(2, ['DEF'], 7.0),
+            $this->pitchPlayer(3, ['OS'], 6.0),
+            $this->pitchPlayer(4, ['FV'], 6.0),
+        ];
+
+        $keeper = $this->keeperNode(PitchLayout::layout($team, 'A', null));
+        $this->assertNotNull($keeper, 'Kale asla boş kalmamalı');
+        $this->assertSame(1, $keeper['id']); // en düşük OVR'li defans
+    }
+
+    public function test_forvetsiz_takimda_en_iyi_ortasaha_forvete_cekilir(): void
+    {
+        // Forvet yok; id4 dribling/şut/teknik'te en iyi orta saha → forvete çekilmeli
+        $team = [
+            $this->pitchPlayer(1, ['KL']),
+            $this->pitchPlayer(2, ['DEF']),
+            $this->pitchPlayer(3, ['OS'], 6.0, ['dribling' => 4, 'sut' => 4, 'teknik' => 4]),
+            $this->pitchPlayer(4, ['OS'], 6.0, ['dribling' => 9, 'sut' => 9, 'teknik' => 9]),
+            $this->pitchPlayer(5, ['OS'], 6.0, ['dribling' => 5, 'sut' => 5, 'teknik' => 5]),
+        ];
+
+        $nodes = PitchLayout::layout($team, 'A', null);
+
+        // Forvet sütununda (x=430) bir oyuncu olmalı ve o id4 olmalı
+        $atFwd = collect($nodes)->first(fn ($n) => abs($n['x'] - 430) < 0.5);
+        $this->assertNotNull($atFwd, 'Takımda en az 1 forvet olmalı');
+        $this->assertSame(4, $atFwd['id']);
     }
 }

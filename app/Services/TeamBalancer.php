@@ -18,6 +18,12 @@ class TeamBalancer
 
     public const MAX_PLAYERS = 24;
 
+    /** Asıl kalecilerin (birincil pozisyon KL) eşit bölünmesi — neredeyse şart (OVR'yi ezer, kurallara yenilir). */
+    public const KEEPER_BALANCE_WEIGHT = 200.0;
+
+    /** Kaleci olabilen (KL içeren) oyuncuların dağılımı — yumuşak tercih. */
+    public const KEEPER_SOFT_WEIGHT = 25.0;
+
     /**
      * @param  list<array{id: int, positions: list<string>, ovr: float}>  $players
      * @param  list<array{type: 'apart'|'together', a: int, b: int}>  $rules
@@ -98,21 +104,34 @@ class TeamBalancer
 
         $penalty = 0.0;
 
-        // İki kaleci varsa her takıma bir tane düşmeli
-        if ($coverA['KL'] + $coverB['KL'] >= 2) {
-            if ($coverA['KL'] === 0) {
-                $penalty += 6;
-            }
-            if ($coverB['KL'] === 0) {
-                $penalty += 6;
-            }
-        }
+        // Asıl kaleciler (birincil pozisyon KL) iki takıma eşit bölünmeli — neredeyse şart.
+        $penalty += self::KEEPER_BALANCE_WEIGHT
+            * $this->imbalanceExcess($this->primaryKeeperCount($teamA), $this->primaryKeeperCount($teamB));
+
+        // Kaleci olabilen (KL içeren) oyuncular da mümkünse dağılsın — yumuşak.
+        $penalty += self::KEEPER_SOFT_WEIGHT
+            * $this->imbalanceExcess($coverA['KL'], $coverB['KL']);
 
         foreach (['DEF', 'OS', 'FV'] as $pos) {
             $penalty += abs($coverA[$pos] - $coverB[$pos]) * 0.6;
         }
 
         return $avgDiff * 10 + $penalty + $this->rulesPenalty($teamA, $teamB, $rules);
+    }
+
+    /** Birincil pozisyonu kaleci olan oyuncu sayısı. */
+    protected function primaryKeeperCount(array $team): int
+    {
+        return count(array_filter($team, fn (array $p) => ($p['positions'][0] ?? null) === 'KL'));
+    }
+
+    /**
+     * İki takım arasındaki sayı dengesizliğinin "fazlası".
+     * Tek sayıda toplamda 1 fark normaldir (eşit bölünemez); onun üstü cezalandırılır.
+     */
+    protected function imbalanceExcess(int $a, int $b): int
+    {
+        return max(0, abs($a - $b) - (($a + $b) % 2));
     }
 
     /** Takımdaki pozisyon kapsama sayıları (çoklu pozisyonlar hepsine sayılır). */

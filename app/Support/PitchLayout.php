@@ -3,8 +3,16 @@
 namespace App\Support;
 
 /**
- * Saha diziliş hesaplayıcı — kadro.html'deki layout/layoutFormation portu.
+ * Saha diziliş hesaplayıcı.
  * Koordinat sistemi: 1000x560 viewBox, A takımı solda, B sağda.
+ *
+ * Kaleci kuralı (kullanıcı kararı): her takımda TAM 1 kaleci, kale asla boş kalmaz.
+ *  1) birincil pozisyonu KL olan (en iyi kaleci özelliğiyle)
+ *  2) yoksa KL'si ikincil olan biri
+ *  3) o da yoksa defans oyuncularından biri (en düşük OVR'li — iyiler sahada kalsın)
+ *  4) hiç yoksa son çare en düşük OVR'li oyuncu
+ * Forvet kuralı: her takımda en az 1 forvet; doğal forvet yoksa orta sahadan
+ * dribling+şut+teknik ortalaması en iyi oyuncu forvete çekilir.
  */
 class PitchLayout
 {
@@ -42,101 +50,192 @@ class PitchLayout
         }, $nodes);
     }
 
-    /** Otomatik: birincil pozisyona göre hatlara dağıt. */
+    /** Otomatik: kaleci ayrılır, kalanlar birincil pozisyonlarına göre hatlara dağılır, forvet garanti edilir. */
     protected static function autoLayout(array $team, string $side): array
     {
-        usort($team, fn (array $a, array $b) => $b['ovr'] <=> $a['ovr']);
+        $keeper = self::selectKeeper($team);
+        $outfield = self::without($team, $keeper);
 
-        $groups = ['KL' => [], 'DEF' => [], 'OS' => [], 'FV' => []];
-        foreach ($team as $player) {
-            $primary = $player['positions'][0] ?? 'OS';
-            $groups[$primary][] = $player;
+        $groups = ['DEF' => [], 'OS' => [], 'FV' => []];
+        foreach ($outfield as $player) {
+            $groups[self::outfieldPrimary($player)][] = $player;
         }
 
-        $xs = $side === 'A'
-            ? ['KL' => 60, 'DEF' => 165, 'OS' => 295, 'FV' => 415]
-            : ['KL' => self::W - 60, 'DEF' => self::W - 165, 'OS' => self::W - 295, 'FV' => self::W - 415];
-
-        $nodes = [];
-        foreach ($groups as $pos => $players) {
-            $count = count($players);
-            if ($count === 0) {
-                continue;
-            }
-
-            $spacing = $count > 1 ? min(96, (self::H - 140) / ($count - 1)) : 0;
-            foreach ($players as $i => $player) {
-                $y = $count === 1 ? self::H / 2 : self::H / 2 + ($i - ($count - 1) / 2) * $spacing;
-                $nodes[] = self::node($player, $xs[$pos], $y);
+        // En az 1 forvet garantisi: doğal forvet yoksa orta sahadan (yoksa defanstan) en iyi forveti çek
+        if ($groups['FV'] === [] && $outfield !== []) {
+            $source = $groups['OS'] !== [] ? 'OS' : 'DEF';
+            if ($groups[$source] !== []) {
+                usort($groups[$source], fn ($a, $b) => self::forwardScore($b['attrs'] ?? []) <=> self::forwardScore($a['attrs'] ?? []));
+                $groups['FV'][] = array_shift($groups[$source]);
             }
         }
 
-        return $nodes;
+        return self::placeNodes($side, $keeper, $groups['DEF'], $groups['OS'], $groups['FV']);
     }
 
     /** Seçilen şablona göre: kaleci + def-orta-forvet hatları. */
     protected static function formationLayout(array $team, string $side, string $formation): array
     {
-        $want = array_map('intval', explode('-', $formation)); // [def, orta, forvet]
+        $wants = array_map('intval', explode('-', $formation)); // [def, orta, forvet]
 
-        // Kaleci: gerçek kaleci varsa en iyisi; yoksa klasik kural — en düşük puanlı kaleye :)
-        $keepers = array_values(array_filter($team, fn (array $p) => in_array('KL', $p['positions'], true)));
-        usort($keepers, fn (array $a, array $b) => $b['ovr'] <=> $a['ovr']);
+        return self::buildLines($team, $side, $wants);
+    }
 
-        if ($keepers !== []) {
-            $gk = $keepers[0];
-        } else {
-            $sorted = $team;
-            usort($sorted, fn (array $a, array $b) => $a['ovr'] <=> $b['ovr']);
-            $gk = $sorted[0];
-        }
+    /** Verilen [def, orta, forvet] sayılarına göre kadroyu hatlara yerleştirir (kaleci hariç). */
+    protected static function buildLines(array $team, string $side, array $wants): array
+    {
+        $keeper = self::selectKeeper($team);
+        $outfield = self::without($team, $keeper);
+        $count = count($outfield);
 
-        $rest = array_values(array_filter($team, fn (array $p) => $p['id'] !== $gk['id']));
+        [$wantDef, $wantMid, $wantFwd] = [$wants[0], $wants[1], $wants[2]];
 
-        // Hat kapasitelerini oyuncu sayısına uyarla (eksikse önce forvetten kıs, fazlaysa ortaya ekle)
-        $total = array_sum($want);
-        while ($total > count($rest)) {
-            if ($want[2] > 0) {
-                $want[2]--;
-            } elseif ($want[1] > 0) {
-                $want[1]--;
+        // Hat kapasitelerini oyuncu sayısına uyarla
+        $total = $wantDef + $wantMid + $wantFwd;
+        while ($total > $count) {
+            if ($wantMid > 0) {
+                $wantMid--;
+            } elseif ($wantDef > 1) {
+                $wantDef--;
+            } elseif ($wantFwd > 1) {
+                $wantFwd--;
+            } elseif ($wantDef > 0) {
+                $wantDef--;
             } else {
-                $want[0]--;
+                $wantFwd--;
             }
             $total--;
         }
-        while ($total < count($rest)) {
-            $want[1]++;
+        while ($total < $count) {
+            $wantMid++;
             $total++;
         }
 
-        // Hatta uygunluk: pozisyon önceliği belirleyici (1. > 2. > 3.), sonra o hattaki ağırlıklı puan
-        $lineScore = function (array $p, string $pos): float {
-            $rank = array_search($pos, $p['positions'], true);
-            $base = $rank !== false
-                ? 110 - $rank * 30
-                : ($pos !== 'OS' && in_array('OS', $p['positions'], true) ? 20 : 0);
+        // En az 1 forvet garantisi (yeterli oyuncu varsa)
+        if ($wantFwd === 0 && $count >= 2) {
+            if ($wantMid > 1) {
+                $wantMid--;
+                $wantFwd++;
+            } elseif ($wantDef > 1) {
+                $wantDef--;
+                $wantFwd++;
+            }
+        }
 
-            return $base + Attributes::weightedScore($p['attrs'], $pos);
-        };
-
-        $pick = function (string $pos, int $k) use (&$rest, $lineScore): array {
-            usort($rest, fn (array $a, array $b) => $lineScore($b, $pos) <=> $lineScore($a, $pos));
-            $chosen = array_slice($rest, 0, $k);
-            $rest = array_slice($rest, $k);
-
-            return $chosen;
-        };
-
-        $def = $pick('DEF', $want[0]);
-        $fwd = $pick('FV', $want[2]);
+        $rest = $outfield;
+        $def = self::pickLine($rest, 'DEF', $wantDef);
+        $fwd = self::pickLine($rest, 'FV', $wantFwd);
         $mid = $rest; // kalanlar orta saha
 
-        $xs = $side === 'A' ? [60, 175, 300, 430] : [self::W - 60, self::W - 175, self::W - 300, self::W - 430];
+        return self::placeNodes($side, $keeper, $def, $mid, $fwd);
+    }
+
+    /**
+     * Takımın kalecisini seçer (kale asla boş kalmaz).
+     *
+     * @return array oyuncu düğümü
+     */
+    protected static function selectKeeper(array $team): array
+    {
+        // 1) Birincil pozisyonu KL olanlar — en iyi kaleci özelliğine sahip olan
+        $primary = array_values(array_filter($team, fn (array $p) => ($p['positions'][0] ?? null) === 'KL'));
+        if ($primary !== []) {
+            return self::bestBy($primary, fn (array $p) => Attributes::weightedScore($p['attrs'] ?? [], 'KL'));
+        }
+
+        // 2) KL'si ikincil olan biri
+        $klAny = array_values(array_filter($team, fn (array $p) => in_array('KL', $p['positions'] ?? [], true)));
+        if ($klAny !== []) {
+            return self::bestBy($klAny, fn (array $p) => Attributes::weightedScore($p['attrs'] ?? [], 'KL'));
+        }
+
+        // 3) Defans oyuncularından biri — en düşük OVR'li (iyi defanslar sahada kalsın)
+        $defs = array_values(array_filter($team, fn (array $p) => in_array('DEF', $p['positions'] ?? [], true)));
+        if ($defs !== []) {
+            return self::bestBy($defs, fn (array $p) => -($p['ovr'] ?? 0));
+        }
+
+        // 4) Son çare: herhangi biri (en düşük OVR'li)
+        return self::bestBy($team, fn (array $p) => -($p['ovr'] ?? 0));
+    }
+
+    /** Bir hattı doldurur: doğal oyuncular önce (öncelik sırasına göre), sonra terfi adayları. */
+    protected static function pickLine(array &$rest, string $pos, int $count): array
+    {
+        if ($count <= 0) {
+            return [];
+        }
+
+        usort($rest, fn (array $a, array $b) => self::lineScore($b, $pos) <=> self::lineScore($a, $pos));
+        $chosen = array_slice($rest, 0, $count);
+        $rest = array_slice($rest, $count);
+
+        return $chosen;
+    }
+
+    /** Bir oyuncunun bir hatta uygunluğu. Doğal pozisyonlar her zaman terfi adaylarından önce gelir. */
+    protected static function lineScore(array $player, string $pos): float
+    {
+        $positions = $player['positions'] ?? [];
+        $rank = array_search($pos, $positions, true);
+
+        if ($rank !== false) {
+            // Doğal oyuncu: öncelik sırası belirleyici (1. > 2. > 3.), sonra hattaki ağırlıklı puan
+            return 1000 - $rank * 100 + Attributes::weightedScore($player['attrs'] ?? [], $pos);
+        }
+
+        // Terfi adayı: forvete dribling+şut+teknik ortalaması, diğer hatlara ağırlıklı puanın yarısı
+        if ($pos === 'FV') {
+            return self::forwardScore($player['attrs'] ?? []);
+        }
+
+        return Attributes::weightedScore($player['attrs'] ?? [], $pos) * 0.5;
+    }
+
+    /** Forvet uygunluğu: dribling + şut + teknik ortalaması (eksik özellik 5 sayılır). */
+    protected static function forwardScore(array $attrs): float
+    {
+        return ((float) ($attrs['dribling'] ?? 5)
+            + (float) ($attrs['sut'] ?? 5)
+            + (float) ($attrs['teknik'] ?? 5)) / 3;
+    }
+
+    /** Kaleci dışında bir oyuncunun yerleşeceği saha hattı (sadece KL ise orta sahaya). */
+    protected static function outfieldPrimary(array $player): string
+    {
+        foreach ($player['positions'] ?? [] as $pos) {
+            if (in_array($pos, ['DEF', 'OS', 'FV'], true)) {
+                return $pos;
+            }
+        }
+
+        return 'OS';
+    }
+
+    /** @return list en yüksek skorlu oyuncu düğümü */
+    protected static function bestBy(array $items, callable $score): array
+    {
+        usort($items, fn (array $a, array $b) => $score($b) <=> $score($a));
+
+        return $items[0];
+    }
+
+    /** Bir oyuncuyu takımdan id'ye göre çıkarır. */
+    protected static function without(array $team, array $player): array
+    {
+        return array_values(array_filter($team, fn (array $p) => $p['id'] !== $player['id']));
+    }
+
+    /** Kaleci + üç hattı saha üzerine yerleştirir. */
+    protected static function placeNodes(string $side, array $keeper, array $def, array $mid, array $fwd): array
+    {
+        $xs = $side === 'A'
+            ? ['KL' => 60, 'DEF' => 175, 'OS' => 300, 'FV' => 430]
+            : ['KL' => self::W - 60, 'DEF' => self::W - 175, 'OS' => self::W - 300, 'FV' => self::W - 430];
 
         $nodes = [];
         $place = function (array $line, float $x) use (&$nodes): void {
-            usort($line, fn (array $a, array $b) => $b['ovr'] <=> $a['ovr']);
+            usort($line, fn (array $a, array $b) => ($b['ovr'] ?? 0) <=> ($a['ovr'] ?? 0));
             $count = count($line);
             $spacing = $count > 1 ? min(125, (self::H - 130) / ($count - 1)) : 0;
 
@@ -146,10 +245,10 @@ class PitchLayout
             }
         };
 
-        $place([$gk], $xs[0]);
-        $place($def, $xs[1]);
-        $place($mid, $xs[2]);
-        $place($fwd, $xs[3]);
+        $place([$keeper], $xs['KL']);
+        $place($def, $xs['DEF']);
+        $place($mid, $xs['OS']);
+        $place($fwd, $xs['FV']);
 
         return $nodes;
     }
