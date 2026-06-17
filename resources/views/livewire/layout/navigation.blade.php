@@ -16,7 +16,7 @@ new class extends Component
     }
 }; ?>
 
-<nav x-data="{ open: false }" class="bg-pitch-surface/80 border-b border-pitch-line backdrop-blur">
+<nav x-data="{ open: false }" class="relative z-50 bg-pitch-surface/80 border-b border-pitch-line backdrop-blur">
     <!-- Primary Navigation Menu -->
     <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div class="flex justify-between h-16">

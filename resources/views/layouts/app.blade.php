@@ -30,8 +30,8 @@
             }
         </script>
     </head>
-    <body class="font-sans antialiased text-pitch-ink">
-        <div class="min-h-screen bg-pitch-bg bg-[radial-gradient(1200px_500px_at_50%_-10%,rgba(40,120,70,.25),transparent_60%)]">
+    <body class="font-sans antialiased text-pitch-ink overflow-x-hidden">
+        <div class="min-h-screen overflow-x-hidden bg-pitch-bg bg-[radial-gradient(1200px_500px_at_50%_-10%,rgba(40,120,70,.25),transparent_60%)]">
             <livewire:layout.navigation />
 
             <!-- Page Content -->

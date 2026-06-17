@@ -221,10 +221,10 @@
 
             {{-- Denge göstergesi + takım listeleri --}}
             <div class="bg-pitch-surface border border-pitch-line rounded-xl p-6 space-y-4">
-                <div class="grid grid-cols-[1fr,auto,1fr] items-center gap-4">
-                    <div class="font-display text-2xl font-bold text-bibA">TURUNCU <span class="block text-[11px] tracking-[.2em] text-pitch-muted font-semibold">{{ $teamA->count() }} OYUNCU · ORT {{ number_format($avgA, 1) }}</span></div>
+                <div class="grid grid-cols-[1fr,auto,1fr] items-center gap-2 sm:gap-4">
+                    <div class="font-display text-lg sm:text-2xl font-bold text-bibA">TURUNCU <span class="block text-[10px] sm:text-[11px] tracking-[.15em] sm:tracking-[.2em] text-pitch-muted font-semibold">{{ $teamA->count() }} OYUNCU · ORT {{ number_format($avgA, 1) }}</span></div>
                     @php $diff = $avgA - $avgB; $shift = max(-22, min(22, $diff * 12)); @endphp
-                    <div class="min-w-[160px] sm:min-w-[260px]">
+                    <div class="min-w-[90px] sm:min-w-[260px]">
                         <div class="relative h-3.5 rounded-full bg-pitch-bg border border-pitch-line overflow-hidden">
                             <div class="absolute left-0 top-0 bottom-0 bg-gradient-to-r from-bibA to-bibA/50" style="width: {{ 50 + $shift }}%"></div>
                             <div class="absolute right-0 top-0 bottom-0 bg-gradient-to-l from-bibB to-bibB/50" style="width: {{ 50 - $shift }}%"></div>
@@ -234,7 +234,7 @@
                             {{ abs($diff) < 0.05 ? 'Tam denge ✓' : 'Fark: '.number_format(abs($diff), 1).' puan ('.($diff > 0 ? 'Turuncu' : 'Yeşil').' önde)' }}
                         </div>
                     </div>
-                    <div class="font-display text-2xl font-bold text-bibB text-end">YEŞİL <span class="block text-[11px] tracking-[.2em] text-pitch-muted font-semibold">{{ $teamB->count() }} OYUNCU · ORT {{ number_format($avgB, 1) }}</span></div>
+                    <div class="font-display text-lg sm:text-2xl font-bold text-bibB text-end">YEŞİL <span class="block text-[10px] sm:text-[11px] tracking-[.15em] sm:tracking-[.2em] text-pitch-muted font-semibold">{{ $teamB->count() }} OYUNCU · ORT {{ number_format($avgB, 1) }}</span></div>
                 </div>
 
                 @if ($canManage && $match->status === 'scheduled')
