@@ -15,10 +15,21 @@
                         <p class="text-pitch-muted mt-1">{{ $group->description }}</p>
                     @endif
                 </div>
-                <div class="shrink-0 flex items-center gap-3">
+                <div class="shrink-0 flex items-center gap-2 flex-wrap justify-end">
                     <span class="text-sm text-pitch-muted">{{ $players->count() }} oyuncu</span>
                     @if ($isAdmin)
                         <x-secondary-button wire:click="$toggle('showSettings')">⚙️ Ayarlar</x-secondary-button>
+                    @endif
+                    @if (auth()->id() === $group->owner_id)
+                        <x-danger-button wire:click="deleteGroup" type="button"
+                                         wire:confirm="DİKKAT: '{{ $group->name }}' grubu, tüm maçları, oyuncuları ve puanlarıyla birlikte kalıcı olarak silinecek. Emin misin?">
+                            Grubu Sil
+                        </x-danger-button>
+                    @else
+                        <x-danger-button wire:click="leaveGroup" type="button"
+                                         wire:confirm="'{{ $group->name }}' grubundan ayrılmak istediğine emin misin?">
+                            Gruptan Ayrıl
+                        </x-danger-button>
                     @endif
                 </div>
             </div>
@@ -250,6 +261,12 @@
                                             wire:confirm="{{ $player->name }} gruptan silinsin mi?"
                                             class="text-xs px-3 py-1.5 rounded-md border border-[#6c3030] text-[#ffb3b3] hover:bg-red-900/30">
                                         Sil
+                                    </button>
+                                @elseif ($isAdmin && ! $player->isGuest() && $player->user_id !== $group->owner_id && $player->user_id !== auth()->id())
+                                    <button wire:click="removeMember({{ $player->user_id }})"
+                                            wire:confirm="{{ $player->name }} gruptan çıkarılsın mı? (Maç geçmişi ve puanları korunur, oyuncu misafire döner.)"
+                                            class="text-xs px-3 py-1.5 rounded-md border border-[#6c3030] text-[#ffb3b3] hover:bg-red-900/30">
+                                        Çıkar
                                     </button>
                                 @endif
                             </div>

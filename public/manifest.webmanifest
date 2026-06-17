@@ -1,0 +1,21 @@
+{
+    "name": "Kadro Kur",
+    "short_name": "Kadro Kur",
+    "description": "Halı saha maç organizasyonu: gruplar, davet, RSVP, dengeli kadro kurma ve istatistikler.",
+    "start_url": "/",
+    "scope": "/",
+    "display": "standalone",
+    "orientation": "portrait",
+    "lang": "tr",
+    "dir": "ltr",
+    "background_color": "#0A150E",
+    "theme_color": "#15502F",
+    "icons": [
+        {
+            "src": "/icon.svg",
+            "sizes": "any",
+            "type": "image/svg+xml",
+            "purpose": "any maskable"
+        }
+    ]
+}

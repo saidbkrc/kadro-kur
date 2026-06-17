@@ -13,7 +13,8 @@
                     @if ($topScorers->isEmpty())
                         <p class="text-pitch-muted text-sm">Henüz gol kaydı yok — maç sonucu girerken golleri atanları da işaretle.</p>
                     @else
-                        <table class="w-full text-sm">
+                        <div class="overflow-x-auto -mx-2">
+                        <table class="w-full min-w-[420px] text-sm">
                             <tr class="text-[11px] tracking-[.12em] text-pitch-muted text-start">
                                 <th class="text-start py-2 px-2 border-b border-pitch-line"></th>
                                 <th class="text-start py-2 px-2 border-b border-pitch-line">OYUNCU</th>
@@ -31,6 +32,7 @@
                                 </tr>
                             @endforeach
                         </table>
+                        </div>
                     @endif
                 </div>
 
@@ -40,7 +42,8 @@
                     @if ($playerStats->isEmpty())
                         <p class="text-pitch-muted text-sm">Henüz istatistik yok — ilk maç sonucu kaydedildiğinde burası dolacak.</p>
                     @else
-                        <table class="w-full text-sm">
+                        <div class="overflow-x-auto -mx-2">
+                        <table class="w-full min-w-[520px] text-sm">
                             <tr class="text-[11px] tracking-[.12em] text-pitch-muted">
                                 <th class="text-start py-2 px-2 border-b border-pitch-line">OYUNCU</th>
                                 <th class="text-center py-2 px-2 border-b border-pitch-line">MAÇ</th>
@@ -64,6 +67,7 @@
                                 </tr>
                             @endforeach
                         </table>
+                        </div>
                     @endif
                 </div>
             </div>

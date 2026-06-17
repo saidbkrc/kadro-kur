@@ -1,0 +1,12 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" role="img" aria-label="Kadro Kur">
+  <rect width="512" height="512" rx="112" fill="#15502F"/>
+  <circle cx="256" cy="256" r="150" fill="#ffffff"/>
+  <polygon points="256,196 304,231 286,288 226,288 208,231" fill="#10240F"/>
+  <g stroke="#10240F" stroke-width="14" stroke-linecap="round">
+    <line x1="256" y1="196" x2="256" y2="120"/>
+    <line x1="304" y1="231" x2="372" y2="206"/>
+    <line x1="286" y1="288" x2="330" y2="348"/>
+    <line x1="226" y1="288" x2="182" y2="348"/>
+    <line x1="208" y1="231" x2="140" y2="206"/>
+  </g>
+</svg>

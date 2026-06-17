@@ -387,6 +387,94 @@ class KadroFlowTest extends TestCase
         $this->assertNotNull($group->playerFor($newUser));
     }
 
+    public function test_uye_gruptan_ayrilir_ve_baskan_uye_cikarir(): void
+    {
+        $owner = User::factory()->create();
+        $group = $this->makeGroup($owner);
+
+        // Geçmişi olan üye (puan almış) → ayrılınca misafire döner
+        $veteran = $this->addMember($group);
+        \App\Models\AttributeRating::create([
+            'player_id' => $veteran->id, 'rater_id' => $owner->id, 'scores' => ['hiz' => 7],
+        ]);
+
+        Livewire::actingAs($veteran->user)
+            ->test(Groups\Show::class, ['group' => $group])
+            ->call('leaveGroup');
+
+        $this->assertFalse($group->isMember($veteran->user));
+        $this->assertNull($veteran->refresh()->user_id, 'Geçmişi olan oyuncu misafire dönmeli');
+
+        // Geçmişi olmayan üyeyi başkan çıkarır → oyuncu kaydı tamamen silinir
+        $rookie = $this->addMember($group);
+        Livewire::actingAs($owner)
+            ->test(Groups\Show::class, ['group' => $group])
+            ->call('removeMember', $rookie->user->id);
+
+        $this->assertFalse($group->isMember($rookie->user));
+        $this->assertDatabaseMissing('players', ['id' => $rookie->id]);
+
+        // Başkan ayrılamaz, normal üye başkasını çıkaramaz
+        Livewire::actingAs($owner)->test(Groups\Show::class, ['group' => $group])
+            ->call('leaveGroup')->assertStatus(403);
+
+        $a = $this->addMember($group);
+        $b = $this->addMember($group);
+        Livewire::actingAs($a->user)->test(Groups\Show::class, ['group' => $group])
+            ->call('removeMember', $b->user->id)->assertStatus(403);
+    }
+
+    public function test_baskan_grubu_siler(): void
+    {
+        $owner = User::factory()->create();
+        $group = $this->makeGroup($owner);
+        $this->makeMatch($group);
+
+        Livewire::actingAs($owner)
+            ->test(Groups\Show::class, ['group' => $group])
+            ->call('deleteGroup');
+
+        $this->assertDatabaseMissing('groups', ['id' => $group->id]);
+        $this->assertDatabaseMissing('matches', ['group_id' => $group->id]);
+
+        // Üye grubu silemez
+        $owner2 = User::factory()->create();
+        $group2 = $this->makeGroup($owner2);
+        $member = $this->addMember($group2);
+        Livewire::actingAs($member->user)->test(Groups\Show::class, ['group' => $group2])
+            ->call('deleteGroup')->assertStatus(403);
+    }
+
+    public function test_kullanici_profilinden_kendi_pozisyon_ayagini_duzenler(): void
+    {
+        $owner = User::factory()->create();
+        $group = $this->makeGroup($owner);
+        $member = $this->addMember($group);
+
+        // Üye kendi oyuncu kaydını düzenler
+        Livewire::actingAs($member->user)
+            ->test(\App\Livewire\Profile\FieldProfile::class)
+            ->call('edit', $member->id)
+            ->call('togglePosition', 'OS')  // varsayılan OS'u kaldır
+            ->call('togglePosition', 'FV')  // FV ekle
+            ->set('editFoot', 'left')
+            ->set('editNumber', 7)
+            ->call('save')
+            ->assertHasNoErrors();
+
+        $member->refresh();
+        $this->assertSame(['FV'], $member->positions);
+        $this->assertSame('left', $member->foot);
+        $this->assertSame(7, $member->shirt_number);
+
+        // Başkasının oyuncusunu düzenleyemez
+        $own = $group->playerFor($owner);
+        Livewire::actingAs($member->user)
+            ->test(\App\Livewire\Profile\FieldProfile::class)
+            ->call('edit', $own->id)
+            ->assertStatus(404);
+    }
+
     public function test_sayfalar_acilir(): void
     {
         $owner = User::factory()->create();

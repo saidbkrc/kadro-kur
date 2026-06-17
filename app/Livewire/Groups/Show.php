@@ -273,6 +273,54 @@ class Show extends Component
         $this->group->rules()->whereKey($ruleId)->delete();
     }
 
+    /* ---------- üyelik ---------- */
+
+    /** Üye gruptan ayrılır. Başkan ayrılamaz (grubu silmeli). */
+    public function leaveGroup()
+    {
+        abort_if(Auth::id() === $this->group->owner_id, 403);
+
+        $this->detachMember(Auth::id());
+
+        return $this->redirectRoute('groups.index', navigate: true);
+    }
+
+    /** Başkan/admin bir üyeyi gruptan çıkarır. */
+    public function removeMember(int $userId): void
+    {
+        abort_unless($this->group->isAdmin(Auth::user()), 403);
+        abort_if($userId === $this->group->owner_id, 403); // başkan çıkarılamaz
+        abort_if($userId === Auth::id(), 403);              // kendini çıkaramaz (ayrıl kullan)
+
+        $this->detachMember($userId);
+    }
+
+    /** Başkan grubu tamamen siler (maçlar, oyuncular, puanlar dahil). */
+    public function deleteGroup()
+    {
+        abort_unless(Auth::id() === $this->group->owner_id, 403);
+
+        $this->group->delete();
+
+        return $this->redirectRoute('groups.index', navigate: true);
+    }
+
+    /** Üyeliği kaldırır; geçmişi olan oyuncu kaydı misafire döner, boşsa silinir. */
+    protected function detachMember(int $userId): void
+    {
+        $player = $this->group->players()->where('user_id', $userId)->first();
+
+        if ($player) {
+            $hasHistory = $player->attributeRatings()->exists()
+                || $player->rsvps()->exists()
+                || $player->goals()->exists();
+
+            $hasHistory ? $player->update(['user_id' => null]) : $player->delete();
+        }
+
+        $this->group->members()->detach($userId);
+    }
+
     /* ---------- haftalık maç ayarları ---------- */
 
     public function saveSettings(): void
