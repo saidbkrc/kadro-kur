@@ -39,34 +39,5 @@
                 {{ $slot }}
             </main>
         </div>
-
-        {{-- Özel onay modalı: tarayıcının confirm() kutusunun yerine. $dispatch('kk-confirm', {message, cb}) ile açılır. --}}
-        <div x-data="{ open: false, message: '', danger: true, _cb: null }"
-             x-on:kk-confirm.window="message = $event.detail.message; danger = $event.detail.danger ?? true; _cb = $event.detail.cb; open = true"
-             x-on:keydown.escape.window="open = false"
-             x-show="open" x-cloak
-             class="fixed inset-0 z-[100] flex items-center justify-center p-4">
-            <div class="absolute inset-0 bg-black/60 backdrop-blur-sm" @click="open = false"
-                 x-transition:enter="transition ease-out duration-150" x-transition:enter-start="opacity-0" x-transition:enter-end="opacity-100"></div>
-            <div class="relative bg-pitch-surface border border-pitch-line rounded-xl shadow-2xl max-w-sm w-full p-6"
-                 x-transition:enter="transition ease-out duration-150" x-transition:enter-start="opacity-0 scale-95" x-transition:enter-end="opacity-100 scale-100">
-                <div class="flex items-start gap-3">
-                    <span class="text-2xl" x-text="danger ? '⚠️' : '❓'"></span>
-                    <p class="text-pitch-ink leading-relaxed" x-text="message"></p>
-                </div>
-                <div class="flex justify-end gap-2 mt-5">
-                    <button type="button" @click="open = false"
-                            class="px-4 py-2 rounded-md text-sm font-semibold bg-pitch-surface2 border border-pitch-line hover:brightness-125">
-                        Vazgeç
-                    </button>
-                    <button type="button" x-ref="kkOk"
-                            @click="const cb = _cb; open = false; _cb = null; if (cb) cb()"
-                            :class="danger ? 'bg-red-700 border-red-600' : 'bg-gradient-to-b from-[#2C7A48] to-[#1F5A35] border-[#3E9A60]'"
-                            class="px-4 py-2 rounded-md text-sm font-semibold border text-pitch-ink hover:brightness-125">
-                        Evet
-                    </button>
-                </div>
-            </div>
-        </div>
     </body>
 </html>

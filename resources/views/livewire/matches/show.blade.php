@@ -51,10 +51,11 @@
 
                     <div class="flex flex-wrap gap-2 pt-1">
                         @if ($going->count() >= 4)
-                            <x-primary-button type="button"
-                                    @click='$dispatch("kk-confirm", { danger: false, message: @js("Kadrolar ortalama puanlara ve kurallara göre dağıtılacak, varsa mevcut oylama sıfırlanacak. Devam edilsin mi?"), cb: () => $wire.buildSquads() })'>
+                            <button type="button"
+                                    @click='kkConfirm(@js("Kadrolar ortalama puanlara ve kurallara göre dağıtılacak, varsa mevcut oylama sıfırlanacak. Devam edilsin mi?"), { danger: false }).then(ok => ok && $wire.buildSquads())'
+                                    class="inline-flex items-center px-4 py-2 bg-gradient-to-b from-[#2C7A48] to-[#1F5A35] border border-[#3E9A60] rounded-md font-semibold text-xs text-pitch-ink uppercase tracking-widest hover:brightness-125 focus:outline-none focus:ring-2 focus:ring-gold transition">
                                 ⚖️ Kadroları Kur
-                            </x-primary-button>
+                            </button>
                         @endif
                         <x-secondary-button wire:click="$toggle('showTemplates')">
                             🗂 Şablonlar
@@ -62,10 +63,11 @@
                         <x-secondary-button wire:click="$toggle('showResultForm')">
                             {{ $showResultForm ? 'Vazgeç' : '📝 Sonucu Gir' }}
                         </x-secondary-button>
-                        <x-danger-button type="button"
-                                @click='$dispatch("kk-confirm", { message: @js("Maç iptal edilecek. Emin misin?"), cb: () => $wire.cancelMatch() })'>
+                        <button type="button"
+                                @click='kkConfirm(@js("Maç iptal edilecek. Emin misin?")).then(ok => ok && $wire.cancelMatch())'
+                                class="inline-flex items-center px-4 py-2 bg-transparent border border-[#6c3030] rounded-md font-semibold text-xs text-[#ffb3b3] uppercase tracking-widest hover:bg-red-900/30 focus:outline-none focus:ring-2 focus:ring-red-500 transition">
                             Maçı İptal Et
-                        </x-danger-button>
+                        </button>
                     </div>
                 </div>
                 <x-input-error :messages="$errors->get('squad')" />
@@ -100,7 +102,7 @@
                                         <span class="text-sm font-medium">{{ $tpl->name }} <span class="text-xs text-pitch-muted">({{ count($tpl->teams) }} oyuncu)</span></span>
                                         <div class="flex gap-2 shrink-0">
                                             <button wire:click="applyTemplate({{ $tpl->id }})" class="text-xs px-3 py-1.5 rounded-md bg-gradient-to-b from-[#2C7A48] to-[#1F5A35] border border-[#3E9A60] font-semibold hover:brightness-125">Yükle</button>
-                                            <button type="button" @click='$dispatch("kk-confirm", { message: @js($tpl->name." şablonu silinsin mi?"), cb: () => $wire.deleteTemplate({{ $tpl->id }}) })' class="text-xs px-3 py-1.5 rounded-md border border-[#6c3030] text-[#ffb3b3] hover:bg-red-900/30">Sil</button>
+                                            <button type="button" @click='kkConfirm(@js($tpl->name." şablonu silinsin mi?")).then(ok => ok && $wire.deleteTemplate({{ $tpl->id }}))' class="text-xs px-3 py-1.5 rounded-md border border-[#6c3030] text-[#ffb3b3] hover:bg-red-900/30">Sil</button>
                                         </div>
                                     </div>
                                 @endforeach
@@ -479,7 +481,7 @@
                         @foreach ($going as $rsvp)
                             @if (! $myPlayer || $rsvp->player_id !== $myPlayer->id)
                                 <button type="button"
-                                        @click='$dispatch("kk-confirm", { message: @js($rsvp->player->name." için MVP oyu vereceksin. Bu oy değiştirilemez. Emin misin?"), cb: () => $wire.voteMvp({{ $rsvp->player_id }}) })'
+                                        @click='kkConfirm(@js($rsvp->player->name." için MVP oyu vereceksin. Bu oy değiştirilemez. Emin misin?")).then(ok => ok && $wire.voteMvp({{ $rsvp->player_id }}))'
                                         class="px-4 py-2 rounded-md text-sm font-medium border border-pitch-line hover:bg-pitch-surface2 hover:border-gold transition">
                                     {{ $rsvp->player->name }}
                                 </button>
