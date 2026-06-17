@@ -203,23 +203,25 @@
                     @endphp
                     <div class="py-3">
                         <div class="flex items-center justify-between gap-4 flex-wrap">
-                            <div class="flex items-center gap-3">
+                            <div class="flex items-center gap-3 min-w-0">
                                 @if ($ovrPublic)
-                                    <span class="font-display text-2xl font-bold w-12 text-center {{ $tier($ovr) }}" title="Genel puan ({{ $player->ratingCount() }} oylama)">{{ number_format($ovr, 1) }}</span>
+                                    <span class="font-display text-2xl font-bold w-11 shrink-0 text-center {{ $tier($ovr) }}" title="Genel puan ({{ $player->ratingCount() }} oylama)">{{ number_format($ovr, 1) }}</span>
                                 @else
-                                    <span class="font-display text-2xl font-bold w-12 text-center text-pitch-muted" title="Puan, {{ $minRatings }} kişi oylayınca görünür">?</span>
+                                    <span class="font-display text-2xl font-bold w-11 shrink-0 text-center text-pitch-muted" title="Puan, {{ $minRatings }} kişi oylayınca görünür">?</span>
                                 @endif
-                                <div>
-                                    <span class="font-semibold">{{ $player->name }}</span>
-                                    @if ($player->shirt_number)
-                                        <span class="text-pitch-muted text-sm">#{{ $player->shirt_number }}</span>
-                                    @endif
-                                    @if ($player->isGuest())
-                                        <span class="ms-1 inline-flex px-2 py-0.5 rounded text-xs font-medium bg-gold/15 text-gold">Misafir</span>
-                                    @elseif ($player->user_id === $group->owner_id)
-                                        <span class="ms-1 inline-flex px-2 py-0.5 rounded text-xs font-medium bg-bibB/15 text-bibB">Başkan</span>
-                                    @endif
-                                    <div class="flex gap-1 mt-1">
+                                <div class="min-w-0">
+                                    <div class="flex items-center gap-1.5 flex-wrap">
+                                        <span class="font-semibold">{{ $player->name }}</span>
+                                        @if ($player->shirt_number)
+                                            <span class="text-pitch-muted text-sm">#{{ $player->shirt_number }}</span>
+                                        @endif
+                                        @if ($player->isGuest())
+                                            <span class="inline-flex px-2 py-0.5 rounded text-xs font-medium bg-gold/15 text-gold">Misafir</span>
+                                        @elseif ($player->user_id === $group->owner_id)
+                                            <span class="inline-flex px-2 py-0.5 rounded text-xs font-medium bg-bibB/15 text-bibB">Başkan</span>
+                                        @endif
+                                    </div>
+                                    <div class="flex gap-1 mt-1 flex-wrap items-center">
                                         @foreach ($player->positions ?? [] as $i => $pos)
                                             <span class="text-[10.5px] font-bold tracking-wide px-2 py-0.5 rounded-full bg-pitch-bg border border-pitch-line {{ $pos === 'KL' ? 'text-gold' : 'text-pitch-muted' }}">
                                                 {{ count($player->positions) > 1 ? ($i + 1).'·' : '' }}{{ $pos }}
@@ -228,9 +230,9 @@
                                         <span class="text-[10.5px] font-bold tracking-wide px-2 py-0.5 rounded-full bg-pitch-bg border border-pitch-line text-bibB" title="{{ \App\Support\Attributes::FEET[$player->foot] ?? 'Sağ ayak' }}">
                                             🦶 {{ $player->footBadge() }}
                                         </span>
-                                        <span class="text-xs text-pitch-muted ms-1">
-                                            {{ $ovrPublic ? $player->ratingCount().' oylama' : $player->ratingCount().'/'.$minRatings.' oylama' }}
-                                        </span>
+                                    </div>
+                                    <div class="text-xs text-pitch-muted mt-1">
+                                        {{ $ovrPublic ? $player->ratingCount().' oylama' : $player->ratingCount().'/'.$minRatings.' oylama' }}
                                     </div>
                                 </div>
                             </div>
