@@ -51,11 +51,11 @@
 
                     <div class="flex flex-wrap gap-2 pt-1">
                         @if ($going->count() >= 4)
-                            <button type="button"
-                                    @click='kkConfirm(@js("Kadrolar ortalama puanlara ve kurallara göre dağıtılacak, varsa mevcut oylama sıfırlanacak. Devam edilsin mi?"), { danger: false }).then(ok => ok && $wire.buildSquads())'
-                                    class="inline-flex items-center px-4 py-2 bg-gradient-to-b from-[#2C7A48] to-[#1F5A35] border border-[#3E9A60] rounded-md font-semibold text-xs text-pitch-ink uppercase tracking-widest hover:brightness-125 focus:outline-none focus:ring-2 focus:ring-gold transition">
+                            <x-primary-button type="button" wire:click="buildSquads"
+                                    data-confirm="Kadrolar ortalama puanlara ve kurallara göre dağıtılacak, varsa mevcut oylama sıfırlanacak. Devam edilsin mi?"
+                                    data-confirm-danger="false">
                                 ⚖️ Kadroları Kur
-                            </button>
+                            </x-primary-button>
                         @endif
                         <x-secondary-button wire:click="$toggle('showTemplates')">
                             🗂 Şablonlar
@@ -63,11 +63,10 @@
                         <x-secondary-button wire:click="$toggle('showResultForm')">
                             {{ $showResultForm ? 'Vazgeç' : '📝 Sonucu Gir' }}
                         </x-secondary-button>
-                        <button type="button"
-                                @click='kkConfirm(@js("Maç iptal edilecek. Emin misin?")).then(ok => ok && $wire.cancelMatch())'
-                                class="inline-flex items-center px-4 py-2 bg-transparent border border-[#6c3030] rounded-md font-semibold text-xs text-[#ffb3b3] uppercase tracking-widest hover:bg-red-900/30 focus:outline-none focus:ring-2 focus:ring-red-500 transition">
+                        <x-danger-button type="button" wire:click="cancelMatch"
+                                data-confirm="Maç iptal edilecek. Emin misin?">
                             Maçı İptal Et
-                        </button>
+                        </x-danger-button>
                     </div>
                 </div>
                 <x-input-error :messages="$errors->get('squad')" />
@@ -102,7 +101,7 @@
                                         <span class="text-sm font-medium">{{ $tpl->name }} <span class="text-xs text-pitch-muted">({{ count($tpl->teams) }} oyuncu)</span></span>
                                         <div class="flex gap-2 shrink-0">
                                             <button wire:click="applyTemplate({{ $tpl->id }})" class="text-xs px-3 py-1.5 rounded-md bg-gradient-to-b from-[#2C7A48] to-[#1F5A35] border border-[#3E9A60] font-semibold hover:brightness-125">Yükle</button>
-                                            <button type="button" @click='kkConfirm(@js($tpl->name." şablonu silinsin mi?")).then(ok => ok && $wire.deleteTemplate({{ $tpl->id }}))' class="text-xs px-3 py-1.5 rounded-md border border-[#6c3030] text-[#ffb3b3] hover:bg-red-900/30">Sil</button>
+                                            <button type="button" wire:click="deleteTemplate({{ $tpl->id }})" data-confirm="{{ $tpl->name }} şablonu silinsin mi?" class="text-xs px-3 py-1.5 rounded-md border border-[#6c3030] text-[#ffb3b3] hover:bg-red-900/30">Sil</button>
                                         </div>
                                     </div>
                                 @endforeach
@@ -480,8 +479,8 @@
                     <div class="flex flex-wrap gap-2">
                         @foreach ($going as $rsvp)
                             @if (! $myPlayer || $rsvp->player_id !== $myPlayer->id)
-                                <button type="button"
-                                        @click='kkConfirm(@js($rsvp->player->name." için MVP oyu vereceksin. Bu oy değiştirilemez. Emin misin?")).then(ok => ok && $wire.voteMvp({{ $rsvp->player_id }}))'
+                                <button type="button" wire:click="voteMvp({{ $rsvp->player_id }})"
+                                        data-confirm="{{ $rsvp->player->name }} için MVP oyu vereceksin. Bu oy değiştirilemez. Emin misin?"
                                         class="px-4 py-2 rounded-md text-sm font-medium border border-pitch-line hover:bg-pitch-surface2 hover:border-gold transition">
                                     {{ $rsvp->player->name }}
                                 </button>
