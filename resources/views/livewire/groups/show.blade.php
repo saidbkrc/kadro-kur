@@ -21,13 +21,13 @@
                         <x-secondary-button wire:click="$toggle('showSettings')">⚙️ Ayarlar</x-secondary-button>
                     @endif
                     @if (auth()->id() === $group->owner_id)
-                        <x-danger-button wire:click="deleteGroup" type="button"
-                                         wire:confirm="DİKKAT: '{{ $group->name }}' grubu, tüm maçları, oyuncuları ve puanlarıyla birlikte kalıcı olarak silinecek. Emin misin?">
+                        <x-danger-button type="button"
+                                         @click='$dispatch("kk-confirm", { message: @js("DİKKAT: ".$group->name." grubu, tüm maçları, oyuncuları ve puanlarıyla birlikte kalıcı olarak silinecek. Emin misin?"), cb: () => $wire.deleteGroup() })'>
                             Grubu Sil
                         </x-danger-button>
                     @else
-                        <x-danger-button wire:click="leaveGroup" type="button"
-                                         wire:confirm="'{{ $group->name }}' grubundan ayrılmak istediğine emin misin?">
+                        <x-danger-button type="button"
+                                         @click='$dispatch("kk-confirm", { message: @js($group->name." grubundan ayrılmak istediğine emin misin?"), cb: () => $wire.leaveGroup() })'>
                             Gruptan Ayrıl
                         </x-danger-button>
                     @endif
@@ -259,14 +259,14 @@
                                             @endforeach
                                         </select>
                                     @endif
-                                    <button wire:click="removeGuest({{ $player->id }})"
-                                            wire:confirm="{{ $player->name }} gruptan silinsin mi?"
+                                    <button type="button"
+                                            @click='$dispatch("kk-confirm", { message: @js($player->name." gruptan silinsin mi?"), cb: () => $wire.removeGuest({{ $player->id }}) })'
                                             class="text-xs px-3 py-1.5 rounded-md border border-[#6c3030] text-[#ffb3b3] hover:bg-red-900/30">
                                         Sil
                                     </button>
                                 @elseif ($isAdmin && ! $player->isGuest() && $player->user_id !== $group->owner_id && $player->user_id !== auth()->id())
-                                    <button wire:click="removeMember({{ $player->user_id }})"
-                                            wire:confirm="{{ $player->name }} gruptan çıkarılsın mı? (Maç geçmişi ve puanları korunur, oyuncu misafire döner.)"
+                                    <button type="button"
+                                            @click='$dispatch("kk-confirm", { message: @js($player->name." gruptan çıkarılsın mı? (Maç geçmişi ve puanları korunur, oyuncu misafire döner.)"), cb: () => $wire.removeMember({{ $player->user_id }}) })'
                                             class="text-xs px-3 py-1.5 rounded-md border border-[#6c3030] text-[#ffb3b3] hover:bg-red-900/30">
                                         Çıkar
                                     </button>

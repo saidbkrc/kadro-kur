@@ -34,22 +34,39 @@
             </div>
 
             @if ($canManage && $match->status === 'scheduled')
-                <div class="flex flex-wrap gap-2 pt-3 border-t border-pitch-line">
-                    @if ($going->count() >= 4)
-                        <x-primary-button wire:click="buildSquads" type="button"
-                                wire:confirm="Kadrolar ortalama puanlara ve kurallara göre dağıtılacak, varsa mevcut oylama sıfırlanacak. Devam edilsin mi?">
-                            ⚖️ Kadroları Kur
-                        </x-primary-button>
+                <div class="pt-3 border-t border-pitch-line space-y-2">
+                    {{-- Kadro kontrol özeti --}}
+                    <div class="text-sm text-pitch-muted">
+                        🔢 <strong class="text-pitch-ink">{{ $going->count() + $waitlist->count() }}</strong> kişi geliyor ·
+                        Kadro: <strong class="text-pitch-ink">{{ $going->count() }}/{{ $match->capacity }}</strong>
+                        @if ($waitlist->count() > 0)
+                            · <span class="text-gold">{{ $waitlist->count() }} yedek</span>
+                        @endif
+                    </div>
+                    @if ($going->count() >= 2 && $going->count() % 2 === 1)
+                        <div class="text-sm text-gold bg-gold/10 border border-gold/30 rounded-md px-3 py-2">
+                            ⚠️ Asıl listede <strong>tek sayıda</strong> oyuncu var ({{ $going->count() }}) — takımlar eşit olmaz. Bir kişiyi "Gelmiyor" yaparak ya da katılımı yöneterek çift sayıya getir.
+                        </div>
                     @endif
-                    <x-secondary-button wire:click="$toggle('showTemplates')">
-                        🗂 Şablonlar
-                    </x-secondary-button>
-                    <x-secondary-button wire:click="$toggle('showResultForm')">
-                        {{ $showResultForm ? 'Vazgeç' : '📝 Sonucu Gir' }}
-                    </x-secondary-button>
-                    <x-danger-button wire:click="cancelMatch" wire:confirm="Maç iptal edilecek. Emin misin?" type="button">
-                        Maçı İptal Et
-                    </x-danger-button>
+
+                    <div class="flex flex-wrap gap-2 pt-1">
+                        @if ($going->count() >= 4)
+                            <x-primary-button type="button"
+                                    @click='$dispatch("kk-confirm", { danger: false, message: @js("Kadrolar ortalama puanlara ve kurallara göre dağıtılacak, varsa mevcut oylama sıfırlanacak. Devam edilsin mi?"), cb: () => $wire.buildSquads() })'>
+                                ⚖️ Kadroları Kur
+                            </x-primary-button>
+                        @endif
+                        <x-secondary-button wire:click="$toggle('showTemplates')">
+                            🗂 Şablonlar
+                        </x-secondary-button>
+                        <x-secondary-button wire:click="$toggle('showResultForm')">
+                            {{ $showResultForm ? 'Vazgeç' : '📝 Sonucu Gir' }}
+                        </x-secondary-button>
+                        <x-danger-button type="button"
+                                @click='$dispatch("kk-confirm", { message: @js("Maç iptal edilecek. Emin misin?"), cb: () => $wire.cancelMatch() })'>
+                            Maçı İptal Et
+                        </x-danger-button>
+                    </div>
                 </div>
                 <x-input-error :messages="$errors->get('squad')" />
 
@@ -83,7 +100,7 @@
                                         <span class="text-sm font-medium">{{ $tpl->name }} <span class="text-xs text-pitch-muted">({{ count($tpl->teams) }} oyuncu)</span></span>
                                         <div class="flex gap-2 shrink-0">
                                             <button wire:click="applyTemplate({{ $tpl->id }})" class="text-xs px-3 py-1.5 rounded-md bg-gradient-to-b from-[#2C7A48] to-[#1F5A35] border border-[#3E9A60] font-semibold hover:brightness-125">Yükle</button>
-                                            <button wire:click="deleteTemplate({{ $tpl->id }})" wire:confirm="'{{ $tpl->name }}' şablonu silinsin mi?" class="text-xs px-3 py-1.5 rounded-md border border-[#6c3030] text-[#ffb3b3] hover:bg-red-900/30">Sil</button>
+                                            <button type="button" @click='$dispatch("kk-confirm", { message: @js($tpl->name." şablonu silinsin mi?"), cb: () => $wire.deleteTemplate({{ $tpl->id }}) })' class="text-xs px-3 py-1.5 rounded-md border border-[#6c3030] text-[#ffb3b3] hover:bg-red-900/30">Sil</button>
                                         </div>
                                     </div>
                                 @endforeach
@@ -461,8 +478,8 @@
                     <div class="flex flex-wrap gap-2">
                         @foreach ($going as $rsvp)
                             @if (! $myPlayer || $rsvp->player_id !== $myPlayer->id)
-                                <button wire:click="voteMvp({{ $rsvp->player_id }})"
-                                        wire:confirm="{{ $rsvp->player->name }} için MVP oyu vereceksin. Bu oy değiştirilemez. Emin misin?"
+                                <button type="button"
+                                        @click='$dispatch("kk-confirm", { message: @js($rsvp->player->name." için MVP oyu vereceksin. Bu oy değiştirilemez. Emin misin?"), cb: () => $wire.voteMvp({{ $rsvp->player_id }}) })'
                                         class="px-4 py-2 rounded-md text-sm font-medium border border-pitch-line hover:bg-pitch-surface2 hover:border-gold transition">
                                     {{ $rsvp->player->name }}
                                 </button>
