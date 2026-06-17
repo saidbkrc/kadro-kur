@@ -236,7 +236,7 @@
                                     </div>
                                 </div>
                             </div>
-                            <div class="flex items-center gap-2 shrink-0">
+                            <div class="flex items-center gap-2 flex-wrap shrink-0 w-full sm:w-auto">
                                 @if ($player->user_id !== auth()->id())
                                     <a href="{{ route('groups.rate', ['group' => $group, 'oyuncu' => $player->id]) }}" wire:navigate
                                        class="text-xs px-3 py-1.5 rounded-md bg-gradient-to-b from-[#2C7A48] to-[#1F5A35] border border-[#3E9A60] font-semibold hover:brightness-125">
