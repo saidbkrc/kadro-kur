@@ -8,14 +8,14 @@
 
         {{-- Başlık + davet linki + ayarlar --}}
         <div class="bg-pitch-surface border border-pitch-line rounded-xl p-6 space-y-4">
-            <div class="flex items-start justify-between gap-4">
-                <div>
+            <div class="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3 sm:gap-4">
+                <div class="min-w-0">
                     <h2 class="font-display uppercase tracking-wider text-2xl font-bold">{{ $group->name }}</h2>
                     @if ($group->description)
                         <p class="text-pitch-muted mt-1">{{ $group->description }}</p>
                     @endif
                 </div>
-                <div class="shrink-0 flex items-center gap-2 flex-wrap justify-end">
+                <div class="shrink-0 flex items-center gap-2 flex-wrap">
                     <span class="text-sm text-pitch-muted">{{ $players->count() }} oyuncu</span>
                     @if ($isAdmin)
                         <x-secondary-button wire:click="$toggle('showSettings')">⚙️ Ayarlar</x-secondary-button>
@@ -153,7 +153,7 @@
         <div class="bg-pitch-surface border border-pitch-line rounded-xl p-6 space-y-4">
             <div class="flex items-center justify-between flex-wrap gap-3">
                 <h3 class="font-display uppercase tracking-wider text-lg font-semibold">Oyuncu Havuzu</h3>
-                <div class="flex items-center gap-2">
+                <div class="flex items-center gap-2 flex-wrap">
                     <a href="{{ route('groups.rate', $group) }}" wire:navigate>
                         <x-primary-button type="button">⭐ Oyuncuları Puanla</x-primary-button>
                     </a>
