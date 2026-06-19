@@ -260,9 +260,25 @@ class FootballMatch extends Model
 
     /* ---------- maç sonu ---------- */
 
-    /** MVP oylaması açık mı? (skor girilince 24 saat açılır) */
+    /** Oylama/performans penceresi süresi (saat). 0 = sınırsız (panelden ayarlanır). */
+    public static function ratingWindowHours(): int
+    {
+        return Setting::int('rating_window_hours', 24);
+    }
+
+    /** Pencere sınırsız mı (panelden 0 yapıldıysa — test için)? */
+    public static function ratingUnlimited(): bool
+    {
+        return self::ratingWindowHours() === 0;
+    }
+
+    /** MVP + performans oylaması açık mı? Sınırsız modda tamamlanmış her maç açıktır (test). */
     public function mvpOpen(): bool
     {
+        if (self::ratingUnlimited()) {
+            return $this->status === 'completed';
+        }
+
         return $this->mvp_closes_at !== null && now()->lt($this->mvp_closes_at);
     }
 }

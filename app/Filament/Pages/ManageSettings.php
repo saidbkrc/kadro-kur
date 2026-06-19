@@ -37,6 +37,7 @@ class ManageSettings extends Page implements HasForms
             'default_capacity' => Setting::int('default_capacity', 14),
             'min_ratings_visibility' => Setting::int('min_ratings_visibility', 5),
             'squad_approval_percent' => Setting::int('squad_approval_percent', 60),
+            'rating_window_hours' => Setting::int('rating_window_hours', 24),
         ]);
     }
 
@@ -78,6 +79,14 @@ class ManageSettings extends Page implements HasForms
                             ->numeric()
                             ->minValue(1)
                             ->maxValue(100)
+                            ->required(),
+
+                        TextInput::make('rating_window_hours')
+                            ->label('Oylama penceresi (saat)')
+                            ->helperText('Maç sonu MVP + performans oylamasının açık kaldığı süre. 0 = sınırsız (test için tüm tamamlanmış maçlar açık olur).')
+                            ->numeric()
+                            ->minValue(0)
+                            ->maxValue(168)
                             ->required(),
                     ])->columns(3),
             ])

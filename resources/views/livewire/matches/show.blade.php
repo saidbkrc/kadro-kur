@@ -463,7 +463,7 @@
                     <h3 class="font-display uppercase tracking-wider text-lg font-semibold">🏆 Maçın Adamı (MVP)</h3>
                     @if ($match->mvpOpen())
                         <span class="text-xs text-gold bg-gold/10 border border-gold/30 rounded-full px-3 py-1">
-                            Oylama açık — {{ (int) ceil(now()->diffInHours($match->mvp_closes_at, true)) }} saat kaldı
+                            {{ \App\Models\FootballMatch::ratingUnlimited() ? 'Oylama açık (sınırsız)' : 'Oylama açık — '.(int) ceil(now()->diffInHours($match->mvp_closes_at, true)).' saat kaldı' }}
                         </span>
                     @elseif ($match->mvp_closes_at)
                         <span class="text-xs text-pitch-muted bg-pitch-bg border border-pitch-line rounded-full px-3 py-1">Oylama kapandı</span>
@@ -508,7 +508,7 @@
                 <div class="flex items-center justify-between flex-wrap gap-2">
                     <h3 class="font-display uppercase tracking-wider text-lg font-semibold">📈 Performans Puanı</h3>
                     @if ($perfOpen)
-                        <span class="text-xs text-gold bg-gold/10 border border-gold/30 rounded-full px-3 py-1">Açık — {{ (int) ceil(now()->diffInHours($match->mvp_closes_at, true)) }} saat kaldı</span>
+                        <span class="text-xs text-gold bg-gold/10 border border-gold/30 rounded-full px-3 py-1">{{ \App\Models\FootballMatch::ratingUnlimited() ? 'Açık (sınırsız)' : 'Açık — '.(int) ceil(now()->diffInHours($match->mvp_closes_at, true)).' saat kaldı' }}</span>
                     @else
                         <span class="text-xs text-pitch-muted bg-pitch-bg border border-pitch-line rounded-full px-3 py-1">Kapandı</span>
                     @endif

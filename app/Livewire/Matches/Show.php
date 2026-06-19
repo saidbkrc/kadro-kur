@@ -350,8 +350,8 @@ class Show extends Component
             'team_a_score' => $this->teamAScore,
             'team_b_score' => $this->teamBScore,
             'status' => 'completed',
-            // MVP oylaması skor girilince 24 saat açılır (tekrar kaydetmek süreyi uzatmaz)
-            'mvp_closes_at' => $this->match->mvp_closes_at ?? now()->addDay(),
+            // Oylama penceresi skor girilince açılır (panel ayarı; tekrar kaydetmek süreyi uzatmaz)
+            'mvp_closes_at' => $this->match->mvp_closes_at ?? now()->addHours(FootballMatch::ratingWindowHours() ?: 24),
         ]);
 
         $participantIds = $this->match->mainListRsvps()->pluck('player_id');
