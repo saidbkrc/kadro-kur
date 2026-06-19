@@ -204,11 +204,7 @@
                     <div class="py-3">
                         <div class="flex items-center justify-between gap-4 flex-wrap">
                             <div class="flex items-center gap-3 min-w-0">
-                                @if ($ovrPublic)
-                                    <span class="font-display text-2xl font-bold w-11 shrink-0 text-center {{ $tier($ovr) }}" title="Genel puan ({{ $player->ratingCount() }} oylama)">{{ number_format($ovr, 1) }}</span>
-                                @else
-                                    <span class="font-display text-2xl font-bold w-11 shrink-0 text-center text-pitch-muted" title="Puan, {{ $minRatings }} kişi oylayınca görünür">?</span>
-                                @endif
+                                <x-ovr-badge :player="$player" num-class="text-2xl w-11" />
                                 <div class="min-w-0">
                                     <div class="flex items-center gap-1.5 flex-wrap">
                                         <span class="font-semibold">{{ $player->name }}</span>

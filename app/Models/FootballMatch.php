@@ -58,6 +58,11 @@ class FootballMatch extends Model
         return $this->hasMany(SquadVote::class, 'match_id');
     }
 
+    public function performanceRatings(): HasMany
+    {
+        return $this->hasMany(MatchPerformanceRating::class, 'match_id');
+    }
+
     /** Asıl listedeki (yedek olmayan) "geliyorum" sayısı. */
     public function confirmedCount(): int
     {
@@ -179,7 +184,7 @@ class FootballMatch extends Model
             ->map(fn (Rsvp $rsvp) => [
                 'id' => $rsvp->player_id,
                 'positions' => $rsvp->player->positions ?? [],
-                'ovr' => $rsvp->player->load('attributeRatings')->overall(),
+                'ovr' => $rsvp->player->load('attributeRatings')->displayRating(),
             ])
             ->values()
             ->all();

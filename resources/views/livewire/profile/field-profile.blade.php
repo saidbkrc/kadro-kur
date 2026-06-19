@@ -38,12 +38,7 @@
             <div class="border border-pitch-line rounded-xl p-4 mb-3">
                 <div class="flex items-center justify-between gap-3 flex-wrap">
                     <div class="flex items-center gap-3">
-                        @php $ovr = $player->overall(); @endphp
-                        @if ($player->overallIsPublic())
-                            <span class="font-display text-2xl font-bold w-12 text-center {{ $tier($ovr) }}">{{ number_format($ovr, 1) }}</span>
-                        @else
-                            <span class="font-display text-2xl font-bold w-12 text-center text-pitch-muted" title="Puan, yeterli oylama olunca görünür">?</span>
-                        @endif
+                        <x-ovr-badge :player="$player" num-class="text-2xl w-12" />
                         <div>
                             <div class="font-semibold">{{ $player->group->name }}</div>
                             <div class="flex gap-1 mt-1 items-center flex-wrap">

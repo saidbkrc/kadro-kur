@@ -269,11 +269,7 @@
                                         class="flex items-center gap-3 px-4 py-2.5 border-b border-pitch-line last:border-b-0 transition
                                                {{ $canManage && $match->status === 'scheduled' ? 'cursor-pointer hover:bg-pitch-surface2' : '' }}
                                                {{ $swapArmed === $rsvp->player_id ? 'bg-gold/10 shadow-[inset_3px_0_0_#FFC83D]' : '' }}">
-                                        @if ($rsvp->player->overallIsPublic())
-                                            <span class="font-display text-lg font-bold w-9 text-center {{ $tier($rsvp->player->overall()) }}">{{ number_format($rsvp->player->overall(), 1) }}</span>
-                                        @else
-                                            <span class="font-display text-lg font-bold w-9 text-center text-pitch-muted" title="Puan, {{ \App\Models\Player::minRatingsForVisibility() }} kişi oylayınca görünür">?</span>
-                                        @endif
+                                        <x-ovr-badge :player="$rsvp->player" num-class="text-lg w-9" />
                                         <span class="font-semibold">{{ $rsvp->player->name }}
                                             @if ($rsvp->player->shirt_number)<span class="text-pitch-muted text-xs font-normal">#{{ $rsvp->player->shirt_number }}</span>@endif
                                             @if ($myPlayer && $rsvp->player_id === $myPlayer->id)<span class="text-xs text-pitch-muted font-normal">(sen)</span>@endif
@@ -504,6 +500,55 @@
                     <p class="text-sm text-pitch-muted">Sonuçlar oylar verildikçe burada görünecek{{ $isParticipant ? '' : ' (kadroda olmadığın için oy kullanamazsın)' }}.</p>
                 @else
                     <p class="text-sm text-pitch-muted">Hiç oy kullanılmadı.</p>
+                @endif
+            </div>
+
+            {{-- Maç sonu performans puanı --}}
+            <div class="bg-pitch-surface border border-pitch-line rounded-xl p-6 space-y-4">
+                <div class="flex items-center justify-between flex-wrap gap-2">
+                    <h3 class="font-display uppercase tracking-wider text-lg font-semibold">📈 Performans Puanı</h3>
+                    @if ($perfOpen)
+                        <span class="text-xs text-gold bg-gold/10 border border-gold/30 rounded-full px-3 py-1">Açık — {{ (int) ceil(now()->diffInHours($match->mvp_closes_at, true)) }} saat kaldı</span>
+                    @else
+                        <span class="text-xs text-pitch-muted bg-pitch-bg border border-pitch-line rounded-full px-3 py-1">Kapandı</span>
+                    @endif
+                </div>
+
+                @if ($perfOpen && $isParticipant)
+                    <p class="text-sm text-pitch-muted">Bu maçta takım arkadaşlarının performansını 1-10 puanla (anonim). Son 5 maçın ortalaması oyuncunun puanına <strong class="text-pitch-ink">%20</strong> oranında ▲/▼ olarak yansır.</p>
+                    <div class="space-y-1.5">
+                        @foreach ($going as $rsvp)
+                            @if (! $myPlayer || $rsvp->player_id !== $myPlayer->id)
+                                @php $cur = (int) ($myPerfRatings->get($rsvp->player_id) ?? 5); $rated = $myPerfRatings->has($rsvp->player_id); @endphp
+                                <div class="flex items-center justify-between gap-2 bg-pitch-bg border border-pitch-line rounded-lg px-3 py-2">
+                                    <span class="text-sm font-medium">{{ $rsvp->player->name }}</span>
+                                    <div class="flex items-center gap-1.5 shrink-0">
+                                        <button type="button" wire:click="ratePerformance({{ $rsvp->player_id }}, {{ max(1, $cur - 1) }})"
+                                                class="w-9 h-9 rounded-md bg-pitch-surface2 border border-pitch-line text-xl font-bold leading-none hover:brightness-125 active:scale-95 transition">−</button>
+                                        <span class="w-8 text-center font-display text-xl font-bold {{ $rated ? 'text-bibB' : 'text-pitch-muted/60' }}">{{ $cur }}</span>
+                                        <button type="button" wire:click="ratePerformance({{ $rsvp->player_id }}, {{ min(10, $cur + 1) }})"
+                                                class="w-9 h-9 rounded-md bg-pitch-surface2 border border-pitch-line text-xl font-bold leading-none hover:brightness-125 active:scale-95 transition">+</button>
+                                    </div>
+                                </div>
+                            @endif
+                        @endforeach
+                    </div>
+                @elseif (! $perfOpen && $perfAverages->isNotEmpty())
+                    <p class="text-sm text-pitch-muted">Bu maçın performans ortalamaları:</p>
+                    <ul class="space-y-1.5">
+                        @foreach ($going as $rsvp)
+                            @if ($perfAverages->has($rsvp->player_id))
+                                <li class="flex items-center justify-between gap-2 text-sm">
+                                    <span class="font-medium">{{ $rsvp->player->name }}</span>
+                                    <span class="font-display text-lg font-bold text-bibB">{{ number_format($perfAverages->get($rsvp->player_id), 1) }}</span>
+                                </li>
+                            @endif
+                        @endforeach
+                    </ul>
+                @elseif ($perfOpen)
+                    <p class="text-sm text-pitch-muted">Bu maçta oynamadığın için performans puanı veremezsin.</p>
+                @else
+                    <p class="text-sm text-pitch-muted">Performans puanı verilmedi.</p>
                 @endif
             </div>
         @endif

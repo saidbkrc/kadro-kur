@@ -21,11 +21,7 @@
                     <button wire:click="select({{ $player->id }})"
                             class="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-start transition
                                    {{ $selectedId === $player->id ? 'bg-bibB/10 border border-bibB' : 'border border-transparent hover:bg-pitch-surface2' }}">
-                        @if ($player->overallIsPublic())
-                            <span class="font-display text-xl font-bold w-10 text-center {{ $tier($player->overall()) }}">{{ number_format($player->overall(), 1) }}</span>
-                        @else
-                            <span class="font-display text-xl font-bold w-10 text-center text-pitch-muted" title="Puan, {{ \App\Models\Player::minRatingsForVisibility() }} kişi oylayınca görünür">?</span>
-                        @endif
+                        <x-ovr-badge :player="$player" num-class="text-xl w-10" />
                         <span class="grow">
                             <span class="font-semibold">{{ $player->name }}</span>
                             <span class="block text-xs text-pitch-muted">{{ implode(' · ', array_map(fn ($p) => Attributes::POSITIONS[$p] ?? $p, $player->positions ?? [])) }}</span>
@@ -72,12 +68,18 @@
                                 <div class="text-[11px] font-extrabold tracking-[.18em] text-pitch-muted border-t border-dashed border-pitch-line pt-3 mb-3">{{ $sectionTitle }}</div>
                                 <div class="space-y-3">
                                     @foreach ($attrs as $key => $label)
-                                        <div class="grid grid-cols-[110px,1fr,34px] items-center gap-3">
+                                        <div class="grid grid-cols-[84px,1fr] sm:grid-cols-[110px,1fr] items-center gap-2 sm:gap-3">
                                             <span class="text-[11px] font-bold tracking-wide text-pitch-muted">{{ $label }}</span>
-                                            <input type="range" min="1" max="10" step="1"
-                                                   wire:model.live="scores.{{ $key }}"
-                                                   class="w-full h-1.5 accent-bibB cursor-pointer">
-                                            <output class="font-display text-lg font-semibold text-end">{{ $scores[$key] ?? 5 }}</output>
+                                            <div class="flex items-center gap-2">
+                                                <button type="button" wire:click="adjust('{{ $key }}', -1)"
+                                                        class="w-9 h-9 shrink-0 rounded-md bg-pitch-bg border border-pitch-line text-xl font-bold leading-none hover:bg-pitch-surface2 active:scale-95 transition">−</button>
+                                                <input type="range" min="1" max="10" step="1"
+                                                       wire:model.live="scores.{{ $key }}"
+                                                       class="grow h-1.5 accent-bibB cursor-pointer">
+                                                <button type="button" wire:click="adjust('{{ $key }}', 1)"
+                                                        class="w-9 h-9 shrink-0 rounded-md bg-pitch-bg border border-pitch-line text-xl font-bold leading-none hover:bg-pitch-surface2 active:scale-95 transition">+</button>
+                                                <output class="font-display text-lg font-semibold w-7 text-end">{{ $scores[$key] ?? 5 }}</output>
+                                            </div>
                                         </div>
                                     @endforeach
                                 </div>

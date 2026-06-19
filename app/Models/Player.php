@@ -115,6 +115,40 @@ class Player extends Model
         return round(Attributes::overall($this->averageAttributes(), $this->positions ?? []), 1);
     }
 
+    /** Son 5 maçın performans ortalaması (her maçın kendi oy ortalamalarının ortalaması). Yoksa null. */
+    public function matchPerformance(): ?float
+    {
+        $perMatch = MatchPerformanceRating::query()
+            ->where('match_performance_ratings.player_id', $this->id)
+            ->join('matches', 'matches.id', '=', 'match_performance_ratings.match_id')
+            ->groupBy('match_performance_ratings.match_id', 'matches.starts_at')
+            ->orderByDesc('matches.starts_at')
+            ->limit(5)
+            ->selectRaw('AVG(match_performance_ratings.score) as avg_score')
+            ->pluck('avg_score');
+
+        return $perMatch->isEmpty() ? null : round($perMatch->avg(), 2);
+    }
+
+    /** FC26 tarzı nihai puan: OVR×0.8 + son 5 maç performansı×0.2. Performans yoksa sadece OVR. */
+    public function displayRating(): float
+    {
+        $ovr = $this->overall();
+        $perf = $this->matchPerformance();
+
+        return $perf === null ? $ovr : round($ovr * 0.8 + $perf * 0.2, 1);
+    }
+
+    /** Form göstergesi: nihai puan − OVR (▲ artı / ▼ eksi). Performans yoksa null. */
+    public function formDelta(): ?float
+    {
+        if ($this->matchPerformance() === null) {
+            return null;
+        }
+
+        return round($this->displayRating() - $this->overall(), 1);
+    }
+
     public function ratingCount(): int
     {
         return $this->attributeRatings->count();

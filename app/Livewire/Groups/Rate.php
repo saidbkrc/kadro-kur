@@ -59,6 +59,16 @@ class Rate extends Component
         $this->saved = false;
     }
 
+    /** +/- butonu: özelliği 1 artır/azalt (1-10 arası). Mobilde slider yerine kolay. */
+    public function adjust(string $key, int $delta): void
+    {
+        if (! array_key_exists($key, $this->scores)) {
+            return;
+        }
+
+        $this->scores[$key] = max(1, min(10, (int) $this->scores[$key] + $delta));
+    }
+
     public function save(): void
     {
         $player = $this->group->players()->findOrFail($this->selectedId);

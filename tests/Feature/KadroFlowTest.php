@@ -475,6 +475,56 @@ class KadroFlowTest extends TestCase
             ->assertStatus(404);
     }
 
+    public function test_mac_sonu_performans_puani_nihai_puana_yansir(): void
+    {
+        $owner = User::factory()->create();
+        $group = $this->makeGroup($owner);
+        $match = $this->makeMatch($group);
+        $ownPlayer = $group->playerFor($owner);
+        $friend = $this->addMember($group);
+
+        $match->setRsvp($ownPlayer, 'going');
+        $match->setRsvp($friend, 'going');
+
+        // Sonucu gir → performans (MVP) penceresi açılır
+        Livewire::actingAs($owner)->test(Matches\Show::class, ['match' => $match])
+            ->set('teamAScore', 1)->set('teamBScore', 0)->call('saveResult')->assertHasNoErrors();
+
+        // Owner, friend'e performans 8 verir (güncellenebilir)
+        Livewire::actingAs($owner)->test(Matches\Show::class, ['match' => $match])
+            ->call('ratePerformance', $friend->id, 6)
+            ->call('ratePerformance', $friend->id, 8);
+
+        $this->assertSame(1, $match->performanceRatings()->where('player_id', $friend->id)->count());
+        $this->assertSame(8, $match->performanceRatings()->where('player_id', $friend->id)->value('score'));
+
+        $friend->refresh();
+        $this->assertEqualsWithDelta(8.0, $friend->matchPerformance(), 0.01);
+        // OVR (puansız) = 5.0 → nihai = 5×0.8 + 8×0.2 = 5.6, form ▲0.6
+        $this->assertEqualsWithDelta(5.6, $friend->displayRating(), 0.01);
+        $this->assertEqualsWithDelta(0.6, $friend->formDelta(), 0.01);
+
+        // Kendine performans veremez
+        Livewire::actingAs($owner)->test(Matches\Show::class, ['match' => $match])
+            ->call('ratePerformance', $ownPlayer->id, 9)->assertStatus(403);
+    }
+
+    public function test_puanlama_arti_eksi_butonu_clampler(): void
+    {
+        $owner = User::factory()->create();
+        $group = $this->makeGroup($owner);
+        $friend = $this->addMember($group);
+
+        Livewire::actingAs($owner)->test(Groups\Rate::class, ['group' => $group])
+            ->call('select', $friend->id)
+            ->call('adjust', 'hiz', 3)   // 5 + 3 = 8
+            ->assertSet('scores.hiz', 8)
+            ->call('adjust', 'hiz', 10)  // 8 + 10 → 10 (üst sınır)
+            ->assertSet('scores.hiz', 10)
+            ->call('adjust', 'hiz', -20) // → 1 (alt sınır)
+            ->assertSet('scores.hiz', 1);
+    }
+
     public function test_sayfalar_acilir(): void
     {
         $owner = User::factory()->create();

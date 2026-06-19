@@ -3,6 +3,7 @@
 namespace App\Livewire\Matches;
 
 use App\Models\FootballMatch;
+use App\Models\MatchPerformanceRating;
 use App\Models\MvpVote;
 use App\Models\Player;
 use App\Models\Rsvp;
@@ -387,6 +388,24 @@ class Show extends Component
         );
     }
 
+    /** Maç sonu performans puanı: 24 saat içinde, asıl kadrodakiler, kendine yok, anonim, güncellenebilir. */
+    public function ratePerformance(int $playerId, int $score): void
+    {
+        abort_unless($this->match->mvpOpen(), 403);
+
+        $participants = $this->match->mainListRsvps();
+        $myPlayer = $participants->pluck('player')->firstWhere('user_id', Auth::id());
+
+        abort_if($myPlayer === null, 403);
+        abort_if($myPlayer->id === $playerId, 403);
+        abort_unless($participants->pluck('player_id')->contains($playerId), 403);
+
+        MatchPerformanceRating::updateOrCreate(
+            ['match_id' => $this->match->id, 'rater_id' => Auth::id(), 'player_id' => $playerId],
+            ['score' => max(1, min(10, $score))],
+        );
+    }
+
     public function cancelMatch(): void
     {
         abort_unless($this->match->canManage(Auth::user()), 403);
@@ -413,7 +432,7 @@ class Show extends Component
 
         $avg = fn ($team) => $team->isEmpty()
             ? 0.0
-            : round($team->avg(fn (Rsvp $r) => $r->player->overall()), 1);
+            : round($team->avg(fn (Rsvp $r) => $r->player->displayRating()), 1);
 
         // Başkanın katılım yönetimi: tüm kadro + her oyuncunun mevcut durumu
         $roster = $this->match->group->players()->orderBy('name')->get();
@@ -452,6 +471,14 @@ class Show extends Component
                 ->with('player')
                 ->get(),
             'matchGoals' => $this->match->goals()->with('player')->orderByDesc('count')->get(),
+            'perfOpen' => $this->match->mvpOpen(),
+            'myPerfRatings' => $this->match->performanceRatings()
+                ->where('rater_id', Auth::id())
+                ->pluck('score', 'player_id'),
+            'perfAverages' => $this->match->performanceRatings()
+                ->selectRaw('player_id, ROUND(AVG(score), 1) as avg_score')
+                ->groupBy('player_id')
+                ->pluck('avg_score', 'player_id'),
         ]);
     }
 
@@ -464,7 +491,7 @@ class Show extends Component
             'number' => $r->player->shirt_number,
             'positions' => $r->player->positions ?? [],
             'foot' => $r->player->foot ?? 'right',
-            'ovr' => $r->player->overall(),
+            'ovr' => $r->player->displayRating(),
             'ovr_public' => $r->player->overallIsPublic(),
             'attrs' => $r->player->averageAttributes(),
         ])->values()->all();
