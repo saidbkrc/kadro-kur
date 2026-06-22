@@ -81,15 +81,17 @@
 
         <div class="grid lg:grid-cols-3 gap-6 items-start">
             {{-- Yaklaşan maçlar --}}
-            <div class="lg:col-span-2 bg-pitch-surface border border-pitch-line rounded-xl p-6 space-y-4">
+            <div class="lg:col-span-2 min-w-0 bg-pitch-surface border border-pitch-line rounded-xl p-6 space-y-4">
                 <h3 class="font-display uppercase tracking-wider text-lg font-semibold">Yaklaşan Maçlar</h3>
-
+        
                 @forelse ($upcoming as $match)
                     @php $rsvp = $myRsvps[$match->id] ?? null; @endphp
                     <a href="{{ route('matches.show', $match) }}" wire:navigate
                        class="block border border-pitch-line rounded-lg p-4 hover:bg-pitch-surface2 transition">
-                        <div class="flex items-center justify-between gap-4">
-                            <div class="min-w-0">
+                       
+                        <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3 sm:gap-4">
+                            
+                            <div class="min-w-0 w-full">
                                 <div class="font-semibold truncate">{{ $match->title }}</div>
                                 <div class="text-sm text-pitch-muted mt-0.5 truncate">
                                     {{ $match->group->name }} · {{ $match->starts_at->translatedFormat('d F, l H:i') }}
@@ -97,7 +99,8 @@
                                 </div>
                                 <div class="text-xs text-bibB mt-1">{{ $match->starts_at->diffForHumans() }}</div>
                             </div>
-                            <div class="shrink-0 text-end space-y-1">
+                            
+                            <div class="shrink-0 text-start sm:text-end space-y-1">
                                 <div class="font-display text-xl font-bold {{ $match->going_count >= $match->capacity ? 'text-bibA' : '' }}">
                                     {{ $match->going_count }}<span class="text-pitch-muted text-sm">/{{ $match->capacity }}</span>
                                 </div>
@@ -125,14 +128,14 @@
                     </div>
                 @endforelse
             </div>
-
+        
             {{-- Gruplarım --}}
-            <div class="bg-pitch-surface border border-pitch-line rounded-xl p-6 space-y-3">
+            <div class="min-w-0 bg-pitch-surface border border-pitch-line rounded-xl p-6 space-y-3">
                 <div class="flex items-center justify-between">
                     <h3 class="font-display uppercase tracking-wider text-lg font-semibold">Gruplarım</h3>
                     <a href="{{ route('groups.index') }}" wire:navigate class="text-xs text-bibB hover:underline">Tümü →</a>
                 </div>
-
+        
                 @forelse ($groups as $group)
                     <a href="{{ route('groups.show', $group) }}" wire:navigate
                        class="flex items-center gap-3 border border-pitch-line rounded-lg p-3 hover:bg-pitch-surface2 transition">
