@@ -57,21 +57,21 @@
                     @foreach ($pending['needsRsvp'] as $match)
                         <a href="{{ route('matches.show', $match) }}" wire:navigate
                            class="flex items-center justify-between gap-3 border border-pitch-line rounded-lg px-4 py-3 hover:bg-pitch-surface2 transition">
-                            <span><span class="text-bibB font-semibold">Katılım bildir</span> · {{ $match->title }} <span class="text-pitch-muted text-sm">({{ $match->group->name }})</span></span>
+                            <span class="min-w-0 break-words"><span class="text-bibB font-semibold">Katılım bildir</span> · {{ $match->title }} <span class="text-pitch-muted text-sm">({{ $match->group->name }})</span></span>
                             <span class="text-pitch-muted text-sm shrink-0">{{ $match->starts_at->diffForHumans() }} →</span>
                         </a>
                     @endforeach
                     @foreach ($pending['squadVotes'] as $match)
                         <a href="{{ route('matches.show', $match) }}" wire:navigate
                            class="flex items-center justify-between gap-3 border border-pitch-line rounded-lg px-4 py-3 hover:bg-pitch-surface2 transition">
-                            <span><span class="text-gold font-semibold">Kadroyu oyla</span> · {{ $match->title }} <span class="text-pitch-muted text-sm">({{ $match->group->name }})</span></span>
+                            <span class="min-w-0 break-words"><span class="text-gold font-semibold">Kadroyu oyla</span> · {{ $match->title }} <span class="text-pitch-muted text-sm">({{ $match->group->name }})</span></span>
                             <span class="text-pitch-muted text-sm shrink-0">oylama açık →</span>
                         </a>
                     @endforeach
                     @foreach ($pending['mvpVotes'] as $match)
                         <a href="{{ route('matches.show', $match) }}" wire:navigate
                            class="flex items-center justify-between gap-3 border border-pitch-line rounded-lg px-4 py-3 hover:bg-pitch-surface2 transition">
-                            <span><span class="text-gold font-semibold">MVP seç 🏆</span> · {{ $match->title }} <span class="text-pitch-muted text-sm">({{ $match->group->name }})</span></span>
+                            <span class="min-w-0 break-words"><span class="text-gold font-semibold">MVP seç 🏆</span> · {{ $match->title }} <span class="text-pitch-muted text-sm">({{ $match->group->name }})</span></span>
                             <span class="text-pitch-muted text-sm shrink-0">{{ (int) ceil(now()->diffInHours($match->mvp_closes_at, true)) }} saat kaldı →</span>
                         </a>
                     @endforeach

@@ -525,6 +525,57 @@ class KadroFlowTest extends TestCase
             ->assertSet('scores.hiz', 1);
     }
 
+    public function test_baska_grubun_sayfasina_ve_macina_erisilemez(): void
+    {
+        // İzolasyon — 1. katman: mount'taki üyelik kapısı (abort_unless isMember, 403)
+        $ownerA = User::factory()->create();
+        $groupA = $this->makeGroup($ownerA);
+        $matchA = $this->makeMatch($groupA);
+
+        // ownerB, A grubunun üyesi değil (kendi grubu var)
+        $ownerB = User::factory()->create();
+        $this->makeGroup($ownerB);
+
+        // HTTP istekleri: yabancı kullanıcı A'nın sayfalarını göremez
+        $this->actingAs($ownerB)->get(route('groups.show', $groupA))->assertForbidden();
+        $this->actingAs($ownerB)->get(route('groups.rate', $groupA))->assertForbidden();
+        $this->actingAs($ownerB)->get(route('groups.stats', $groupA))->assertForbidden();
+        $this->actingAs($ownerB)->get(route('matches.show', $matchA))->assertForbidden();
+
+        // Livewire mount kapısı da doğrudan erişimi engeller
+        Livewire::actingAs($ownerB)->test(Matches\Show::class, ['match' => $matchA])->assertStatus(403);
+        Livewire::actingAs($ownerB)->test(Groups\Show::class, ['group' => $groupA])->assertStatus(403);
+    }
+
+    public function test_capraz_grup_id_ile_oyuncu_yonetilemez(): void
+    {
+        // İzolasyon — 2. katman: ilişki-traversal kapsama (başka grubun ID'si bulunamaz)
+        $ownerA = User::factory()->create();
+        $groupA = $this->makeGroup($ownerA);
+        $matchA = $this->makeMatch($groupA);
+
+        $ownerB = User::factory()->create();
+        $groupB = $this->makeGroup($ownerB);
+        $playerB = $this->addMember($groupB); // B grubunun oyuncusu
+
+        // ownerA kendi grubunun adminidir (403 kapısını geçer) ama B'nin oyuncu ID'siyle
+        // aksiyon denerse, $this->group->players()->findOrFail() zinciri onu bulamaz → 404
+        $this->assertThrows(
+            fn () => Livewire::actingAs($ownerA)
+                ->test(Groups\Show::class, ['group' => $groupA])
+                ->call('editPositions', $playerB->id),
+            \Illuminate\Database\Eloquent\ModelNotFoundException::class,
+        );
+
+        // Maç aksiyonunda da çapraz-grup oyuncu ID'si ebeveynden çözülemez → 404
+        $this->assertThrows(
+            fn () => Livewire::actingAs($ownerA)
+                ->test(Matches\Show::class, ['match' => $matchA])
+                ->call('setPlayerRsvp', $playerB->id, 'going'),
+            \Illuminate\Database\Eloquent\ModelNotFoundException::class,
+        );
+    }
+
     public function test_sayfalar_acilir(): void
     {
         $owner = User::factory()->create();
