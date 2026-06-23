@@ -9,6 +9,7 @@ use App\Models\Group;
 use App\Models\Player;
 use App\Models\User;
 use App\Services\MatchScheduler;
+use App\Services\PlayerBadges;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Livewire\Livewire;
 use Tests\TestCase;
@@ -574,6 +575,71 @@ class KadroFlowTest extends TestCase
                 ->call('setPlayerRsvp', $playerB->id, 'going'),
             \Illuminate\Database\Eloquent\ModelNotFoundException::class,
         );
+    }
+
+    public function test_rozetler_mac_verisinden_hesaplanir(): void
+    {
+        $owner = User::factory()->create();
+        $group = $this->makeGroup($owner);
+        $p1 = $group->playerFor($owner);
+        $p2 = $this->addMember($group);
+
+        // Tamamlanmış maç: A 5–2 B, MVP penceresi kapanmış (mvp sayılsın)
+        $match = $group->matches()->create([
+            'created_by' => $owner->id,
+            'title' => 'Final',
+            'starts_at' => now()->subDay(),
+            'capacity' => 14,
+            'status' => 'completed',
+            'team_a_score' => 5,
+            'team_b_score' => 2,
+            'mvp_closes_at' => now()->subHour(),
+        ]);
+        $match->rsvps()->create(['player_id' => $p1->id, 'status' => 'going', 'team' => 'A']);
+        $match->rsvps()->create(['player_id' => $p2->id, 'status' => 'going', 'team' => 'B']);
+        $match->goals()->create(['player_id' => $p1->id, 'count' => 3]); // hat-trick
+        $match->mvpVotes()->create(['voter_id' => $owner->id, 'player_id' => $p1->id]);
+
+        $badges = app(PlayerBadges::class);
+        $stats = $badges->statsForPlayer($p1);
+
+        $this->assertSame(1, $stats['played']);
+        $this->assertSame(1, $stats['win']);
+        $this->assertSame(3, $stats['goals']);
+        $this->assertSame(3, $stats['best_match_goals']);
+        $this->assertSame(1, $stats['mvp']);
+
+        $earned = collect($badges->evaluate($stats))->where('earned', true)->pluck('key');
+        $this->assertContains('first_goal', $earned);
+        $this->assertContains('hat_trick', $earned);
+        $this->assertContains('mvp', $earned);
+        $this->assertContains('first_match', $earned);
+        $this->assertNotContains('scorer', $earned);  // 10 gol eşiği geçilmedi
+        $this->assertNotContains('veteran', $earned);  // 50 maç eşiği geçilmedi
+    }
+
+    public function test_oyuncu_profili_izolasyon_korunur(): void
+    {
+        $ownerA = User::factory()->create();
+        $groupA = $this->makeGroup($ownerA);
+        $playerA = $groupA->playerFor($ownerA);
+
+        $ownerB = User::factory()->create();
+        $groupB = $this->makeGroup($ownerB);
+        $playerB = $groupB->playerFor($ownerB);
+
+        // Üye olmayan A grubundaki bir oyuncunun profilini göremez (mount kapısı, 403)
+        $this->actingAs($ownerB)->get(route('groups.player', [$groupA, $playerA]))->assertForbidden();
+
+        // A admini, B'nin oyuncu ID'siyle A grubu üzerinden profile erişemez (traversal, 404)
+        $this->assertThrows(
+            fn () => Livewire::actingAs($ownerA)
+                ->test(Groups\PlayerProfile::class, ['group' => $groupA, 'player' => $playerB]),
+            \Illuminate\Database\Eloquent\ModelNotFoundException::class,
+        );
+
+        // Kendi grubundaki oyuncu profili normal açılır
+        $this->actingAs($ownerA)->get(route('groups.player', [$groupA, $playerA]))->assertOk();
     }
 
     public function test_sayfalar_acilir(): void

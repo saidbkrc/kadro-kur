@@ -4,6 +4,7 @@ namespace App\Livewire\Groups;
 
 use App\Models\FootballMatch;
 use App\Models\Group;
+use App\Services\PlayerBadges;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\View\View;
 use Livewire\Attributes\Layout;
@@ -22,8 +23,13 @@ class Stats extends Component
         $this->group = $group;
     }
 
-    public function render(): View
+    public function render(PlayerBadges $badges): View
     {
+        // Her oyuncunun kazandığı rozet ikonları (oyuncu tablosunda gösterilir)
+        $earnedIcons = $badges->statsForGroup($this->group)->map(
+            fn (array $s) => collect($badges->evaluate($s))->where('earned', true)->pluck('icon')->all()
+        );
+
         $matches = $this->group->matches()
             ->where('status', 'completed')
             ->with(['rsvps.player', 'goals.player', 'mvpVotes.player'])
@@ -103,6 +109,7 @@ class Stats extends Component
             'matches' => $matches,
             'playerStats' => $playerStats,
             'topScorers' => $topScorers,
+            'earnedIcons' => $earnedIcons,
         ]);
     }
 }
