@@ -40,7 +40,7 @@
             </div>
 
             {{-- Puanlama formu --}}
-            <div class="min-w-0 bg-pitch-surface border border-pitch-line rounded-xl p-6">
+            <div class="min-w-0 bg-pitch-surface border border-pitch-line rounded-xl p-4 sm:p-6">
                 @if ($selected)
                     <form wire:submit="save" class="space-y-5">
                         <div class="flex items-center justify-between gap-4">
@@ -66,27 +66,32 @@
                         @endphp
 
                         @foreach ($sections as [$sectionTitle, $attrs])
-                            <div>
-                                <div class="text-[11px] font-extrabold tracking-[.18em] text-pitch-muted border-t border-dashed border-pitch-line pt-3 mb-3">{{ $sectionTitle }}</div>
-                                <div class="space-y-3">
-                                    @foreach ($attrs as $key => $label)
-                                        <div class="grid grid-cols-[84px,1fr] sm:grid-cols-[110px,1fr] items-center gap-2 sm:gap-3">
-                                            <span class="text-[11px] font-bold tracking-wide text-pitch-muted">{{ $label }}</span>
-                                            <div class="flex items-center gap-2">
-                                                <button type="button" wire:click="adjust('{{ $key }}', -1)"
-                                                        class="w-9 h-9 shrink-0 rounded-md bg-pitch-bg border border-pitch-line text-xl font-bold leading-none hover:bg-pitch-surface2 active:scale-95 transition">−</button>
-                                                <input type="range" min="1" max="10" step="1"
-                                                       wire:model.live="scores.{{ $key }}"
-                                                       class="grow h-1.5 accent-bibB cursor-pointer">
-                                                <button type="button" wire:click="adjust('{{ $key }}', 1)"
-                                                        class="w-9 h-9 shrink-0 rounded-md bg-pitch-bg border border-pitch-line text-xl font-bold leading-none hover:bg-pitch-surface2 active:scale-95 transition">+</button>
-                                                <output class="font-display text-lg font-semibold w-7 text-end shrink-0">{{ $scores[$key] ?? 5 }}</output>
+                                <div>
+                                    <div class="text-[11px] font-extrabold tracking-[.18em] text-pitch-muted border-t border-dashed border-pitch-line pt-3 mb-3">{{ $sectionTitle }}</div>
+                                    <div class="space-y-3">
+                                        @foreach ($attrs as $key => $label)
+                                            <div class="grid grid-cols-[76px,1fr] sm:grid-cols-[110px,1fr] items-center gap-1.5 sm:gap-3">
+                                                
+                                                <span class="text-[10px] sm:text-[11px] font-bold tracking-wide text-pitch-muted leading-tight">{{ $label }}</span>
+                                                
+                                                <div class="flex items-center gap-1.5 sm:gap-2 min-w-0">
+                                                    <button type="button" wire:click="adjust('{{ $key }}', -1)"
+                                                            class="w-8 h-8 sm:w-9 sm:h-9 shrink-0 rounded-md bg-pitch-bg border border-pitch-line text-xl font-bold leading-none hover:bg-pitch-surface2 active:scale-95 transition">−</button>
+                                                    
+                                                    <input type="range" min="1" max="10" step="1"
+                                                        wire:model.live="scores.{{ $key }}"
+                                                        class="grow min-w-[40px] sm:min-w-0 h-1.5 accent-bibB cursor-pointer">
+                                                    
+                                                    <button type="button" wire:click="adjust('{{ $key }}', 1)"
+                                                            class="w-8 h-8 sm:w-9 sm:h-9 shrink-0 rounded-md bg-pitch-bg border border-pitch-line text-xl font-bold leading-none hover:bg-pitch-surface2 active:scale-95 transition">+</button>
+                                                    
+                                                    <output class="font-display text-base sm:text-lg font-semibold w-5 sm:w-7 text-end shrink-0">{{ $scores[$key] ?? 5 }}</output>
+                                                </div>
                                             </div>
-                                        </div>
-                                    @endforeach
+                                        @endforeach
+                                    </div>
                                 </div>
-                            </div>
-                        @endforeach
+                            @endforeach
 
                         <div class="flex items-center gap-3 pt-2">
                             <x-primary-button>Puanları Kaydet</x-primary-button>
