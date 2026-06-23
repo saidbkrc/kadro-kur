@@ -16,16 +16,18 @@
 
         <div class="grid lg:grid-cols-[340px,1fr] gap-6 items-start">
             {{-- Oyuncu listesi --}}
-            <div class="bg-pitch-surface border border-pitch-line rounded-xl p-4 space-y-1">
+            <div class="min-w-0 bg-pitch-surface border border-pitch-line rounded-xl p-4 space-y-1">
                 @forelse ($players as $player)
                     <button wire:click="select({{ $player->id }})"
                             class="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-start transition
                                    {{ $selectedId === $player->id ? 'bg-bibB/10 border border-bibB' : 'border border-transparent hover:bg-pitch-surface2' }}">
-                        <x-ovr-badge :player="$player" num-class="text-xl w-10" />
-                        <span class="grow">
-                            <span class="font-semibold">{{ $player->name }}</span>
-                            <span class="block text-xs text-pitch-muted">{{ implode(' · ', array_map(fn ($p) => Attributes::POSITIONS[$p] ?? $p, $player->positions ?? [])) }}</span>
+                        <x-ovr-badge :player="$player" num-class="text-xl w-10 shrink-0" />
+                        
+                        <span class="grow min-w-0">
+                            <span class="font-semibold block truncate">{{ $player->name }}</span>
+                            <span class="block text-xs text-pitch-muted truncate">{{ implode(' · ', array_map(fn ($p) => Attributes::POSITIONS[$p] ?? $p, $player->positions ?? [])) }}</span>
                         </span>
+                        
                         @if ($ratedIds->contains($player->id))
                             <span class="text-bibB text-sm shrink-0" title="Puanladın">✓</span>
                         @else
@@ -38,12 +40,12 @@
             </div>
 
             {{-- Puanlama formu --}}
-            <div class="bg-pitch-surface border border-pitch-line rounded-xl p-6">
+            <div class="min-w-0 bg-pitch-surface border border-pitch-line rounded-xl p-6">
                 @if ($selected)
                     <form wire:submit="save" class="space-y-5">
-                        <div class="flex items-center justify-between">
-                            <h3 class="font-display uppercase tracking-wider text-xl font-semibold">{{ $selected->name }}</h3>
-                            <div class="text-end">
+                        <div class="flex items-center justify-between gap-4">
+                            <h3 class="font-display uppercase tracking-wider text-xl font-semibold truncate min-w-0">{{ $selected->name }}</h3>
+                            <div class="text-end shrink-0">
                                 <span class="block text-[11px] tracking-[.15em] text-pitch-muted">SENİN VERDİĞİN GENEL</span>
                                 <span class="font-display text-3xl font-bold {{ $tier(Attributes::overall($scores, $selected->positions ?? [])) }}">
                                     {{ number_format(Attributes::overall($scores, $selected->positions ?? []), 1) }}
@@ -78,7 +80,7 @@
                                                        class="grow h-1.5 accent-bibB cursor-pointer">
                                                 <button type="button" wire:click="adjust('{{ $key }}', 1)"
                                                         class="w-9 h-9 shrink-0 rounded-md bg-pitch-bg border border-pitch-line text-xl font-bold leading-none hover:bg-pitch-surface2 active:scale-95 transition">+</button>
-                                                <output class="font-display text-lg font-semibold w-7 text-end">{{ $scores[$key] ?? 5 }}</output>
+                                                <output class="font-display text-lg font-semibold w-7 text-end shrink-0">{{ $scores[$key] ?? 5 }}</output>
                                             </div>
                                         </div>
                                     @endforeach
