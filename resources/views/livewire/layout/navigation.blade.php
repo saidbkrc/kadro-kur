@@ -16,7 +16,35 @@ new class extends Component
     }
 }; ?>
 
-<nav x-data="{ open: false }" class="relative z-50 bg-pitch-surface/80 border-b border-pitch-line backdrop-blur">
+<nav
+    x-data="{
+        open: false,
+        pwaInstallable: false,
+        isIOS: /iphone|ipad|ipod/i.test(navigator.userAgent),
+        standalone: window.matchMedia('(display-mode: standalone)').matches || window.navigator.standalone === true,
+        showIosHelp: false,
+        init() {
+            if (window.__pwaPrompt) this.pwaInstallable = true;
+        },
+        get canInstall() {
+            return !this.standalone && (this.pwaInstallable || this.isIOS);
+        },
+        async install() {
+            if (window.__pwaPrompt) {
+                window.__pwaPrompt.prompt();
+                await window.__pwaPrompt.userChoice;
+                window.__pwaPrompt = null;
+                this.pwaInstallable = false;
+            } else if (this.isIOS) {
+                this.open = false;
+                this.showIosHelp = true;
+            }
+        },
+    }"
+    @pwa-installable.window="pwaInstallable = true"
+    @pwa-installed.window="pwaInstallable = false; standalone = true"
+    class="relative z-50 bg-pitch-surface/80 border-b border-pitch-line backdrop-blur"
+>
     <!-- Primary Navigation Menu -->
     <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div class="flex justify-between h-16">
@@ -65,6 +93,12 @@ new class extends Component
                     </x-slot>
 
                     <x-slot name="content">
+                        <button x-show="canInstall" x-cloak @click="install()" class="w-full text-start">
+                            <x-dropdown-link>
+                                📲 Uygulamayı Yükle
+                            </x-dropdown-link>
+                        </button>
+
                         <x-dropdown-link :href="route('profile')" wire:navigate>
                             {{ __('Profile') }}
                         </x-dropdown-link>
@@ -112,6 +146,12 @@ new class extends Component
             </div>
 
             <div class="mt-3 space-y-1">
+                <button x-show="canInstall" x-cloak @click="install()" class="w-full text-start">
+                    <x-responsive-nav-link>
+                        📲 Uygulamayı Yükle
+                    </x-responsive-nav-link>
+                </button>
+
                 <x-responsive-nav-link :href="route('profile')" wire:navigate>
                     {{ __('Profile') }}
                 </x-responsive-nav-link>
@@ -129,7 +169,30 @@ new class extends Component
         <div class="pt-2 pb-3 space-y-1">
             <x-responsive-nav-link :href="route('login')" wire:navigate>Giriş Yap</x-responsive-nav-link>
             <x-responsive-nav-link :href="route('register')" wire:navigate>Kayıt Ol</x-responsive-nav-link>
+            <button x-show="canInstall" x-cloak @click="install()" class="w-full text-start">
+                <x-responsive-nav-link>
+                    📲 Uygulamayı Yükle
+                </x-responsive-nav-link>
+            </button>
         </div>
         @endguest
+    </div>
+
+    <!-- iOS "Ana Ekrana Ekle" talimatı (Safari beforeinstallprompt desteklemez) -->
+    <div x-show="showIosHelp" x-cloak
+         class="fixed inset-0 z-[100] flex items-end sm:items-center justify-center bg-black/60 p-4"
+         @click.self="showIosHelp = false">
+        <div class="w-full max-w-sm rounded-2xl bg-pitch-surface border border-pitch-line p-5 text-pitch-ink shadow-xl">
+            <div class="flex items-center justify-between mb-3">
+                <h3 class="font-display uppercase tracking-wider text-lg font-bold">📲 Uygulamayı Yükle</h3>
+                <button @click="showIosHelp = false" class="text-pitch-muted hover:text-pitch-ink text-xl leading-none">&times;</button>
+            </div>
+            <p class="text-sm text-pitch-muted mb-3">iPhone / iPad'de Kadro Kur'u ana ekrana eklemek için:</p>
+            <ol class="space-y-2 text-sm">
+                <li class="flex gap-2"><span class="text-bibB font-bold">1.</span> Safari'nin altındaki <span class="font-semibold">Paylaş</span> butonuna dokun <span class="text-pitch-muted">(kare + ok ⬆️)</span></li>
+                <li class="flex gap-2"><span class="text-bibB font-bold">2.</span> <span class="font-semibold">Ana Ekrana Ekle</span> seçeneğini bul</li>
+                <li class="flex gap-2"><span class="text-bibB font-bold">3.</span> Sağ üstten <span class="font-semibold">Ekle</span>'ye dokun</li>
+            </ol>
+        </div>
     </div>
 </nav>

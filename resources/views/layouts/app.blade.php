@@ -28,6 +28,16 @@
             if ('serviceWorker' in navigator) {
                 window.addEventListener('load', () => navigator.serviceWorker.register('/sw.js').catch(() => {}));
             }
+            // PWA: yükleme isteğini yakala (menüdeki "Uygulamayı Yükle" butonu kullanır)
+            window.addEventListener('beforeinstallprompt', (e) => {
+                e.preventDefault();
+                window.__pwaPrompt = e;
+                window.dispatchEvent(new CustomEvent('pwa-installable'));
+            });
+            window.addEventListener('appinstalled', () => {
+                window.__pwaPrompt = null;
+                window.dispatchEvent(new CustomEvent('pwa-installed'));
+            });
         </script>
     </head>
     <body class="font-sans antialiased text-pitch-ink overflow-x-hidden">
