@@ -6,74 +6,75 @@
         </div>
 
         <div class="grid lg:grid-cols-2 gap-6 items-start">
-            <div class="space-y-6">
+            <div class="space-y-6 min-w-0">
+                
                 {{-- Gol krallığı --}}
-                <div class="bg-pitch-surface border border-pitch-line rounded-xl p-6">
+                <div class="min-w-0 bg-pitch-surface border border-pitch-line rounded-xl p-4 sm:p-6">
                     <h3 class="font-display uppercase tracking-wider text-lg font-semibold mb-3">👑 Gol Krallığı</h3>
                     @if ($topScorers->isEmpty())
                         <p class="text-pitch-muted text-sm">Henüz gol kaydı yok — maç sonucu girerken golleri atanları da işaretle.</p>
                     @else
-                        <div class="overflow-x-auto -mx-2">
-                        <table class="w-full min-w-[420px] text-sm">
-                            <tr class="text-[11px] tracking-[.12em] text-pitch-muted text-start">
-                                <th class="text-start py-2 px-2 border-b border-pitch-line"></th>
-                                <th class="text-start py-2 px-2 border-b border-pitch-line">OYUNCU</th>
-                                <th class="text-center py-2 px-2 border-b border-pitch-line">GOL</th>
-                                <th class="text-center py-2 px-2 border-b border-pitch-line">MAÇ</th>
-                                <th class="text-center py-2 px-2 border-b border-pitch-line">GOL/MAÇ</th>
-                            </tr>
-                            @foreach ($topScorers as $i => $s)
-                                <tr>
-                                    <td class="py-2 px-2 border-b border-pitch-line font-display font-bold {{ $i === 0 ? 'text-gold' : 'text-pitch-muted' }} w-9">{{ $i === 0 ? '👑' : ($i + 1).'.' }}</td>
-                                    <td class="py-2 px-2 border-b border-pitch-line font-semibold">{{ $s['player']->name }}</td>
-                                    <td class="py-2 px-2 border-b border-pitch-line text-center font-extrabold text-gold">{{ $s['goals'] }}</td>
-                                    <td class="py-2 px-2 border-b border-pitch-line text-center">{{ $s['played'] }}</td>
-                                    <td class="py-2 px-2 border-b border-pitch-line text-center">{{ $s['played'] > 0 ? number_format($s['goals'] / $s['played'], 1) : '–' }}</td>
+                        <div class="overflow-x-auto -mx-4 px-4 sm:-mx-6 sm:px-6">
+                            <table class="w-full min-w-[420px] text-sm">
+                                <tr class="text-[11px] tracking-[.12em] text-pitch-muted text-start">
+                                    <th class="text-start py-2 px-2 border-b border-pitch-line"></th>
+                                    <th class="text-start py-2 px-2 border-b border-pitch-line">OYUNCU</th>
+                                    <th class="text-center py-2 px-2 border-b border-pitch-line">GOL</th>
+                                    <th class="text-center py-2 px-2 border-b border-pitch-line">MAÇ</th>
+                                    <th class="text-center py-2 px-2 border-b border-pitch-line">GOL/MAÇ</th>
                                 </tr>
-                            @endforeach
-                        </table>
+                                @foreach ($topScorers as $i => $s)
+                                    <tr>
+                                        <td class="py-2 px-2 border-b border-pitch-line font-display font-bold {{ $i === 0 ? 'text-gold' : 'text-pitch-muted' }} w-9">{{ $i === 0 ? '👑' : ($i + 1).'.' }}</td>
+                                        <td class="py-2 px-2 border-b border-pitch-line font-semibold">{{ $s['player']->name }}</td>
+                                        <td class="py-2 px-2 border-b border-pitch-line text-center font-extrabold text-gold">{{ $s['goals'] }}</td>
+                                        <td class="py-2 px-2 border-b border-pitch-line text-center">{{ $s['played'] }}</td>
+                                        <td class="py-2 px-2 border-b border-pitch-line text-center">{{ $s['played'] > 0 ? number_format($s['goals'] / $s['played'], 1) : '–' }}</td>
+                                    </tr>
+                                @endforeach
+                            </table>
                         </div>
                     @endif
                 </div>
 
                 {{-- Oyuncu istatistikleri --}}
-                <div class="bg-pitch-surface border border-pitch-line rounded-xl p-6">
+                <div class="min-w-0 bg-pitch-surface border border-pitch-line rounded-xl p-4 sm:p-6">
                     <h3 class="font-display uppercase tracking-wider text-lg font-semibold mb-3">Oyuncu İstatistikleri</h3>
                     @if ($playerStats->isEmpty())
                         <p class="text-pitch-muted text-sm">Henüz istatistik yok — ilk maç sonucu kaydedildiğinde burası dolacak.</p>
                     @else
-                        <div class="overflow-x-auto -mx-2">
-                        <table class="w-full min-w-[520px] text-sm">
-                            <tr class="text-[11px] tracking-[.12em] text-pitch-muted">
-                                <th class="text-start py-2 px-2 border-b border-pitch-line">OYUNCU</th>
-                                <th class="text-center py-2 px-2 border-b border-pitch-line">MAÇ</th>
-                                <th class="text-center py-2 px-2 border-b border-pitch-line">G</th>
-                                <th class="text-center py-2 px-2 border-b border-pitch-line">B</th>
-                                <th class="text-center py-2 px-2 border-b border-pitch-line">M</th>
-                                <th class="text-center py-2 px-2 border-b border-pitch-line">⚽</th>
-                                <th class="text-center py-2 px-2 border-b border-pitch-line">⭐</th>
-                                <th class="text-center py-2 px-2 border-b border-pitch-line">KAZANMA</th>
-                            </tr>
-                            @foreach ($playerStats as $s)
-                                <tr>
-                                    <td class="py-2 px-2 border-b border-pitch-line font-semibold">{{ $s['player']->name }}</td>
-                                    <td class="py-2 px-2 border-b border-pitch-line text-center">{{ $s['played'] }}</td>
-                                    <td class="py-2 px-2 border-b border-pitch-line text-center text-[#7DE39A]">{{ $s['win'] }}</td>
-                                    <td class="py-2 px-2 border-b border-pitch-line text-center text-pitch-muted">{{ $s['draw'] }}</td>
-                                    <td class="py-2 px-2 border-b border-pitch-line text-center text-[#FF8A8A]">{{ $s['loss'] }}</td>
-                                    <td class="py-2 px-2 border-b border-pitch-line text-center">{{ $s['goals'] ?: '–' }}</td>
-                                    <td class="py-2 px-2 border-b border-pitch-line text-center">{{ $s['mvp'] ?: '–' }}</td>
-                                    <td class="py-2 px-2 border-b border-pitch-line text-center font-bold">%{{ $s['played'] > 0 ? round($s['win'] / $s['played'] * 100) : 0 }}</td>
+                        <div class="overflow-x-auto -mx-4 px-4 sm:-mx-6 sm:px-6">
+                            <table class="w-full min-w-[520px] text-sm">
+                                <tr class="text-[11px] tracking-[.12em] text-pitch-muted">
+                                    <th class="text-start py-2 px-2 border-b border-pitch-line">OYUNCU</th>
+                                    <th class="text-center py-2 px-2 border-b border-pitch-line">MAÇ</th>
+                                    <th class="text-center py-2 px-2 border-b border-pitch-line">G</th>
+                                    <th class="text-center py-2 px-2 border-b border-pitch-line">B</th>
+                                    <th class="text-center py-2 px-2 border-b border-pitch-line">M</th>
+                                    <th class="text-center py-2 px-2 border-b border-pitch-line">⚽</th>
+                                    <th class="text-center py-2 px-2 border-b border-pitch-line">⭐</th>
+                                    <th class="text-center py-2 px-2 border-b border-pitch-line">KAZANMA</th>
                                 </tr>
-                            @endforeach
-                        </table>
+                                @foreach ($playerStats as $s)
+                                    <tr>
+                                        <td class="py-2 px-2 border-b border-pitch-line font-semibold">{{ $s['player']->name }}</td>
+                                        <td class="py-2 px-2 border-b border-pitch-line text-center">{{ $s['played'] }}</td>
+                                        <td class="py-2 px-2 border-b border-pitch-line text-center text-[#7DE39A]">{{ $s['win'] }}</td>
+                                        <td class="py-2 px-2 border-b border-pitch-line text-center text-pitch-muted">{{ $s['draw'] }}</td>
+                                        <td class="py-2 px-2 border-b border-pitch-line text-center text-[#FF8A8A]">{{ $s['loss'] }}</td>
+                                        <td class="py-2 px-2 border-b border-pitch-line text-center">{{ $s['goals'] ?: '–' }}</td>
+                                        <td class="py-2 px-2 border-b border-pitch-line text-center">{{ $s['mvp'] ?: '–' }}</td>
+                                        <td class="py-2 px-2 border-b border-pitch-line text-center font-bold">%{{ $s['played'] > 0 ? round($s['win'] / $s['played'] * 100) : 0 }}</td>
+                                    </tr>
+                                @endforeach
+                            </table>
                         </div>
                     @endif
                 </div>
             </div>
 
             {{-- Maç geçmişi --}}
-            <div class="bg-pitch-surface border border-pitch-line rounded-xl p-6">
+            <div class="min-w-0 bg-pitch-surface border border-pitch-line rounded-xl p-4 sm:p-6">
                 <h3 class="font-display uppercase tracking-wider text-lg font-semibold mb-3">Maç Geçmişi <span class="text-xs text-pitch-muted font-normal tracking-widest">{{ $matches->count() }} MAÇ</span></h3>
                 @if ($matches->isEmpty())
                     <p class="text-pitch-muted text-sm">Kayıtlı maç yok. Maç sayfasında takımları kurup maç sonrası skoru kaydet.</p>
@@ -98,21 +99,23 @@
                                 $mvpName = $match->mvpVotes->firstWhere('player_id', $topId)?->player?->name;
                             }
                         @endphp
-                        <a href="{{ route('matches.show', $match) }}" wire:navigate class="block py-3 hover:bg-pitch-surface2 rounded-lg px-2 -mx-2 transition">
+                        <a href="{{ route('matches.show', $match) }}" wire:navigate class="block py-3 sm:py-4 hover:bg-pitch-surface2 rounded-lg px-2 -mx-2 transition">
                             <div class="text-xs text-pitch-muted">{{ $match->starts_at->translatedFormat('d F Y, l') }}</div>
-                            <div class="flex items-center gap-4 mt-1">
-                                <span class="font-display text-2xl font-bold whitespace-nowrap">
+                            
+                            <div class="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-4 mt-1.5 sm:mt-1">
+                                <span class="font-display text-2xl font-bold whitespace-nowrap shrink-0">
                                     <span class="text-bibA {{ $match->team_a_score > $match->team_b_score ? 'underline underline-offset-4' : '' }}">{{ $match->team_a_score }}</span>
                                     :
                                     <span class="text-bibB {{ $match->team_b_score > $match->team_a_score ? 'underline underline-offset-4' : '' }}">{{ $match->team_b_score }}</span>
                                 </span>
-                                <span class="text-xs text-pitch-muted leading-relaxed">
+                                <span class="text-xs text-pitch-muted leading-relaxed min-w-0 break-words">
                                     @if ($teamNames('A'))<b class="text-bibA">Turuncu:</b> {{ $teamNames('A') }}<br>@endif
                                     @if ($teamNames('B'))<b class="text-bibB">Yeşil:</b> {{ $teamNames('B') }}@endif
                                 </span>
                             </div>
+
                             @if ($goalText || $mvpName)
-                                <div class="text-xs text-pitch-muted mt-1">
+                                <div class="text-xs text-pitch-muted mt-2 min-w-0 break-words">
                                     @if ($goalText)⚽ <b class="text-pitch-ink">{{ $goalText }}</b>@endif
                                     @if ($goalText && $mvpName) &nbsp;·&nbsp; @endif
                                     @if ($mvpName)⭐ Maçın adamı: <b class="text-gold">{{ $mvpName }}</b>@endif
