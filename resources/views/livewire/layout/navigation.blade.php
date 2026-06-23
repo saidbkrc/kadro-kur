@@ -22,12 +22,13 @@ new class extends Component
         pwaInstallable: false,
         isIOS: /iphone|ipad|ipod/i.test(navigator.userAgent),
         standalone: window.matchMedia('(display-mode: standalone)').matches || window.navigator.standalone === true,
-        showIosHelp: false,
+        showHelp: false,
         init() {
             if (window.__pwaPrompt) this.pwaInstallable = true;
         },
         get canInstall() {
-            return !this.standalone && (this.pwaInstallable || this.isIOS);
+            // Yüklü değilse butonu her zaman göster; tıklayınca ya native prompt ya talimat açılır
+            return !this.standalone;
         },
         async install() {
             if (window.__pwaPrompt) {
@@ -35,10 +36,11 @@ new class extends Component
                 await window.__pwaPrompt.userChoice;
                 window.__pwaPrompt = null;
                 this.pwaInstallable = false;
-            } else if (this.isIOS) {
-                this.open = false;
-                this.showIosHelp = true;
+                return;
             }
+            // Native prompt yok (iOS Safari, ya da Chrome henüz tetiklemedi) → talimat göster
+            this.open = false;
+            this.showHelp = true;
         },
     }"
     @pwa-installable.window="pwaInstallable = true"
@@ -178,21 +180,38 @@ new class extends Component
         @endguest
     </div>
 
-    <!-- iOS "Ana Ekrana Ekle" talimatı (Safari beforeinstallprompt desteklemez) -->
-    <div x-show="showIosHelp" x-cloak
+    <!-- Yükleme talimatı (native prompt gelmediğinde: iOS Safari veya Android/Chrome menüsü) -->
+    <div x-show="showHelp" x-cloak
          class="fixed inset-0 z-[100] flex items-end sm:items-center justify-center bg-black/60 p-4"
-         @click.self="showIosHelp = false">
+         @click.self="showHelp = false">
         <div class="w-full max-w-sm rounded-2xl bg-pitch-surface border border-pitch-line p-5 text-pitch-ink shadow-xl">
             <div class="flex items-center justify-between mb-3">
                 <h3 class="font-display uppercase tracking-wider text-lg font-bold">📲 Uygulamayı Yükle</h3>
-                <button @click="showIosHelp = false" class="text-pitch-muted hover:text-pitch-ink text-xl leading-none">&times;</button>
+                <button @click="showHelp = false" class="text-pitch-muted hover:text-pitch-ink text-xl leading-none">&times;</button>
             </div>
-            <p class="text-sm text-pitch-muted mb-3">iPhone / iPad'de Kadro Kur'u ana ekrana eklemek için:</p>
-            <ol class="space-y-2 text-sm">
-                <li class="flex gap-2"><span class="text-bibB font-bold">1.</span> Safari'nin altındaki <span class="font-semibold">Paylaş</span> butonuna dokun <span class="text-pitch-muted">(kare + ok ⬆️)</span></li>
-                <li class="flex gap-2"><span class="text-bibB font-bold">2.</span> <span class="font-semibold">Ana Ekrana Ekle</span> seçeneğini bul</li>
-                <li class="flex gap-2"><span class="text-bibB font-bold">3.</span> Sağ üstten <span class="font-semibold">Ekle</span>'ye dokun</li>
-            </ol>
+
+            <template x-if="isIOS">
+                <div>
+                    <p class="text-sm text-pitch-muted mb-3">iPhone / iPad'de Kadro Kur'u ana ekrana eklemek için:</p>
+                    <ol class="space-y-2 text-sm">
+                        <li class="flex gap-2"><span class="text-bibB font-bold">1.</span> Safari'nin altındaki <span class="font-semibold">Paylaş</span> butonuna dokun <span class="text-pitch-muted">(kare + ok ⬆️)</span></li>
+                        <li class="flex gap-2"><span class="text-bibB font-bold">2.</span> <span class="font-semibold">Ana Ekrana Ekle</span> seçeneğini bul</li>
+                        <li class="flex gap-2"><span class="text-bibB font-bold">3.</span> Sağ üstten <span class="font-semibold">Ekle</span>'ye dokun</li>
+                    </ol>
+                </div>
+            </template>
+
+            <template x-if="!isIOS">
+                <div>
+                    <p class="text-sm text-pitch-muted mb-3">Kadro Kur'u ana ekrana eklemek için:</p>
+                    <ol class="space-y-2 text-sm">
+                        <li class="flex gap-2"><span class="text-bibB font-bold">1.</span> Tarayıcının sağ üstündeki <span class="font-semibold">⋮ menü</span>sünü aç</li>
+                        <li class="flex gap-2"><span class="text-bibB font-bold">2.</span> <span class="font-semibold">Uygulamayı yükle</span> veya <span class="font-semibold">Ana ekrana ekle</span>'ye dokun</li>
+                        <li class="flex gap-2"><span class="text-bibB font-bold">3.</span> <span class="font-semibold">Yükle</span>'yi onayla</li>
+                    </ol>
+                    <p class="text-xs text-pitch-muted mt-3">Bu seçenek çıkmıyorsa sayfayı yenileyip tekrar dene.</p>
+                </div>
+            </template>
         </div>
     </div>
 </nav>
