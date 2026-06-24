@@ -399,6 +399,7 @@ class Show extends Component
         abort_if($myPlayer === null, 403);
         abort_if($myPlayer->id === $playerId, 403);
         abort_unless($participants->pluck('player_id')->contains($playerId), 403);
+        abort_if($participants->firstWhere('player_id', $playerId)?->player?->isGuest(), 403); // misafir puanlanmaz
 
         MatchPerformanceRating::updateOrCreate(
             ['match_id' => $this->match->id, 'rater_id' => Auth::id(), 'player_id' => $playerId],

@@ -518,7 +518,7 @@
                     <p class="text-sm text-pitch-muted">Bu maçta takım arkadaşlarının performansını 1-10 puanla (anonim). Son 5 maçın ortalaması oyuncunun puanına <strong class="text-pitch-ink">%20</strong> oranında ▲/▼ olarak yansır.</p>
                     <div class="space-y-1.5">
                         @foreach ($going as $rsvp)
-                            @if (! $myPlayer || $rsvp->player_id !== $myPlayer->id)
+                            @if ((! $myPlayer || $rsvp->player_id !== $myPlayer->id) && ! $rsvp->player->isGuest())
                                 @php $cur = (int) ($myPerfRatings->get($rsvp->player_id) ?? 5); $rated = $myPerfRatings->has($rsvp->player_id); @endphp
                                 <div class="flex items-center justify-between gap-2 bg-pitch-bg border border-pitch-line rounded-lg px-3 py-2">
                                     <span class="text-sm font-medium">{{ $rsvp->player->name }}</span>
@@ -537,7 +537,7 @@
                     <p class="text-sm text-pitch-muted">Bu maçın performans ortalamaları:</p>
                     <ul class="space-y-1.5">
                         @foreach ($going as $rsvp)
-                            @if ($perfAverages->has($rsvp->player_id))
+                            @if ($perfAverages->has($rsvp->player_id) && ! $rsvp->player->isGuest())
                                 <li class="flex items-center justify-between gap-2 text-sm">
                                     <span class="font-medium">{{ $rsvp->player->name }}</span>
                                     <span class="font-display text-lg font-bold text-bibB">{{ number_format($perfAverages->get($rsvp->player_id), 1) }}</span>

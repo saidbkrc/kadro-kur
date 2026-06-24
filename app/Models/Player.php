@@ -16,6 +16,9 @@ class Player extends Model
     /** Ortalama puanın görünür olması için gereken en az oylama sayısı (varsayılan; panelden değişebilir). */
     public const MIN_RATINGS_FOR_VISIBILITY = 5;
 
+    /** Misafir oyuncu (hesapsız) puanlanmaz; sabit varsayılan puanla gelir. */
+    public const GUEST_RATING = 6.5;
+
     protected $fillable = ['group_id', 'user_id', 'name', 'shirt_number', 'positions', 'foot'];
 
     /** Panel ayarından okunur, yoksa varsayılan sabite düşer. */
@@ -109,15 +112,23 @@ class Player extends Model
         return $averages;
     }
 
-    /** Genel puan (OVR) — puanlanmamış özellikler 5 (orta) kabul edilir. */
+    /** Genel puan (OVR) — puanlanmamış özellikler 5 (orta) kabul edilir. Misafir: sabit 6.5. */
     public function overall(): float
     {
+        if ($this->isGuest()) {
+            return self::GUEST_RATING;
+        }
+
         return round(Attributes::overall($this->averageAttributes(), $this->positions ?? []), 1);
     }
 
-    /** Son 5 maçın performans ortalaması (her maçın kendi oy ortalamalarının ortalaması). Yoksa null. */
+    /** Son 5 maçın performans ortalaması (her maçın kendi oy ortalamalarının ortalaması). Yoksa null. Misafir: yok. */
     public function matchPerformance(): ?float
     {
+        if ($this->isGuest()) {
+            return null;
+        }
+
         $perMatch = MatchPerformanceRating::query()
             ->where('match_performance_ratings.player_id', $this->id)
             ->join('matches', 'matches.id', '=', 'match_performance_ratings.match_id')
@@ -154,9 +165,13 @@ class Player extends Model
         return $this->attributeRatings->count();
     }
 
-    /** Ortalama puan herkese (oyuncunun kendisine de) ancak eşik oylama sayısından sonra gösterilir. */
+    /** Ortalama puan herkese (oyuncunun kendisine de) ancak eşik oylama sayısından sonra gösterilir. Misafir: sabit 6.5 hep görünür. */
     public function overallIsPublic(): bool
     {
+        if ($this->isGuest()) {
+            return true;
+        }
+
         return $this->ratingCount() >= self::minRatingsForVisibility();
     }
 }

@@ -34,7 +34,8 @@ class Rate extends Component
         if ($playerId > 0) {
             $valid = $group->players()
                 ->whereKey($playerId)
-                ->where(fn ($q) => $q->whereNull('user_id')->orWhere('user_id', '!=', Auth::id()))
+                ->whereNotNull('user_id') // misafir puanlanmaz
+                ->where('user_id', '!=', Auth::id())
                 ->exists();
 
             if ($valid) {
@@ -46,6 +47,7 @@ class Rate extends Component
     public function select(int $playerId): void
     {
         $player = $this->group->players()->findOrFail($playerId);
+        abort_if($player->isGuest(), 403); // misafir puanlanmaz (sabit 6.5)
         abort_if($player->user_id === Auth::id(), 403); // kendine puan yok
 
         $existing = AttributeRating::where('player_id', $playerId)
@@ -72,6 +74,7 @@ class Rate extends Component
     public function save(): void
     {
         $player = $this->group->players()->findOrFail($this->selectedId);
+        abort_if($player->isGuest(), 403); // misafir puanlanmaz (sabit 6.5)
         abort_if($player->user_id === Auth::id(), 403);
 
         $clean = [];
@@ -91,7 +94,8 @@ class Rate extends Component
     {
         $players = $this->group->players()
             ->with('attributeRatings')
-            ->where(fn ($q) => $q->whereNull('user_id')->orWhere('user_id', '!=', Auth::id()))
+            ->whereNotNull('user_id') // misafir puanlanmaz
+            ->where('user_id', '!=', Auth::id())
             ->orderBy('name')
             ->get();
 

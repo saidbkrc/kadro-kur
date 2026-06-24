@@ -642,6 +642,27 @@ class KadroFlowTest extends TestCase
         $this->actingAs($ownerA)->get(route('groups.player', [$groupA, $playerA]))->assertOk();
     }
 
+    public function test_misafir_oyuncu_puanlanmaz_ve_sabit_puanla_gelir(): void
+    {
+        $owner = User::factory()->create();
+        $group = $this->makeGroup($owner);
+        $guest = $group->players()->create(['name' => 'Misafir Ali', 'positions' => []]); // user_id null
+
+        // Misafir: sabit 6.5, hep görünür, form yansımaz
+        $this->assertTrue($guest->isGuest());
+        $this->assertSame(6.5, $guest->overall());
+        $this->assertSame(6.5, $guest->displayRating());
+        $this->assertTrue($guest->overallIsPublic());
+        $this->assertNull($guest->matchPerformance());
+        $this->assertNull($guest->formDelta());
+
+        // Puanlama akışında misafir seçilemez/kaydedilemez (403)
+        Livewire::actingAs($owner)
+            ->test(Groups\Rate::class, ['group' => $group])
+            ->call('select', $guest->id)
+            ->assertStatus(403);
+    }
+
     public function test_sayfalar_acilir(): void
     {
         $owner = User::factory()->create();
