@@ -8,8 +8,11 @@ use App\Models\FootballMatch;
 use App\Models\Group;
 use App\Models\Player;
 use App\Models\User;
+use App\Notifications\MatchPushNotification;
 use App\Services\MatchScheduler;
 use App\Services\PlayerBadges;
+use App\Services\PushNotifier;
+use Illuminate\Support\Facades\Notification;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Livewire\Livewire;
 use Tests\TestCase;
@@ -661,6 +664,66 @@ class KadroFlowTest extends TestCase
             ->test(Groups\Rate::class, ['group' => $group])
             ->call('select', $guest->id)
             ->assertStatus(403);
+    }
+
+    public function test_push_bildirimleri_dogru_olaylarda_gider(): void
+    {
+        Notification::fake();
+
+        $owner = User::factory()->create();
+        $group = $this->makeGroup($owner);
+        $memberPlayer = $this->addMember($group);
+        $member = $memberPlayer->user;
+
+        // 1) Yeni maç → üyeye gider, açan kişiye gitmez
+        Livewire::actingAs($owner)
+            ->test(Groups\Show::class, ['group' => $group])
+            ->set('title', 'Perşembe 21:00 maçı')
+            ->set('starts_at', now()->addDays(2)->format('Y-m-d\TH:i'))
+            ->set('capacity', 10)
+            ->call('createMatch');
+
+        Notification::assertSentTo($member, MatchPushNotification::class, fn ($n) => str_contains($n->title, 'Yeni maç'));
+        Notification::assertNotSentTo($owner, MatchPushNotification::class);
+
+        $match = $group->matches()->first();
+        $match->setRsvp($group->playerFor($owner), 'going');
+        $match->setRsvp($memberPlayer, 'going');
+
+        // 2) Kadro ilk kez oylamaya sunulunca gider; alternatif gezinmek (voting→voting) tekrar göndermez
+        Notification::fake();
+        $this->actingAs($owner);
+        $match->refresh()->applySquad([$group->playerFor($owner)->id], [$memberPlayer->id]);
+        Notification::assertSentTo($member, MatchPushNotification::class, fn ($n) => str_contains($n->title, 'Kadro'));
+
+        Notification::fake();
+        $match->refresh()->applySquad([$memberPlayer->id], [$group->playerFor($owner)->id]);
+        Notification::assertNothingSent();
+    }
+
+    public function test_mac_hatirlatmasi_bir_kez_gonderilir(): void
+    {
+        Notification::fake();
+
+        $owner = User::factory()->create();
+        $group = $this->makeGroup($owner);
+        $member = $this->addMember($group)->user;
+
+        // 24 saat penceresinde bir maç
+        $group->matches()->create([
+            'created_by' => $owner->id,
+            'title' => 'Yarınki maç',
+            'starts_at' => now()->addHours(20),
+            'capacity' => 10,
+        ]);
+
+        app(PushNotifier::class)->sendDueReminders();
+        Notification::assertSentTo($member, MatchPushNotification::class, fn ($n) => str_contains($n->title, 'yaklaşıyor'));
+
+        // İkinci çalıştırma aynı maç için tekrar göndermez (reminder_sent_at işaretli)
+        Notification::fake();
+        app(PushNotifier::class)->sendDueReminders();
+        Notification::assertNothingSent();
     }
 
     public function test_sayfalar_acilir(): void

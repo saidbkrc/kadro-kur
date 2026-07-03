@@ -1,6 +1,7 @@
 <?php
 
 use App\Services\MatchScheduler;
+use App\Services\PushNotifier;
 use Illuminate\Support\Facades\Schedule;
 
 // Haftalık otomatik maçlar: gelecek maçı olmayan gruplara sıradakini açar.
@@ -8,4 +9,10 @@ use Illuminate\Support\Facades\Schedule;
 Schedule::call(fn () => app(MatchScheduler::class)->run())
     ->hourly()
     ->name('weekly-matches')
+    ->withoutOverlapping();
+
+// Maç hatırlatma push'u: 24 saat penceresine giren maçlar (maç başına 1 kez).
+Schedule::call(fn () => app(PushNotifier::class)->sendDueReminders())
+    ->hourly()
+    ->name('match-reminders')
     ->withoutOverlapping();

@@ -16,7 +16,7 @@ class FootballMatch extends Model
     protected $fillable = [
         'group_id', 'created_by', 'title', 'location', 'starts_at', 'capacity', 'status',
         'squad_status', 'formation_a', 'formation_b', 'pitch_layout',
-        'team_a_score', 'team_b_score', 'mvp_closes_at',
+        'team_a_score', 'team_b_score', 'mvp_closes_at', 'reminder_sent_at',
     ];
 
     protected function casts(): array
@@ -24,6 +24,7 @@ class FootballMatch extends Model
         return [
             'starts_at' => 'datetime',
             'mvp_closes_at' => 'datetime',
+            'reminder_sent_at' => 'datetime',
             'pitch_layout' => 'array',
         ];
     }
@@ -200,6 +201,8 @@ class FootballMatch extends Model
     /** Seçilen bölünmeyi uygular ve onay oylamasını (yeniden) başlatır. */
     public function applySquad(array $teamAIds, array $teamBIds): void
     {
+        $wasVoting = $this->squad_status === 'voting'; // alternatif gezinirken tekrar bildirim gitmesin
+
         DB::transaction(function () use ($teamAIds, $teamBIds) {
             $this->rsvps()->update(['team' => null]);
             $this->rsvps()->whereIn('player_id', $teamAIds)->update(['team' => 'A']);
@@ -208,6 +211,10 @@ class FootballMatch extends Model
             $this->squadVotes()->delete();
             $this->update(['squad_status' => 'voting', 'pitch_layout' => null]);
         });
+
+        if (! $wasVoting) {
+            app(\App\Services\PushNotifier::class)->squadVoteOpened($this, auth()->id());
+        }
     }
 
     /** Kadroyu ve oylamayı sıfırlar (asıl liste değişince çağrılır). */

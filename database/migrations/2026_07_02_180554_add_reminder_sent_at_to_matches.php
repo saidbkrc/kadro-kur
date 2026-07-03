@@ -1,0 +1,23 @@
+<?php
+
+use Illuminate\Database\Migrations\Migration;
+use Illuminate\Database\Schema\Blueprint;
+use Illuminate\Support\Facades\Schema;
+
+return new class extends Migration
+{
+    /** Maç hatırlatma bildirimi bir kez gönderilsin diye işaretlenir. */
+    public function up(): void
+    {
+        Schema::table('matches', function (Blueprint $table) {
+            $table->timestamp('reminder_sent_at')->nullable()->after('mvp_closes_at');
+        });
+    }
+
+    public function down(): void
+    {
+        Schema::table('matches', function (Blueprint $table) {
+            $table->dropColumn('reminder_sent_at');
+        });
+    }
+};

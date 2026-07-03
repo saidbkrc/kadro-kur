@@ -111,6 +111,8 @@ class Show extends Component
             'capacity' => $this->capacity,
         ]);
 
+        app(\App\Services\PushNotifier::class)->newMatch($match, Auth::id());
+
         return $this->redirectRoute('matches.show', $match, navigate: true);
     }
 

@@ -24,6 +24,9 @@ Route::middleware(['auth'])->group(function () {
     Route::get('gruplar/{group}/oyuncu/{player}', Groups\PlayerProfile::class)->name('groups.player');
 
     Route::get('maclar/{match}', Matches\Show::class)->name('matches.show');
+
+    Route::post('push/abone', [App\Http\Controllers\PushSubscriptionController::class, 'store'])->name('push.subscribe');
+    Route::post('push/iptal', [App\Http\Controllers\PushSubscriptionController::class, 'destroy'])->name('push.unsubscribe');
 });
 
 require __DIR__.'/auth.php';

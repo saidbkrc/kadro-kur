@@ -8,6 +8,7 @@ use App\Models\MvpVote;
 use App\Models\Player;
 use App\Models\Rsvp;
 use App\Services\MatchScheduler;
+use App\Services\PushNotifier;
 use App\Support\Attributes;
 use App\Support\PitchLayout;
 use Illuminate\Support\Facades\Auth;
@@ -346,6 +347,8 @@ class Show extends Component
             ],
         );
 
+        $firstCompletion = $this->match->status !== 'completed'; // skoru düzeltmek tekrar bildirim göndermesin
+
         $this->match->update([
             'team_a_score' => $this->teamAScore,
             'team_b_score' => $this->teamBScore,
@@ -353,6 +356,10 @@ class Show extends Component
             // Oylama penceresi skor girilince açılır (panel ayarı; tekrar kaydetmek süreyi uzatmaz)
             'mvp_closes_at' => $this->match->mvp_closes_at ?? now()->addHours(FootballMatch::ratingWindowHours() ?: 24),
         ]);
+
+        if ($firstCompletion) {
+            app(PushNotifier::class)->resultEntered($this->match, Auth::id());
+        }
 
         $participantIds = $this->match->mainListRsvps()->pluck('player_id');
 

@@ -30,13 +30,17 @@ class MatchScheduler
 
         $next = $this->nextOccurrence($group);
 
-        return $group->matches()->create([
+        $match = $group->matches()->create([
             'created_by' => $group->owner_id,
             'title' => $next->translatedFormat('l H:i').' maçı',
             'location' => $group->default_location,
             'starts_at' => $next,
             'capacity' => $group->capacity,
         ]);
+
+        app(PushNotifier::class)->newMatch($match); // otomatik maç: herkese haber ver
+
+        return $match;
     }
 
     /** Otomatik maçı açık tüm grupları kontrol eder (scheduler her saat çağırır). */

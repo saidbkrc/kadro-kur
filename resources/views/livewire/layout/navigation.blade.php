@@ -23,6 +23,8 @@ new class extends Component
         isIOS: /iphone|ipad|ipod/i.test(navigator.userAgent),
         standalone: window.matchMedia('(display-mode: standalone)').matches || window.navigator.standalone === true,
         showHelp: false,
+        pushSupported: 'PushManager' in window && 'Notification' in window,
+        pushOn: 'Notification' in window && Notification.permission === 'granted',
         init() {
             if (window.__pwaPrompt) this.pwaInstallable = true;
         },
@@ -45,6 +47,7 @@ new class extends Component
     }"
     @pwa-installable.window="pwaInstallable = true"
     @pwa-installed.window="pwaInstallable = false; standalone = true"
+    x-on:push-enabled.window="pushOn = true" {{-- @push Blade direktifiyle çakışır, x-on: şart --}}
     class="relative z-50 bg-pitch-surface/80 border-b border-pitch-line backdrop-blur"
 >
     <!-- Primary Navigation Menu -->
@@ -101,6 +104,12 @@ new class extends Component
                             </x-dropdown-link>
                         </button>
 
+                        <button x-show="pushSupported && !pushOn" x-cloak @click="window.enablePush()" class="w-full text-start">
+                            <x-dropdown-link>
+                                🔔 Bildirimleri Aç
+                            </x-dropdown-link>
+                        </button>
+
                         <x-dropdown-link :href="route('profile')" wire:navigate>
                             {{ __('Profile') }}
                         </x-dropdown-link>
@@ -151,6 +160,12 @@ new class extends Component
                 <button x-show="canInstall" x-cloak @click="install()" class="w-full text-start">
                     <x-responsive-nav-link>
                         📲 Uygulamayı Yükle
+                    </x-responsive-nav-link>
+                </button>
+
+                <button x-show="pushSupported && !pushOn" x-cloak @click="window.enablePush()" class="w-full text-start">
+                    <x-responsive-nav-link>
+                        🔔 Bildirimleri Aç
                     </x-responsive-nav-link>
                 </button>
 

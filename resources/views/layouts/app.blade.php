@@ -14,6 +14,7 @@
         <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
         <meta name="apple-mobile-web-app-title" content="Kadro Kur">
         <link rel="manifest" href="/manifest.webmanifest">
+        <meta name="vapid-key" content="{{ config('webpush.vapid.public_key') }}">
         <link rel="icon" href="/icon.svg" type="image/svg+xml">
         <link rel="apple-touch-icon" href="/icon-192.png">
 
@@ -38,6 +39,48 @@
                 window.__pwaPrompt = null;
                 window.dispatchEvent(new CustomEvent('pwa-installed'));
             });
+
+            // Web push aboneliği: izin varken sessizce senkronla; menü butonu enablePush() çağırır.
+            (() => {
+                const vapidKey = document.querySelector('meta[name="vapid-key"]')?.content;
+                const csrf = document.querySelector('meta[name="csrf-token"]')?.content;
+                if (!vapidKey || !('serviceWorker' in navigator) || !('PushManager' in window)) return;
+
+                const urlB64ToUint8 = (b64) => {
+                    const pad = '='.repeat((4 - (b64.length % 4)) % 4);
+                    const raw = atob((b64 + pad).replace(/-/g, '+').replace(/_/g, '/'));
+                    return Uint8Array.from([...raw].map((c) => c.charCodeAt(0)));
+                };
+
+                const subscribe = async () => {
+                    const reg = await navigator.serviceWorker.ready;
+                    const sub = await reg.pushManager.subscribe({
+                        userVisibleOnly: true,
+                        applicationServerKey: urlB64ToUint8(vapidKey),
+                    });
+                    await fetch('/push/abone', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json', 'X-CSRF-TOKEN': csrf },
+                        body: JSON.stringify(sub.toJSON()),
+                    });
+                    window.dispatchEvent(new CustomEvent('push-enabled'));
+                };
+
+                // Menüdeki "Bildirimleri Aç" butonu bunu çağırır
+                window.enablePush = async () => {
+                    if (Notification.permission === 'denied') {
+                        alert('Bildirim izni tarayıcıda engellenmiş. Site ayarlarından izin vermelisin.');
+                        return;
+                    }
+                    const perm = await Notification.requestPermission();
+                    if (perm === 'granted') await subscribe().catch(() => {});
+                };
+
+                // İzin zaten verilmişse aboneliği sunucuyla sessizce senkronla (cihaz/anahtar değişebilir)
+                if (Notification.permission === 'granted') {
+                    window.addEventListener('load', () => subscribe().catch(() => {}));
+                }
+            })();
         </script>
     </head>
     <body class="font-sans antialiased text-pitch-ink overflow-x-hidden">
