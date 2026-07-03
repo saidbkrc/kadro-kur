@@ -22,7 +22,7 @@
                                   placeholder="Her salı 21:00, Yıldız Halı Saha"></textarea>
                         <x-input-error :messages="$errors->get('description')" class="mt-2" />
                     </div>
-                    <x-primary-button>Grubu Kur</x-primary-button>
+                    <x-primary-button class="w-full sm:w-auto">Grubu Kur</x-primary-button>
                 </form>
             </div>
         @endif

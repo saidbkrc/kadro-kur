@@ -57,7 +57,7 @@ new class extends Component
                 <!-- Logo -->
                 <div class="shrink-0 flex items-center">
                     <a href="{{ route('dashboard') }}" wire:navigate class="flex items-center gap-2">
-                        <span class="text-2xl">⚽</span>
+                        <img src="/logo-96.png" alt="" class="w-8 h-8 rounded-lg">
                         <span class="font-display uppercase tracking-wider text-xl font-bold text-pitch-ink">Kadro Kur</span>
                     </a>
                 </div>

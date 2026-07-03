@@ -8,13 +8,13 @@
         <title>{{ config('app.name', 'Kadro Kur') }}</title>
 
         {{-- PWA: ana ekrana ekle --}}
-        <meta name="theme-color" content="#15502F">
+        <meta name="theme-color" content="#0F1F41">
         <meta name="mobile-web-app-capable" content="yes">
         <meta name="apple-mobile-web-app-capable" content="yes">
         <meta name="apple-mobile-web-app-title" content="Kadro Kur">
         <link rel="manifest" href="/manifest.webmanifest">
-        <link rel="icon" href="/icon.svg" type="image/svg+xml">
-        <link rel="apple-touch-icon" href="/icon.svg">
+        <link rel="icon" href="/favicon-48.png" type="image/png">
+        <link rel="apple-touch-icon" href="/icon-192.png">
 
         <!-- Fonts -->
         <link rel="preconnect" href="https://fonts.bunny.net">
@@ -24,9 +24,9 @@
         @vite(['resources/css/app.css', 'resources/js/app.js'])
     </head>
     <body class="font-sans text-pitch-ink antialiased">
-        <div class="min-h-screen flex flex-col sm:justify-center items-center pt-6 sm:pt-0 bg-pitch-bg bg-[radial-gradient(1200px_500px_at_50%_-10%,rgba(40,120,70,.25),transparent_60%)]">
+        <div class="min-h-screen flex flex-col sm:justify-center items-center pt-6 sm:pt-0 bg-pitch-bg bg-[radial-gradient(1200px_500px_at_50%_-10%,rgba(40,173,85,.14),transparent_60%)]">
             <a href="/" wire:navigate class="flex items-center gap-3">
-                <span class="text-4xl">⚽</span>
+                <img src="/logo-96.png" alt="Kadro Kur" class="w-12 h-12 rounded-xl">
                 <span class="font-display uppercase tracking-wider text-3xl font-bold">Kadro Kur</span>
             </a>
 

@@ -15,18 +15,18 @@
                         <p class="text-pitch-muted mt-1">{{ $group->description }}</p>
                     @endif
                 </div>
-                <div class="shrink-0 flex items-center gap-2 flex-wrap">
-                    <span class="text-sm text-pitch-muted">{{ $players->count() }} oyuncu</span>
+                <div class="shrink-0 grid grid-cols-2 gap-2 sm:flex sm:items-center sm:flex-wrap">
+                    <span class="col-span-2 sm:col-auto text-sm text-pitch-muted">{{ $players->count() }} oyuncu</span>
                     @if ($isAdmin)
-                        <x-secondary-button wire:click="$toggle('showSettings')">⚙️ Ayarlar</x-secondary-button>
+                        <x-secondary-button wire:click="$toggle('showSettings')" class="w-full sm:w-auto">⚙️ Ayarlar</x-secondary-button>
                     @endif
                     @if (auth()->id() === $group->owner_id)
-                        <x-danger-button type="button" wire:click="deleteGroup"
+                        <x-danger-button type="button" wire:click="deleteGroup" class="w-full sm:w-auto"
                                 data-confirm="DİKKAT: {{ $group->name }} grubu, tüm maçları, oyuncuları ve puanlarıyla birlikte kalıcı olarak silinecek. Emin misin?">
                             Grubu Sil
                         </x-danger-button>
                     @else
-                        <x-danger-button type="button" wire:click="leaveGroup"
+                        <x-danger-button type="button" wire:click="leaveGroup" class="w-full sm:w-auto"
                                 data-confirm="{{ $group->name }} grubundan ayrılmak istediğine emin misin?">
                             Gruptan Ayrıl
                         </x-danger-button>
@@ -34,12 +34,14 @@
                 </div>
             </div>
 
-            <div x-data="{ copied: false }" class="flex items-center gap-2 bg-pitch-bg border border-pitch-line rounded-lg p-3">
-                <span class="text-sm text-pitch-muted shrink-0">Davet linki:</span>
-                <code class="text-sm text-bibB truncate">{{ route('groups.join', $group->invite_code) }}</code>
+            <div x-data="{ copied: false }" class="flex flex-col sm:flex-row sm:items-center gap-2 bg-pitch-bg border border-pitch-line rounded-lg p-3">
+                <div class="flex items-center gap-2 min-w-0">
+                    <span class="text-sm text-pitch-muted shrink-0">Davet linki:</span>
+                    <code class="text-sm text-bibB truncate">{{ route('groups.join', $group->invite_code) }}</code>
+                </div>
                 <button type="button"
                         @click="navigator.clipboard.writeText('{{ route('groups.join', $group->invite_code) }}'); copied = true; setTimeout(() => copied = false, 2000)"
-                        class="ms-auto shrink-0 inline-flex items-center px-3 py-1.5 bg-pitch-surface2 border border-pitch-line rounded-md text-xs font-semibold uppercase tracking-widest hover:brightness-125">
+                        class="w-full sm:w-auto sm:ms-auto shrink-0 inline-flex items-center justify-center px-3 py-2 bg-pitch-surface2 border border-pitch-line rounded-md text-xs font-semibold uppercase tracking-widest hover:brightness-125">
                     <span x-show="!copied">Kopyala</span>
                     <span x-show="copied" x-cloak class="text-bibB">Kopyalandı ✓</span>
                 </button>
@@ -80,7 +82,7 @@
                     </label>
                     <x-input-error :messages="$errors->get('matchDay')" />
                     <x-input-error :messages="$errors->get('matchTime')" />
-                    <x-primary-button>Kaydet</x-primary-button>
+                    <x-primary-button class="w-full sm:w-auto">Kaydet</x-primary-button>
                 </form>
             @endif
         </div>
@@ -119,7 +121,7 @@
                             <x-input-error :messages="$errors->get('capacity')" class="mt-2" />
                         </div>
                     </div>
-                    <x-primary-button>Maçı Aç</x-primary-button>
+                    <x-primary-button class="w-full sm:w-auto">Maçı Aç</x-primary-button>
                 </form>
             @endif
 
@@ -153,15 +155,15 @@
         <div class="bg-pitch-surface border border-pitch-line rounded-xl p-6 space-y-4">
             <div class="flex items-center justify-between flex-wrap gap-3">
                 <h3 class="font-display uppercase tracking-wider text-lg font-semibold">Oyuncu Havuzu</h3>
-                <div class="flex items-center gap-2 flex-wrap">
-                    <a href="{{ route('groups.rate', $group) }}" wire:navigate>
-                        <x-primary-button type="button">⭐ Oyuncuları Puanla</x-primary-button>
+                <div class="grid grid-cols-2 gap-2 w-full sm:w-auto sm:flex sm:items-center sm:flex-wrap">
+                    <a href="{{ route('groups.rate', $group) }}" wire:navigate class="{{ $isAdmin ? '' : 'col-span-1' }}">
+                        <x-primary-button type="button" class="w-full sm:w-auto">⭐ Oyuncuları Puanla</x-primary-button>
                     </a>
                     <a href="{{ route('groups.stats', $group) }}" wire:navigate>
-                        <x-secondary-button>📊 İstatistikler</x-secondary-button>
+                        <x-secondary-button class="w-full sm:w-auto">📊 İstatistikler</x-secondary-button>
                     </a>
                     @if ($isAdmin)
-                        <x-secondary-button wire:click="$toggle('showGuestForm')">
+                        <x-secondary-button wire:click="$toggle('showGuestForm')" class="col-span-2 sm:col-auto w-full sm:w-auto">
                             {{ $showGuestForm ? 'Vazgeç' : '+ Misafir Oyuncu' }}
                         </x-secondary-button>
                     @endif
@@ -180,13 +182,13 @@
                         <x-text-input wire:model="guestName" id="guestName" type="text" maxlength="24"
                                       class="w-full sm:w-64" placeholder="Ad / Lakap (örn. Mahmut)" />
                         <x-text-input wire:model="guestNumber" id="guestNumber" type="number" min="1" max="99"
-                                      class="w-28" placeholder="Forma No" />
-                        <select wire:model="guestFoot" class="bg-pitch-bg border-pitch-line text-pitch-ink rounded-md text-sm focus:border-bibB focus:ring-bibB/40">
+                                      class="w-full sm:w-28" placeholder="Forma No" />
+                        <select wire:model="guestFoot" class="w-full sm:w-auto bg-pitch-bg border-pitch-line text-pitch-ink rounded-md text-sm focus:border-bibB focus:ring-bibB/40">
                             @foreach (\App\Support\Attributes::FEET as $value => $label)
                                 <option value="{{ $value }}">{{ $label }}</option>
                             @endforeach
                         </select>
-                        <x-primary-button>+ Ekle</x-primary-button>
+                        <x-primary-button class="w-full sm:w-auto">+ Ekle</x-primary-button>
                     </div>
                     <x-input-error :messages="$errors->get('guestName')" />
                     <x-input-error :messages="$errors->get('guestNumber')" />
@@ -236,16 +238,16 @@
                                     </div>
                                 </div>
                             </div>
-                            <div class="flex items-center gap-2 flex-wrap shrink-0 w-full sm:w-auto">
+                            <div class="flex items-center gap-2 flex-wrap shrink-0 w-full sm:w-auto [&>*]:flex-1 sm:[&>*]:flex-none">
                                 @if ($player->user_id !== auth()->id() && ! $player->isGuest())
                                     <a href="{{ route('groups.rate', ['group' => $group, 'oyuncu' => $player->id]) }}" wire:navigate
-                                       class="text-xs px-3 py-1.5 rounded-md bg-gradient-to-b from-[#2C7A48] to-[#1F5A35] border border-[#3E9A60] font-semibold hover:brightness-125">
+                                       class="text-xs text-center px-3 py-2 rounded-md bg-gradient-to-b from-pitch-green2 to-pitch-green border border-pitch-green2 font-semibold hover:brightness-125">
                                         ⭐ Puanla
                                     </a>
                                 @endif
                                 @if ($isAdmin)
                                     <button wire:click="editPositions({{ $player->id }})"
-                                            class="text-xs px-3 py-1.5 rounded-md bg-pitch-surface2 border border-pitch-line hover:brightness-125">
+                                            class="text-xs px-3 py-2 rounded-md bg-pitch-surface2 border border-pitch-line hover:brightness-125">
                                         Düzenle
                                     </button>
                                 @endif
@@ -261,13 +263,13 @@
                                     @endif
                                     <button type="button" wire:click="removeGuest({{ $player->id }})"
                                             data-confirm="{{ $player->name }} gruptan silinsin mi?"
-                                            class="text-xs px-3 py-1.5 rounded-md border border-[#6c3030] text-[#ffb3b3] hover:bg-red-900/30">
+                                            class="text-xs px-3 py-2 rounded-md border border-[#6c3030] text-[#ffb3b3] hover:bg-red-900/30">
                                         Sil
                                     </button>
                                 @elseif ($isAdmin && ! $player->isGuest() && $player->user_id !== $group->owner_id && $player->user_id !== auth()->id())
                                     <button type="button" wire:click="removeMember({{ $player->user_id }})"
                                             data-confirm="{{ $player->name }} gruptan çıkarılsın mı? (Maç geçmişi ve puanları korunur, oyuncu misafire döner.)"
-                                            class="text-xs px-3 py-1.5 rounded-md border border-[#6c3030] text-[#ffb3b3] hover:bg-red-900/30">
+                                            class="text-xs px-3 py-2 rounded-md border border-[#6c3030] text-[#ffb3b3] hover:bg-red-900/30">
                                         Çıkar
                                     </button>
                                 @endif
@@ -337,7 +339,7 @@
                 <x-input-error :messages="$errors->get('ruleA')" />
                 <div class="flex flex-wrap gap-2">
                     @forelse ($rules as $rule)
-                        <span class="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-pitch-bg border text-sm {{ $rule->type === 'apart' ? 'border-[#a05a30]' : 'border-[#3E9A60]' }}">
+                        <span class="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-pitch-bg border text-sm {{ $rule->type === 'apart' ? 'border-[#a05a30]' : 'border-pitch-green2' }}">
                             {{ $rule->type === 'apart' ? '↔' : '🔗' }}
                             <b>{{ $rule->playerA->name }}</b> + <b>{{ $rule->playerB->name }}</b>
                             <span class="text-pitch-muted text-xs">{{ $rule->type === 'apart' ? 'ayrı takımlarda' : 'aynı takımda' }}</span>

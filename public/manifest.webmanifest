@@ -8,8 +8,8 @@
     "orientation": "portrait",
     "lang": "tr",
     "dir": "ltr",
-    "background_color": "#0A150E",
-    "theme_color": "#15502F",
+    "background_color": "#0F1F41",
+    "theme_color": "#0F1F41",
     "icons": [
         {
             "src": "/icon-192.png",
@@ -34,12 +34,6 @@
             "sizes": "512x512",
             "type": "image/png",
             "purpose": "maskable"
-        },
-        {
-            "src": "/icon.svg",
-            "sizes": "any",
-            "type": "image/svg+xml",
-            "purpose": "any"
         }
     ]
 }

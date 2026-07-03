@@ -15,17 +15,17 @@ export default {
                 sans: ['Figtree', ...defaultTheme.fontFamily.sans],
                 display: ['"Barlow Condensed"', '"Arial Narrow"', 'Impact', ...defaultTheme.fontFamily.sans],
             },
-            // kadro.html'in koyu yeşil saha kimliği
+            // Lacivert zemin + logodaki canlı saha yeşili aksan (kadro-logo)
             colors: {
                 pitch: {
-                    bg: '#0A150E',
-                    surface: '#11231A',
-                    surface2: '#16301F',
-                    line: '#23402F',
-                    ink: '#EDF7EF',
-                    muted: '#8AAD94',
-                    green: '#15502F',
-                    green2: '#196038',
+                    bg: '#0F1F41',
+                    surface: '#16294E',
+                    surface2: '#1E3560',
+                    line: '#2C4577',
+                    ink: '#EDF2FB',
+                    muted: '#92A5CC',
+                    green: '#1F8F44',
+                    green2: '#28AD55',
                 },
                 bibA: '#FF7A1A',      // turuncu yelek
                 bibB: '#C8F04B',      // yeşil yelek

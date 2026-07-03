@@ -133,7 +133,7 @@
             <div class="min-w-0 bg-pitch-surface border border-pitch-line rounded-xl p-6 space-y-3">
                 <div class="flex items-center justify-between">
                     <h3 class="font-display uppercase tracking-wider text-lg font-semibold">Gruplarım</h3>
-                    <a href="{{ route('groups.index') }}" wire:navigate class="text-xs text-bibB hover:underline">Tümü →</a>
+                    <a href="{{ route('groups.index') }}" wire:navigate class="text-xs text-bibB hover:underline px-2 py-2 -my-2 -me-2">Tümü →</a>
                 </div>
         
                 @forelse ($groups as $group)

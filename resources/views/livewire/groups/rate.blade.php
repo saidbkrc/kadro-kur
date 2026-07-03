@@ -93,10 +93,10 @@
                                 </div>
                             @endforeach
 
-                        <div class="flex items-center gap-3 pt-2">
-                            <x-primary-button>Puanları Kaydet</x-primary-button>
+                        <div class="flex flex-col sm:flex-row sm:items-center gap-3 pt-2">
+                            <x-primary-button class="w-full sm:w-auto">Puanları Kaydet</x-primary-button>
                             @if ($saved)
-                                <span class="text-bibB text-sm">Kaydedildi ✓</span>
+                                <span class="text-bibB text-sm text-center sm:text-start">Kaydedildi ✓</span>
                             @endif
                         </div>
                     </form>
