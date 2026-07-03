@@ -621,6 +621,54 @@ class KadroFlowTest extends TestCase
         $this->assertNotContains('veteran', $earned);  // 50 maç eşiği geçilmedi
     }
 
+    public function test_yeni_rozetler_seri_duvar_mukemmel_hesaplanir(): void
+    {
+        $owner = User::factory()->create();
+        $group = $this->makeGroup($owner);
+        $keeper = $group->playerFor($owner);
+        $keeper->update(['positions' => ['KL']]);
+        $rakip = $this->addMember($group);
+
+        // Üst üste 3 galibiyet, hepsi gol yemeden (A takımı kalecisi)
+        foreach ([1, 2, 3] as $i) {
+            $match = $group->matches()->create([
+                'created_by' => $owner->id,
+                'title' => "Maç {$i}",
+                'starts_at' => now()->subDays(10 - $i),
+                'capacity' => 14,
+                'status' => 'completed',
+                'team_a_score' => 2,
+                'team_b_score' => 0,
+                'mvp_closes_at' => now()->subHour(),
+            ]);
+            $match->rsvps()->create(['player_id' => $keeper->id, 'status' => 'going', 'team' => 'A']);
+            $match->rsvps()->create(['player_id' => $rakip->id, 'status' => 'going', 'team' => 'B']);
+        }
+
+        // Son maçta 9+ performans ortalaması (Mükemmel Maç)
+        $group->matches()->latest('starts_at')->first()
+            ->performanceRatings()->create(['rater_id' => $rakip->user_id, 'player_id' => $keeper->id, 'score' => 9]);
+
+        $badges = app(PlayerBadges::class);
+        $stats = $badges->statsForPlayer($keeper);
+
+        $this->assertSame(3, $stats['win']);
+        $this->assertSame(3, $stats['win_streak']);
+        $this->assertSame(3, $stats['clean_sheets']);
+        $this->assertEquals(9.0, $stats['best_match_perf']);
+
+        $earned = collect($badges->evaluate($stats))->where('earned', true)->pluck('key');
+        $this->assertContains('win_streak', $earned);   // Seri: üst üste 3
+        $this->assertContains('wall', $earned);         // Duvar: gol yemeden
+        $this->assertContains('perfect_match', $earned); // Mükemmel Maç: 9+
+        $this->assertNotContains('winner', $earned);    // Galip: 10 galibiyet henüz yok
+
+        // Rakip kaleci değil ve hep kaybetti: takım rozetleri yok
+        $rakipEarned = collect($badges->evaluate($badges->statsForPlayer($rakip)))->where('earned', true)->pluck('key');
+        $this->assertNotContains('wall', $rakipEarned);
+        $this->assertNotContains('win_streak', $rakipEarned);
+    }
+
     public function test_oyuncu_profili_izolasyon_korunur(): void
     {
         $ownerA = User::factory()->create();

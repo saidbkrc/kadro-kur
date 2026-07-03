@@ -28,9 +28,15 @@ class PlayerBadges
             ['key' => 'goal_king', 'icon' => '👑', 'name' => 'Gol Kralı', 'desc' => 'Toplam 50 gol at', 'group' => 'Gol', 'goal' => 50, 'stat' => 'goals'],
             ['key' => 'hat_trick', 'icon' => '⚡', 'name' => 'Hat-trick', 'desc' => 'Tek maçta 3 gol at', 'group' => 'Gol', 'goal' => 3, 'stat' => 'best_match_goals'],
 
-            // 🏆 MVP
+            // 🏆 MVP & Performans
             ['key' => 'mvp', 'icon' => '⭐', 'name' => 'Maçın Adamı', 'desc' => 'Bir maçta MVP seçil', 'group' => 'MVP', 'goal' => 1, 'stat' => 'mvp'],
             ['key' => 'star', 'icon' => '🌟', 'name' => 'Yıldız', 'desc' => '5 kez MVP seçil', 'group' => 'MVP', 'goal' => 5, 'stat' => 'mvp'],
+            ['key' => 'perfect_match', 'icon' => '💎', 'name' => 'Mükemmel Maç', 'desc' => 'Bir maçta 9+ performans ortalaması al', 'group' => 'MVP', 'goal' => 9, 'stat' => 'best_match_perf'],
+
+            // 🏆 Takım
+            ['key' => 'winner', 'icon' => '🥇', 'name' => 'Galip', 'desc' => '10 galibiyet al', 'group' => 'Takım', 'goal' => 10, 'stat' => 'win'],
+            ['key' => 'win_streak', 'icon' => '📈', 'name' => 'Seri', 'desc' => 'Üst üste 3 maç kazan', 'group' => 'Takım', 'goal' => 3, 'stat' => 'win_streak'],
+            ['key' => 'wall', 'icon' => '🧱', 'name' => 'Duvar', 'desc' => 'Kalede gol yemeden maç bitir', 'group' => 'Takım', 'goal' => 1, 'stat' => 'clean_sheets'],
 
             // 🤝 Katılım
             ['key' => 'first_match', 'icon' => '🐣', 'name' => 'İlk Maç', 'desc' => 'İlk maçına çık', 'group' => 'Katılım', 'goal' => 1, 'stat' => 'played'],
@@ -44,22 +50,26 @@ class PlayerBadges
      * Grubun tüm oyuncuları için ham istatistik toplar.
      * Maçlar kronolojik (eski→yeni) gezilir ki katılım serisi doğru hesaplansın.
      *
-     * @return Collection<int, array{played:int,goals:int,mvp:int,best_match_goals:int,streak:int}>
+     * @return Collection<int, array<string, int|float>>
      */
     public function statsForGroup(Group $group): Collection
     {
         $matches = $group->matches()
             ->where('status', 'completed')
-            ->with(['rsvps', 'goals', 'mvpVotes'])
+            ->with(['rsvps', 'goals', 'mvpVotes', 'performanceRatings'])
             ->orderBy('starts_at')
             ->get();
 
-        /** @var array<int, array{played:int,win:int,draw:int,loss:int,goals:int,mvp:int,best_match_goals:int,streak:int,_run:int}> $stats */
+        // Duvar rozeti: kaleci pozisyonlu oyuncular (mevcut pozisyona göre)
+        $keeperIds = $group->players()->get()->filter(fn ($p) => $p->isGoalkeeper())->pluck('id')->flip();
+
+        /** @var array<int, array<string, int|float>> $stats */
         $stats = [];
         $touch = function (int $playerId) use (&$stats): void {
             $stats[$playerId] ??= [
                 'played' => 0, 'win' => 0, 'draw' => 0, 'loss' => 0, 'goals' => 0, 'mvp' => 0,
                 'best_match_goals' => 0, 'streak' => 0, '_run' => 0,
+                'win_streak' => 0, '_win_run' => 0, 'clean_sheets' => 0, 'best_match_perf' => 0.0,
             ];
         };
 
@@ -78,14 +88,32 @@ class PlayerBadges
                     if ($rsvp->team !== null) {
                         if ($isDraw) {
                             $stats[$rsvp->player_id]['draw']++;
+                            $stats[$rsvp->player_id]['_win_run'] = 0;
                         } elseif ($rsvp->team === $winner) {
                             $stats[$rsvp->player_id]['win']++;
+                            $stats[$rsvp->player_id]['_win_run']++;
+                            $stats[$rsvp->player_id]['win_streak'] = max($stats[$rsvp->player_id]['win_streak'], $stats[$rsvp->player_id]['_win_run']);
                         } else {
                             $stats[$rsvp->player_id]['loss']++;
+                            $stats[$rsvp->player_id]['_win_run'] = 0;
+                        }
+
+                        // Duvar: kaleci ve takımı gol yememiş (0-0 beraberlik de sayılır)
+                        $conceded = $rsvp->team === 'A' ? $match->team_b_score : $match->team_a_score;
+                        if ($keeperIds->has($rsvp->player_id) && $conceded === 0) {
+                            $stats[$rsvp->player_id]['clean_sheets']++;
                         }
                     }
                 }
             }
+
+            // Mükemmel Maç: bu maçtaki performans oylarının oyuncu başına ortalaması
+            $match->performanceRatings
+                ->groupBy('player_id')
+                ->each(function ($ratings, $pid) use (&$stats, $touch) {
+                    $touch($pid);
+                    $stats[$pid]['best_match_perf'] = max($stats[$pid]['best_match_perf'], round($ratings->avg('score'), 1));
+                });
 
             // Katılım serisi: bu maçta gelenler için run +1, gelmeyenler için sıfırla
             foreach ($stats as $pid => &$s) {
@@ -121,7 +149,7 @@ class PlayerBadges
         }
 
         return collect($stats)->map(function (array $s) {
-            unset($s['_run']);
+            unset($s['_run'], $s['_win_run']);
 
             return $s;
         });
@@ -133,6 +161,7 @@ class PlayerBadges
         return [
             'played' => 0, 'win' => 0, 'draw' => 0, 'loss' => 0, 'goals' => 0,
             'mvp' => 0, 'best_match_goals' => 0, 'streak' => 0,
+            'win_streak' => 0, 'clean_sheets' => 0, 'best_match_perf' => 0.0,
         ];
     }
 
@@ -145,7 +174,7 @@ class PlayerBadges
     /**
      * Tek oyuncunun rozet durumu: her rozet için kazanıldı mı + ilerleme.
      *
-     * @return list<array{key:string,icon:string,name:string,desc:string,group:string,goal:int,value:int,earned:bool,progress:float}>
+     * @return list<array{key:string,icon:string,name:string,desc:string,group:string,goal:int,value:int|float,earned:bool,progress:float}>
      */
     public function forPlayer(Player $player): array
     {
@@ -155,13 +184,13 @@ class PlayerBadges
     /**
      * Ham istatistikten rozet listesi türetir (kazanılan önce, sonra ilerlemeye göre).
      *
-     * @param  array{played:int,goals:int,mvp:int,best_match_goals:int,streak:int}  $stats
-     * @return list<array{key:string,icon:string,name:string,desc:string,group:string,goal:int,value:int,earned:bool,progress:float}>
+     * @param  array<string, int|float>  $stats
+     * @return list<array{key:string,icon:string,name:string,desc:string,group:string,goal:int,value:int|float,earned:bool,progress:float}>
      */
     public function evaluate(array $stats): array
     {
         $badges = array_map(function (array $b) use ($stats) {
-            $value = (int) ($stats[$b['stat']] ?? 0);
+            $value = round($stats[$b['stat']] ?? 0, 1); // performans ondalıklı, diğerleri tam sayı görünür
             $earned = $value >= $b['goal'];
 
             return [
