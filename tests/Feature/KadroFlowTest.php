@@ -869,6 +869,78 @@ class KadroFlowTest extends TestCase
         $this->assertNotContains('win_streak', $rakipEarned);
     }
 
+    public function test_havuzdan_profile_gidilir_ve_kafa_kafaya_kiyaslanir(): void
+    {
+        $owner = User::factory()->create();
+        $group = $this->makeGroup($owner);
+        $p1 = $group->playerFor($owner);
+        $p2 = $this->addMember($group);
+
+        // Havuzdaki oyuncu adı profile linkli
+        $this->actingAs($owner)->get(route('groups.show', $group))
+            ->assertOk()
+            ->assertSee(route('groups.player', [$group, $p2]));
+
+        // Kafa kafaya: iki isim ve VS görünür
+        Livewire::actingAs($owner)
+            ->test(Groups\PlayerProfile::class, ['group' => $group, 'player' => $p1])
+            ->set('compareId', $p2->id)
+            ->assertSee('VS')
+            ->assertSee($p2->name)
+            ->assertSee('EN UZUN SERİ');
+
+        // Kendisiyle kıyas sıfırlanır
+        Livewire::actingAs($owner)
+            ->test(Groups\PlayerProfile::class, ['group' => $group, 'player' => $p1])
+            ->set('compareId', $p1->id)
+            ->assertSet('compareId', null);
+
+        // Çapraz grup: başka grubun oyuncusuyla kıyas → 404
+        $foreign = $this->makeGroup(User::factory()->create());
+        $foreignPlayer = $foreign->players()->first();
+
+        $this->assertThrows(
+            fn () => Livewire::actingAs($owner)
+                ->test(Groups\PlayerProfile::class, ['group' => $group, 'player' => $p1])
+                ->set('compareId', $foreignPlayer->id),
+            \Illuminate\Database\Eloquent\ModelNotFoundException::class,
+        );
+    }
+
+    public function test_oyuncu_karti_ve_foto_yukleme(): void
+    {
+        \Illuminate\Support\Facades\Storage::fake('public');
+
+        $owner = User::factory()->create();
+        $group = $this->makeGroup($owner);
+        $p1 = $group->playerFor($owner);
+        $other = $this->addMember($group);
+
+        // Kart profilde görünür (4 istatistik etiketi)
+        $this->actingAs($owner)->get(route('groups.player', [$group, $p1]))
+            ->assertOk()
+            ->assertSee('GENEL')->assertSee('HIZ')->assertSee('ŞUT')->assertSee('PAS')->assertSee('DEF');
+
+        // Kendi kartına fotoğraf yükler
+        $file = \Illuminate\Http\UploadedFile::fake()->image('kart.jpg', 400, 400);
+        Livewire::actingAs($owner)
+            ->test(Groups\PlayerProfile::class, ['group' => $group, 'player' => $p1])
+            ->set('photo', $file)
+            ->assertHasNoErrors();
+
+        $p1->refresh();
+        $this->assertNotNull($p1->photo_path);
+        \Illuminate\Support\Facades\Storage::disk('public')->assertExists($p1->photo_path);
+
+        // Başkasının kartına yükleyemez (profil sayfası onun, foto başkasının olur → 403)
+        Livewire::actingAs($owner)
+            ->test(Groups\PlayerProfile::class, ['group' => $group, 'player' => $other])
+            ->set('photo', \Illuminate\Http\UploadedFile::fake()->image('sahte.jpg'))
+            ->assertStatus(403);
+
+        $this->assertNull($other->refresh()->photo_path);
+    }
+
     public function test_oyuncu_profili_izolasyon_korunur(): void
     {
         $ownerA = User::factory()->create();

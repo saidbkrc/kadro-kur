@@ -19,7 +19,7 @@ class Player extends Model
     /** Misafir oyuncu (hesapsız) puanlanmaz; sabit varsayılan puanla gelir. */
     public const GUEST_RATING = 6.5;
 
-    protected $fillable = ['group_id', 'user_id', 'name', 'shirt_number', 'positions', 'foot'];
+    protected $fillable = ['group_id', 'user_id', 'name', 'shirt_number', 'positions', 'foot', 'photo_path'];
 
     /** Panel ayarından okunur, yoksa varsayılan sabite düşer. */
     public static function minRatingsForVisibility(): int
@@ -78,6 +78,30 @@ class Player extends Model
     public function isGoalkeeper(): bool
     {
         return in_array('KL', $this->positions ?? [], true);
+    }
+
+    /** Kart fotoğrafının tam URL'i (yoksa null — kartta siluet gösterilir). */
+    public function photoUrl(): ?string
+    {
+        return $this->photo_path ? asset('storage/'.$this->photo_path) : null;
+    }
+
+    /**
+     * Oyuncu kartındaki 4 temel istatistik. DEF ayrı bir özellik olmadığından
+     * DEF pozisyon ağırlıklarından türetilir (puanlanmamış özellik 5 sayılır).
+     *
+     * @return array<string, float> [etiket => 1-10 puan]
+     */
+    public function cardStats(): array
+    {
+        $avg = $this->averageAttributes();
+
+        return [
+            'HIZ' => round($avg['hiz'] ?? 5, 1),
+            'ŞUT' => round($avg['sut'] ?? 5, 1),
+            'PAS' => round($avg['pas'] ?? 5, 1),
+            'DEF' => round(Attributes::weightedScore($avg, 'DEF'), 1),
+        ];
     }
 
     /** Tercih edilen ayağın kısa rozeti: sağ→R, sol→L, çift→R/L. */

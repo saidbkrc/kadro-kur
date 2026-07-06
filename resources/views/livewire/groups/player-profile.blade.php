@@ -41,6 +41,120 @@
             @endforeach
         </div>
 
+        {{-- Kafa kafaya karşılaştırma --}}
+        <div class="bg-pitch-surface border border-pitch-line rounded-xl p-4 sm:p-6 space-y-4">
+            <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
+                <h3 class="font-display uppercase tracking-wider text-lg font-semibold">⚔️ Kafa Kafaya</h3>
+                <select wire:model.live="compareId"
+                        class="w-full sm:w-64 bg-pitch-bg border-pitch-line text-pitch-ink rounded-md text-sm focus:border-bibB focus:ring-bibB/40">
+                    <option value="">Rakip seç…</option>
+                    @foreach ($otherPlayers as $other)
+                        <option value="{{ $other->id }}">{{ $other->name }}</option>
+                    @endforeach
+                </select>
+            </div>
+
+            @if ($compare && $compareStats !== null)
+                @php
+                    $fmt = fn ($v) => is_float($v) ? number_format($v, 1) : $v;
+                    $rate = fn (array $s) => $s['played'] > 0 ? round($s['win'] / $s['played'] * 100) : 0;
+                    // [etiket, sol değer, sağ değer, gösterim soneki]
+                    $rows = [
+                        ['GENEL PUAN', $player->overallIsPublic() ? $player->displayRating() : null, $compare->overallIsPublic() ? $compare->displayRating() : null, ''],
+                        ['MAÇ', $stats['played'], $compareStats['played'], ''],
+                        ['GALİBİYET', $stats['win'], $compareStats['win'], ''],
+                        ['KAZANMA', $rate($stats), $rate($compareStats), '%'],
+                        ['GOL', $stats['goals'], $compareStats['goals'], ''],
+                        ['MVP', $stats['mvp'], $compareStats['mvp'], ''],
+                        ['EN UZUN SERİ', $stats['win_streak'], $compareStats['win_streak'], ''],
+                        ['ROZET', $myEarned, $compareEarned, ''],
+                    ];
+                @endphp
+
+                <div class="grid grid-cols-[1fr,auto,1fr] items-center gap-2 pb-3 border-b border-pitch-line">
+                    <div class="flex flex-col items-center gap-1 min-w-0">
+                        <x-ovr-badge :player="$player" numClass="text-3xl w-14" />
+                        <span class="font-display uppercase tracking-wide text-sm font-bold text-center truncate w-full">{{ $player->name }}</span>
+                    </div>
+                    <span class="font-display text-xl font-bold text-pitch-muted">VS</span>
+                    <div class="flex flex-col items-center gap-1 min-w-0">
+                        <x-ovr-badge :player="$compare" numClass="text-3xl w-14" />
+                        <a href="{{ route('groups.player', [$group, $compare]) }}" wire:navigate
+                           class="font-display uppercase tracking-wide text-sm font-bold text-center truncate w-full hover:text-bibB">{{ $compare->name }}</a>
+                    </div>
+                </div>
+
+                <div class="divide-y divide-pitch-line/60">
+                    @foreach ($rows as [$label, $left, $right, $suffix])
+                        @php
+                            $leftWins = $left !== null && ($right === null || $left > $right);
+                            $rightWins = $right !== null && ($left === null || $right > $left);
+                        @endphp
+                        <div class="grid grid-cols-[1fr,auto,1fr] items-center gap-2 py-2 text-center">
+                            <span class="font-display text-lg font-bold {{ $leftWins && !$rightWins ? 'text-bibB' : 'text-pitch-ink' }}">
+                                {{ $left === null ? '?' : $fmt($left).$suffix }}{{ $leftWins && !$rightWins ? ' ◂' : '' }}
+                            </span>
+                            <span class="text-[10px] tracking-[.15em] text-pitch-muted w-28">{{ $label }}</span>
+                            <span class="font-display text-lg font-bold {{ $rightWins && !$leftWins ? 'text-bibB' : 'text-pitch-ink' }}">
+                                {{ $rightWins && !$leftWins ? '▸ ' : '' }}{{ $right === null ? '?' : $fmt($right).$suffix }}
+                            </span>
+                        </div>
+                    @endforeach
+                </div>
+            @else
+                <p class="text-sm text-pitch-muted">Gruptan bir rakip seç — istatistikler FIFA tarzı yan yana kıyaslanır. 🎮</p>
+            @endif
+        </div>
+
+        {{-- FIFA tarzı oyuncu kartı --}}
+        @php
+            $ovrPublic = $player->overallIsPublic() && ! $player->isGuest();
+            $ovr = $ovrPublic ? $player->displayRating() : ($player->isGuest() ? $player->overall() : null);
+            $ovrTier = $ovr === null ? 'text-pitch-muted' : ($ovr >= 8 ? 'text-gold' : ($ovr >= 6.5 ? 'text-[#7DE39A]' : 'text-pitch-ink'));
+        @endphp
+        <div>
+            <div class="relative w-64 mx-auto rounded-2xl border border-gold/50 bg-gradient-to-b from-pitch-surface2 to-pitch-surface p-5 shadow-[0_0_35px_rgba(255,200,61,.10)]">
+                <div class="flex items-start justify-between gap-3">
+                    <div class="text-center shrink-0">
+                        <div class="font-display text-4xl font-extrabold leading-none {{ $ovrTier }}">{{ $ovr !== null ? number_format($ovr, 1) : '?' }}</div>
+                        <div class="text-[9px] tracking-[.2em] text-pitch-muted mt-0.5">GENEL</div>
+                        <div class="mt-1.5 text-xs font-bold text-pitch-muted">
+                            {{ ($player->positions[0] ?? '—') }} · {{ $player->footBadge() }}
+                        </div>
+                    </div>
+                    <div class="w-24 h-24 rounded-xl overflow-hidden border border-pitch-line bg-pitch-bg flex items-center justify-center shrink-0">
+                        @if ($player->photoUrl())
+                            <img src="{{ $player->photoUrl() }}" alt="{{ $player->name }}" class="w-full h-full object-cover">
+                        @else
+                            <span class="text-4xl opacity-40">👤</span>
+                        @endif
+                    </div>
+                </div>
+
+                <div class="mt-3 pt-2 border-t border-gold/30 text-center font-display uppercase tracking-wider text-lg font-bold truncate">
+                    {{ $player->name }}@if ($player->shirt_number) <span class="text-pitch-muted">#{{ $player->shirt_number }}</span>@endif
+                </div>
+
+                <div class="mt-2 grid grid-cols-2 gap-x-8 gap-y-1.5 px-3">
+                    @foreach ($player->cardStats() as $label => $value)
+                        <div class="flex items-baseline justify-between">
+                            <span class="text-[10px] tracking-[.15em] text-pitch-muted">{{ $label }}</span>
+                            <span class="font-display text-lg font-bold">{{ $ovrPublic ? number_format($value, 1) : '?' }}</span>
+                        </div>
+                    @endforeach
+                </div>
+            </div>
+
+            @if ($player->user_id === auth()->id())
+                <label class="block w-64 mx-auto mt-2 text-center text-xs text-bibB hover:underline cursor-pointer">
+                    📷 Kart fotoğrafını değiştir
+                    <input type="file" wire:model="photo" accept="image/*" class="hidden">
+                </label>
+                <div wire:loading wire:target="photo" class="mt-1 text-center text-xs text-pitch-muted">Yükleniyor…</div>
+                <x-input-error :messages="$errors->get('photo')" class="mt-1 text-center" />
+            @endif
+        </div>
+
         {{-- Rozetler --}}
         @php
             $earnedCount = collect($badges)->where('earned', true)->count();
