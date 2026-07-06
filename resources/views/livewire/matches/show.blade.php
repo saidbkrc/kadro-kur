@@ -144,7 +144,7 @@
             @php
                 $reminderTypes = [];
                 if ($match->status === 'scheduled') {
-                    $reminderTypes['rsvp'] = '📋 RSVP hatırlat';
+                    $reminderTypes['rsvp'] = '📋 Katılım hatırlat';
                     if ($match->squad_status === 'voting') $reminderTypes['squad_vote'] = '🗳️ Kadro oylaması hatırlat';
                     if ($match->squad_status === 'approved') $reminderTypes['squad_announce'] = '📣 Kadroyu duyur';
                 } else {
@@ -168,7 +168,7 @@
                     @if ($reminderNotice)
                         <p class="text-sm text-bibB">{{ $reminderNotice }}</p>
                     @endif
-                    <p class="text-xs text-pitch-muted">Hatırlatma yalnızca işini henüz yapmamış kişilere gider (RSVP vermeyenler, oy kullanmayanlar vb.).</p>
+                    <p class="text-xs text-pitch-muted">Hatırlatma yalnızca işini henüz yapmamış kişilere gider (katılım bildirmeyenler, oy kullanmayanlar vb.).</p>
                 </div>
             @endif
         @endif

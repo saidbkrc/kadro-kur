@@ -23,7 +23,7 @@ class PushNotifier
         $this->send(
             $this->groupMembers($match, $exceptUserId),
             '⚽ Yeni maç: '.$match->title,
-            $match->starts_at->translatedFormat('d F l H:i').' — Geliyor musun? RSVP ver.',
+            $match->starts_at->translatedFormat('d F l H:i').' — Geliyor musun? Katılımını bildir.',
             route('matches.show', $match),
             'mac-'.$match->id.'-yeni',
         );
@@ -77,7 +77,7 @@ class PushNotifier
             $this->send(
                 $this->groupMembers($match),
                 '⏰ Maç yaklaşıyor: '.$match->title,
-                $match->starts_at->translatedFormat('l H:i').' — RSVP verdin mi?',
+                $match->starts_at->translatedFormat('l H:i').' — Katılımını bildirdin mi?',
                 route('matches.show', $match),
                 'mac-'.$match->id.'-hatirlatma',
             );
@@ -86,7 +86,7 @@ class PushNotifier
 
     /** Başkanın elle gönderebileceği hazır hatırlatmalar: [tip => etiket]. */
     public const MANUAL_REMINDERS = [
-        'rsvp' => '📋 RSVP hatırlat',
+        'rsvp' => '📋 Katılım hatırlat',
         'squad_vote' => '🗳️ Kadro oylaması hatırlat',
         'squad_announce' => '📣 Maç kadrosunu duyur',
         'mvp' => '🏆 MVP oylaması hatırlat',
@@ -112,7 +112,7 @@ class PushNotifier
                     return in_array($status, ['going', 'not_going'], true);
                 }),
                 '📋 Katılımını bekliyoruz',
-                $title.' — Geliyor musun? RSVP\'ni ver.',
+                $title.' — Geliyor musun? Katılımını bildir.',
             ],
             // Kadro oylaması: oy hakkı olup henüz oy kullanmamışlar
             'squad_vote' => [
