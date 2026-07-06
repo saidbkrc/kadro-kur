@@ -64,6 +64,12 @@ class Player extends Model
         return $this->hasMany(MvpVote::class);
     }
 
+    /** Kazanılmış rozet kayıtları (yeni kazanım tespiti için — hesap türetilmiş). */
+    public function badges(): HasMany
+    {
+        return $this->hasMany(PlayerBadge::class);
+    }
+
     public function isGuest(): bool
     {
         return $this->user_id === null;

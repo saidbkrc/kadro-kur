@@ -3,6 +3,8 @@
 namespace App\Services;
 
 use App\Models\FootballMatch;
+use App\Models\Group;
+use App\Models\Player;
 use App\Models\User;
 use App\Notifications\MatchPushNotification;
 use Illuminate\Support\Collection;
@@ -79,6 +81,152 @@ class PushNotifier
                 route('matches.show', $match),
                 'mac-'.$match->id.'-hatirlatma',
             );
+        }
+    }
+
+    /** Başkanın elle gönderebileceği hazır hatırlatmalar: [tip => etiket]. */
+    public const MANUAL_REMINDERS = [
+        'rsvp' => '📋 RSVP hatırlat',
+        'squad_vote' => '🗳️ Kadro oylaması hatırlat',
+        'squad_announce' => '📣 Maç kadrosunu duyur',
+        'mvp' => '🏆 MVP oylaması hatırlat',
+        'perf' => '📈 Performans puanı hatırlat',
+    ];
+
+    /**
+     * Başkanın hazır hatırlatması. Hedef kitle tipe göre daraltılır (işini yapmış
+     * olanlara spam gitmez). Gönderilen kişi sayısını döndürür.
+     */
+    public function manualReminder(FootballMatch $match, string $type, ?int $exceptUserId = null): int
+    {
+        $title = $match->title;
+        $url = route('matches.show', $match);
+
+        [$users, $header, $body] = match ($type) {
+            // RSVP: henüz kesin cevap vermemiş üyeler (cevapsız veya "belki")
+            'rsvp' => [
+                $this->groupMembers($match, $exceptUserId)->reject(function (User $user) use ($match) {
+                    $player = $match->group->players()->firstWhere('user_id', $user->id);
+                    $status = $player ? $match->rsvps()->firstWhere('player_id', $player->id)?->status : null;
+
+                    return in_array($status, ['going', 'not_going'], true);
+                }),
+                '📋 Katılımını bekliyoruz',
+                $title.' — Geliyor musun? RSVP\'ni ver.',
+            ],
+            // Kadro oylaması: oy hakkı olup henüz oy kullanmamışlar
+            'squad_vote' => [
+                User::whereIn('id', collect($match->squadVoterIds())
+                    ->diff($match->squadVotes()->pluck('user_id'))
+                    ->reject(fn ($id) => $id === $exceptUserId))->get(),
+                '🗳️ Kadro oyunu bekliyor',
+                $title.' — Takımlar kuruldu, onayla ya da reddet.',
+            ],
+            // Kadro duyurusu: asıl listedeki herkes
+            'squad_announce' => [
+                User::whereIn('id', collect($match->squadVoterIds())->reject(fn ($id) => $id === $exceptUserId))->get(),
+                '📣 Maç kadrosu belli oldu',
+                $title.' — Takımına ve dizilişe göz at.',
+            ],
+            // MVP: kadroda olup henüz MVP oyu vermemişler
+            'mvp' => [
+                User::whereIn('id', $match->mainListRsvps()->pluck('player.user_id')->filter()
+                    ->diff($match->mvpVotes()->pluck('voter_id'))
+                    ->reject(fn ($id) => $id === $exceptUserId))->get(),
+                '🏆 Maçın adamını seç',
+                $title.' — MVP oyunu henüz kullanmadın!',
+            ],
+            // Performans: kadroda olup bu maçta hiç puan vermemişler
+            'perf' => [
+                User::whereIn('id', $match->mainListRsvps()->pluck('player.user_id')->filter()
+                    ->diff($match->performanceRatings()->pluck('rater_id'))
+                    ->reject(fn ($id) => $id === $exceptUserId))->get(),
+                '📈 Takım arkadaşlarını puanla',
+                $title.' — Performans puanların bekleniyor.',
+            ],
+            default => throw new \InvalidArgumentException("Bilinmeyen hatırlatma tipi: {$type}"),
+        };
+
+        $users = $users->values();
+        $this->send($users, $header, $body, $url, 'mac-'.$match->id.'-hatirlatma-'.$type);
+
+        return $users->count();
+    }
+
+    /**
+     * Grubun rozetlerini senkronlar; yeni rozet kazananlara tek bildirim gönderir
+     * (oyuncu başına 1 push — birden çok rozet aynı mesajda listelenir).
+     */
+    public function syncBadgesAndNotify(Group $group): void
+    {
+        $new = app(PlayerBadges::class)->syncGroup($group);
+
+        if ($new === []) {
+            return;
+        }
+
+        $players = Player::with('user')->whereIn('id', array_keys($new))->get()->keyBy('id');
+
+        foreach ($new as $playerId => $badges) {
+            $player = $players->get($playerId);
+            if ($player?->user === null) {
+                continue; // misafirin hesabı yok
+            }
+
+            $names = collect($badges)->map(fn (array $b) => $b['icon'].' '.$b['name'])->implode(', ');
+
+            $this->send(
+                collect([$player->user]),
+                count($badges) > 1 ? '🎉 '.count($badges).' yeni rozet kazandın!' : '🎉 Yeni rozet kazandın!',
+                $names.' — profilinde seni bekliyor.',
+                route('groups.player', [$group, $player]),
+                'rozet-'.$player->id,
+            );
+        }
+    }
+
+    /**
+     * Maç özeti: maçtan ~24 saat sonra skor + MVP lideri + golcü tek bildirimde
+     * (maç başına 1 kez, digest_sent_at ile). Scheduler her saat çağırır.
+     */
+    public function sendDueDigests(): void
+    {
+        $due = FootballMatch::query()
+            ->where('status', 'completed')
+            ->whereNull('digest_sent_at')
+            ->where('starts_at', '<=', now()->subDay())
+            ->where('starts_at', '>=', now()->subDays(7)) // eski maçlara geriye dönük özet atma
+            ->with(['group', 'goals.player', 'mvpVotes.player'])
+            ->get();
+
+        foreach ($due as $match) {
+            $match->update(['digest_sent_at' => now()]);
+
+            $parts = ["Turuncu {$match->team_a_score} - {$match->team_b_score} Yeşil"];
+
+            if ($match->mvpVotes->isNotEmpty()) {
+                $topId = $match->mvpVotes->countBy('player_id')->sortDesc()->keys()->first();
+                $mvpName = $match->mvpVotes->firstWhere('player_id', $topId)?->player?->name;
+                if ($mvpName) {
+                    $parts[] = '🏆 MVP: '.$mvpName;
+                }
+            }
+
+            $topGoal = $match->goals->sortByDesc('count')->first();
+            if ($topGoal?->player) {
+                $parts[] = '⚽ '.$topGoal->player->name.($topGoal->count > 1 ? ' ×'.$topGoal->count : '');
+            }
+
+            $this->send(
+                $this->groupMembers($match),
+                '📊 Maç özeti: '.$match->title,
+                implode(' · ', $parts),
+                route('matches.show', $match),
+                'mac-'.$match->id.'-ozet',
+            );
+
+            // Ertesi gün rozetleri de tara (MVP/performans kaynaklı yeni kazanımlar)
+            $this->syncBadgesAndNotify($match->group);
         }
     }
 

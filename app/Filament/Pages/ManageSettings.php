@@ -37,7 +37,8 @@ class ManageSettings extends Page implements HasForms
             'default_capacity' => Setting::int('default_capacity', 14),
             'min_ratings_visibility' => Setting::int('min_ratings_visibility', 5),
             'squad_approval_percent' => Setting::int('squad_approval_percent', 60),
-            'rating_window_hours' => Setting::int('rating_window_hours', 24),
+            'rating_window_hours' => Setting::int('rating_window_hours', 168),
+            'performance_window_hours' => Setting::int('performance_window_hours', 168),
         ]);
     }
 
@@ -82,11 +83,19 @@ class ManageSettings extends Page implements HasForms
                             ->required(),
 
                         TextInput::make('rating_window_hours')
-                            ->label('Oylama penceresi (saat)')
-                            ->helperText('Maç sonu MVP + performans oylamasının açık kaldığı süre. 0 = sınırsız (test için tüm tamamlanmış maçlar açık olur).')
+                            ->label('MVP oylama penceresi (saat)')
+                            ->helperText('Skor girildikten sonra MVP oylamasının açık kaldığı süre. Varsayılan 168 = 1 hafta. 0 = sınırsız (test için tüm tamamlanmış maçlarda MVP + performans açık olur).')
                             ->numeric()
                             ->minValue(0)
-                            ->maxValue(168)
+                            ->maxValue(720)
+                            ->required(),
+
+                        TextInput::make('performance_window_hours')
+                            ->label('Performans penceresi (saat)')
+                            ->helperText('Maç saatinden itibaren performans puanlamasının açık kaldığı süre. Varsayılan 168 = 1 hafta (bir sonraki maça kadar).')
+                            ->numeric()
+                            ->minValue(1)
+                            ->maxValue(720)
                             ->required(),
                     ])->columns(3),
             ])

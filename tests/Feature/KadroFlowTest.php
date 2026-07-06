@@ -289,7 +289,7 @@ class KadroFlowTest extends TestCase
         $this->assertSame(3, $group->squadTemplates()->count());
     }
 
-    public function test_sonuc_girilir_mvp_24_saat_acilir_oy_degistirilemez(): void
+    public function test_sonuc_girilir_mvp_oylamasi_acilir_oy_degistirilemez(): void
     {
         $owner = User::factory()->create();
         $group = $this->makeGroup($owner);
@@ -327,14 +327,214 @@ class KadroFlowTest extends TestCase
         $this->assertSame(1, $match->mvpVotes()->count());
         $this->assertSame($ownPlayer->id, $match->mvpVotes()->first()->player_id);
 
-        // 24 saat geçince oylama kapanır
-        $this->travel(25)->hours();
+        // 1 hafta geçince oylama kapanır (varsayılan pencere 168 saat)
+        $this->travel(8)->days();
         $this->assertFalse($match->refresh()->mvpOpen());
 
         Livewire::actingAs($owner)
             ->test(Matches\Show::class, ['match' => $match])
             ->call('voteMvp', $friend->id)
             ->assertStatus(403);
+    }
+
+    public function test_performans_penceresi_mvpden_bagimsiz_bir_hafta_acik(): void
+    {
+        $owner = User::factory()->create();
+        $group = $this->makeGroup($owner);
+        $ownPlayer = $group->playerFor($owner);
+        $friend = $this->addMember($group);
+
+        // Dün oynanmış, MVP penceresi kapanmış maç
+        $match = $group->matches()->create([
+            'created_by' => $owner->id,
+            'title' => 'Dünkü maç',
+            'starts_at' => now()->subDay(),
+            'capacity' => 14,
+            'status' => 'completed',
+            'team_a_score' => 3,
+            'team_b_score' => 2,
+            'mvp_closes_at' => now()->subHours(2),
+        ]);
+        $match->rsvps()->create(['player_id' => $ownPlayer->id, 'status' => 'going', 'team' => 'A']);
+        $match->rsvps()->create(['player_id' => $friend->id, 'status' => 'going', 'team' => 'B']);
+
+        // MVP kapandı ama performans hâlâ açık (pencere: maç saati + 168 saat)
+        $this->assertFalse($match->mvpOpen());
+        $this->assertTrue($match->perfOpen());
+
+        Livewire::actingAs($owner)
+            ->test(Matches\Show::class, ['match' => $match])
+            ->call('ratePerformance', $friend->id, 8)
+            ->assertHasNoErrors();
+
+        $this->assertSame(1, $match->performanceRatings()->count());
+
+        // 1 hafta dolunca performans da kapanır
+        $this->travel(7)->days();
+        $this->assertFalse($match->refresh()->perfOpen());
+
+        Livewire::actingAs($owner)
+            ->test(Matches\Show::class, ['match' => $match])
+            ->call('ratePerformance', $friend->id, 9)
+            ->assertStatus(403);
+    }
+
+    public function test_baskan_gecmis_mac_skorunu_duzeltir_bildirim_tekrarlanmaz(): void
+    {
+        $owner = User::factory()->create();
+        $group = $this->makeGroup($owner);
+        $ownPlayer = $group->playerFor($owner);
+        $friend = $this->addMember($group);
+
+        $match = $this->makeMatch($group);
+        $match->setRsvp($ownPlayer, 'going');
+        $match->setRsvp($friend, 'going');
+
+        Livewire::actingAs($owner)
+            ->test(Matches\Show::class, ['match' => $match])
+            ->set('teamAScore', 3)->set('teamBScore', 1)
+            ->set('goals', [$friend->id => 2])
+            ->call('saveResult');
+
+        $closesAt = $match->refresh()->mvp_closes_at;
+        $this->assertNull($match->result_edited_at, 'İlk kayıt düzenleme sayılmaz');
+
+        // Skor düzeltilir: bildirim gitmez (rozetler ilk kayıtta verildi), oylama süresi uzamaz
+        Notification::fake();
+        Livewire::actingAs($owner)
+            ->test(Matches\Show::class, ['match' => $match->refresh()])
+            ->set('teamAScore', 4)->set('teamBScore', 2)
+            ->call('saveResult')
+            ->assertHasNoErrors();
+
+        Notification::assertNothingSent();
+        $match->refresh();
+        $this->assertSame(4, $match->team_a_score);
+        $this->assertSame(2, $match->team_b_score);
+        $this->assertSame(2, $match->goals()->where('player_id', $friend->id)->value('count'));
+        $this->assertTrue($closesAt->equalTo($match->mvp_closes_at), 'Oylama penceresi uzamamalı');
+
+        // Şeffaflık kaydı düşer
+        $this->assertNotNull($match->result_edited_at);
+        $this->assertSame($owner->id, $match->result_edited_by);
+
+        // Yönetici olmayan üye skoru düzenleyemez
+        Livewire::actingAs($friend->user)
+            ->test(Matches\Show::class, ['match' => $match])
+            ->set('teamAScore', 9)->set('teamBScore', 0)
+            ->call('saveResult')
+            ->assertStatus(403);
+    }
+
+    public function test_baskan_hatirlatma_gonderir_ve_30dk_sinirlanir(): void
+    {
+        Notification::fake();
+
+        $owner = User::factory()->create();
+        $group = $this->makeGroup($owner);
+        $ownPlayer = $group->playerFor($owner);
+        $cevapsiz = $this->addMember($group);   // RSVP vermedi → hatırlatma almalı
+        $gelen = $this->addMember($group);      // "geliyorum" dedi → almamalı
+
+        $match = $this->makeMatch($group);
+        $match->setRsvp($ownPlayer, 'going');
+        $match->setRsvp($gelen, 'going');
+
+        \Illuminate\Support\Facades\RateLimiter::clear('manuel-bildirim:'.$group->id);
+
+        $component = Livewire::actingAs($owner)
+            ->test(Matches\Show::class, ['match' => $match])
+            ->call('sendReminder', 'rsvp');
+
+        Notification::assertSentTo($cevapsiz->user, MatchPushNotification::class);
+        Notification::assertNotSentTo($gelen->user, MatchPushNotification::class);
+        Notification::assertNotSentTo($owner, MatchPushNotification::class);
+        $component->assertSet('reminderNotice', '✅ Hatırlatma 1 kişiye gönderildi.');
+
+        // 30 dk dolmadan ikinci gönderim engellenir
+        Notification::fake();
+        Livewire::actingAs($owner)
+            ->test(Matches\Show::class, ['match' => $match])
+            ->call('sendReminder', 'rsvp')
+            ->assertSet('reminderNotice', fn ($v) => str_contains((string) $v, 'Çok sık'));
+        Notification::assertNothingSent();
+
+        // Yönetici olmayan gönderemez
+        Livewire::actingAs($gelen->user)
+            ->test(Matches\Show::class, ['match' => $match])
+            ->call('sendReminder', 'rsvp')
+            ->assertStatus(403);
+    }
+
+    public function test_rozet_kazanilinca_bildirim_gider_tekrar_gitmez(): void
+    {
+        Notification::fake();
+
+        $owner = User::factory()->create();
+        $group = $this->makeGroup($owner);
+        $ownPlayer = $group->playerFor($owner);
+        $friend = $this->addMember($group);
+
+        $match = $this->makeMatch($group);
+        $match->setRsvp($ownPlayer, 'going');
+        $match->setRsvp($friend, 'going');
+
+        // Skor girilir → İlk Maç + (golcüye) İlk Gol rozetleri kazanılır
+        Livewire::actingAs($owner)
+            ->test(Matches\Show::class, ['match' => $match])
+            ->set('teamAScore', 2)->set('teamBScore', 1)
+            ->set('goals', [$friend->id => 1])
+            ->call('saveResult');
+
+        Notification::assertSentTo($friend->user, MatchPushNotification::class,
+            fn ($n) => str_contains($n->title, 'rozet') && str_contains($n->body, 'İlk Gol'));
+        Notification::assertSentTo($owner, MatchPushNotification::class,
+            fn ($n) => str_contains($n->title, 'rozet') && str_contains($n->body, 'İlk Maç'));
+
+        $this->assertTrue($friend->badges()->where('badge_key', 'first_goal')->exists());
+
+        // Aynı grup tekrar senkronlanır → yeni rozet yok, bildirim gitmez
+        Notification::fake();
+        app(PushNotifier::class)->syncBadgesAndNotify($group);
+        Notification::assertNothingSent();
+    }
+
+    public function test_mac_ozeti_ertesi_gun_bir_kez_gider(): void
+    {
+        Notification::fake();
+
+        $owner = User::factory()->create();
+        $group = $this->makeGroup($owner);
+        $ownPlayer = $group->playerFor($owner);
+        $friend = $this->addMember($group);
+
+        // Dün oynanmış, özeti gönderilmemiş maç
+        $match = $group->matches()->create([
+            'created_by' => $owner->id,
+            'title' => 'Dünkü maç',
+            'starts_at' => now()->subHours(25),
+            'capacity' => 14,
+            'status' => 'completed',
+            'team_a_score' => 4,
+            'team_b_score' => 2,
+            'mvp_closes_at' => now()->addDays(5),
+        ]);
+        $match->rsvps()->create(['player_id' => $ownPlayer->id, 'status' => 'going', 'team' => 'A']);
+        $match->rsvps()->create(['player_id' => $friend->id, 'status' => 'going', 'team' => 'B']);
+        $match->goals()->create(['player_id' => $friend->id, 'count' => 2]);
+        $match->mvpVotes()->create(['voter_id' => $owner->id, 'player_id' => $friend->id]);
+
+        app(PushNotifier::class)->sendDueDigests();
+
+        Notification::assertSentTo($friend->user, MatchPushNotification::class,
+            fn ($n) => str_contains($n->title, 'Maç özeti') && str_contains($n->body, '4 - 2') && str_contains($n->body, 'MVP'));
+        $this->assertNotNull($match->refresh()->digest_sent_at);
+
+        // İkinci çalıştırma aynı maç için özet göndermez
+        Notification::fake();
+        app(PushNotifier::class)->sendDueDigests();
+        Notification::assertNotSentTo($friend->user, MatchPushNotification::class,
+            fn ($n) => str_contains($n->title, 'Maç özeti'));
     }
 
     public function test_haftalik_otomatik_mac_olusur(): void

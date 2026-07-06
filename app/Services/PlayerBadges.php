@@ -4,6 +4,7 @@ namespace App\Services;
 
 use App\Models\Group;
 use App\Models\Player;
+use App\Models\PlayerBadge;
 use Illuminate\Support\Collection;
 
 /**
@@ -153,6 +154,41 @@ class PlayerBadges
 
             return $s;
         });
+    }
+
+    /**
+     * Grubun kazanılmış rozetlerini player_badges ile senkronlar; YENİ kazanılanları
+     * döndürür: [player_id => rozet listesi]. Bildirim göndermez (PushNotifier yapar).
+     *
+     * @return array<int, list<array{key:string,icon:string,name:string}>>
+     */
+    public function syncGroup(Group $group): array
+    {
+        $existing = PlayerBadge::whereIn('player_id', $group->players()->pluck('id'))
+            ->get()
+            ->groupBy('player_id')
+            ->map(fn ($rows) => $rows->pluck('badge_key'));
+
+        $new = [];
+
+        foreach ($this->statsForGroup($group) as $playerId => $stats) {
+            $have = $existing->get($playerId) ?? collect();
+
+            $fresh = collect($this->evaluate($stats))
+                ->where('earned', true)
+                ->reject(fn (array $b) => $have->contains($b['key']))
+                ->values();
+
+            foreach ($fresh as $badge) {
+                PlayerBadge::firstOrCreate(['player_id' => $playerId, 'badge_key' => $badge['key']]);
+            }
+
+            if ($fresh->isNotEmpty()) {
+                $new[$playerId] = $fresh->map(fn (array $b) => ['key' => $b['key'], 'icon' => $b['icon'], 'name' => $b['name']])->all();
+            }
+        }
+
+        return $new;
     }
 
     /** Hiç maçı olmayan oyuncu için sıfır istatistik. */

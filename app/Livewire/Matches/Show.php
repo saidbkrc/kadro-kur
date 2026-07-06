@@ -43,6 +43,9 @@ class Show extends Component
     // Sonuç formu
     public bool $showResultForm = false;
 
+    /** Başkanın hatırlatma paneli geri bildirimi */
+    public ?string $reminderNotice = null;
+
     public ?int $teamAScore = null;
 
     public ?int $teamBScore = null;
@@ -359,6 +362,9 @@ class Show extends Component
 
         if ($firstCompletion) {
             app(PushNotifier::class)->resultEntered($this->match, Auth::id());
+        } else {
+            // Şeffaflık: geçmiş sonucun sonradan düzenlendiği not edilir
+            $this->match->update(['result_edited_at' => now(), 'result_edited_by' => Auth::id()]);
         }
 
         $participantIds = $this->match->mainListRsvps()->pluck('player_id');
@@ -369,6 +375,9 @@ class Show extends Component
                 $this->match->goals()->create(['player_id' => $playerId, 'count' => (int) $count]);
             }
         }
+
+        // Yeni rozet kazananlara bildirim (skor/goller işlendiği için burada)
+        app(PushNotifier::class)->syncBadgesAndNotify($this->match->group);
 
         // Haftalık otomatik maç: sıradaki maçı hemen aç
         app(MatchScheduler::class)->ensureUpcomingMatch($this->match->group);
@@ -395,10 +404,10 @@ class Show extends Component
         );
     }
 
-    /** Maç sonu performans puanı: 24 saat içinde, asıl kadrodakiler, kendine yok, anonim, güncellenebilir. */
+    /** Maç sonu performans puanı: pencere 1 hafta (perfOpen), asıl kadrodakiler, kendine yok, anonim, güncellenebilir. */
     public function ratePerformance(int $playerId, int $score): void
     {
-        abort_unless($this->match->mvpOpen(), 403);
+        abort_unless($this->match->perfOpen(), 403);
 
         $participants = $this->match->mainListRsvps();
         $myPlayer = $participants->pluck('player')->firstWhere('user_id', Auth::id());
@@ -419,6 +428,37 @@ class Show extends Component
         abort_unless($this->match->canManage(Auth::user()), 403);
 
         $this->match->update(['status' => 'cancelled']);
+    }
+
+    /* ---------- başkan hatırlatmaları ---------- */
+
+    /** Grup başına 30 dakikada 1 elle bildirim (spam koruması). */
+    protected function reminderRateKey(): string
+    {
+        return 'manuel-bildirim:'.$this->match->group_id;
+    }
+
+    /** Başkanın hazır hatırlatma bildirimi göndermesi. */
+    public function sendReminder(string $type): void
+    {
+        abort_unless($this->match->canManage(Auth::user()), 403);
+        abort_unless(array_key_exists($type, PushNotifier::MANUAL_REMINDERS), 400);
+
+        if (\Illuminate\Support\Facades\RateLimiter::tooManyAttempts($this->reminderRateKey(), 1)) {
+            $minutes = (int) ceil(\Illuminate\Support\Facades\RateLimiter::availableIn($this->reminderRateKey()) / 60);
+            $this->reminderNotice = "⏳ Çok sık bildirim gönderilemez — {$minutes} dk sonra tekrar dene.";
+
+            return;
+        }
+
+        $count = app(PushNotifier::class)->manualReminder($this->match, $type, Auth::id());
+
+        if ($count > 0) {
+            \Illuminate\Support\Facades\RateLimiter::hit($this->reminderRateKey(), 1800); // 30 dk
+            $this->reminderNotice = "✅ Hatırlatma {$count} kişiye gönderildi.";
+        } else {
+            $this->reminderNotice = 'Herkes zaten yapmış — gönderilecek kimse yok. 👏';
+        }
     }
 
     /* ---------- render ---------- */
@@ -479,7 +519,7 @@ class Show extends Component
                 ->with('player')
                 ->get(),
             'matchGoals' => $this->match->goals()->with('player')->orderByDesc('count')->get(),
-            'perfOpen' => $this->match->mvpOpen(),
+            'perfOpen' => $this->match->perfOpen(),
             'myPerfRatings' => $this->match->performanceRatings()
                 ->where('rater_id', Auth::id())
                 ->pluck('score', 'player_id'),

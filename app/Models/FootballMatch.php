@@ -17,6 +17,7 @@ class FootballMatch extends Model
         'group_id', 'created_by', 'title', 'location', 'starts_at', 'capacity', 'status',
         'squad_status', 'formation_a', 'formation_b', 'pitch_layout',
         'team_a_score', 'team_b_score', 'mvp_closes_at', 'reminder_sent_at',
+        'digest_sent_at', 'result_edited_at', 'result_edited_by',
     ];
 
     protected function casts(): array
@@ -25,6 +26,8 @@ class FootballMatch extends Model
             'starts_at' => 'datetime',
             'mvp_closes_at' => 'datetime',
             'reminder_sent_at' => 'datetime',
+            'digest_sent_at' => 'datetime',
+            'result_edited_at' => 'datetime',
             'pitch_layout' => 'array',
         ];
     }
@@ -37,6 +40,12 @@ class FootballMatch extends Model
     public function creator(): BelongsTo
     {
         return $this->belongsTo(User::class, 'created_by');
+    }
+
+    /** Skoru sonradan düzenleyen kişi (şeffaflık notu için). */
+    public function resultEditor(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'result_edited_by');
     }
 
     public function rsvps(): HasMany
@@ -267,10 +276,10 @@ class FootballMatch extends Model
 
     /* ---------- maç sonu ---------- */
 
-    /** Oylama/performans penceresi süresi (saat). 0 = sınırsız (panelden ayarlanır). */
+    /** MVP oylama penceresi süresi (saat) — varsayılan 1 hafta (bir sonraki maça kadar). 0 = sınırsız. */
     public static function ratingWindowHours(): int
     {
-        return Setting::int('rating_window_hours', 24);
+        return Setting::int('rating_window_hours', 168);
     }
 
     /** Pencere sınırsız mı (panelden 0 yapıldıysa — test için)? */
@@ -279,7 +288,7 @@ class FootballMatch extends Model
         return self::ratingWindowHours() === 0;
     }
 
-    /** MVP + performans oylaması açık mı? Sınırsız modda tamamlanmış her maç açıktır (test). */
+    /** MVP oylaması açık mı? Sınırsız modda tamamlanmış her maç açıktır (test). */
     public function mvpOpen(): bool
     {
         if (self::ratingUnlimited()) {
@@ -287,5 +296,31 @@ class FootballMatch extends Model
         }
 
         return $this->mvp_closes_at !== null && now()->lt($this->mvp_closes_at);
+    }
+
+    /** Performans penceresi süresi (saat) — varsayılan 1 hafta (bir sonraki maça kadar). */
+    public static function performanceWindowHours(): int
+    {
+        return Setting::int('performance_window_hours', 168);
+    }
+
+    /** Performans puanlamasının kapanacağı an (maç saatinden itibaren). */
+    public function perfClosesAt(): ?\Illuminate\Support\Carbon
+    {
+        return $this->starts_at?->copy()->addHours(self::performanceWindowHours());
+    }
+
+    /** Maç sonu performans puanlaması açık mı? MVP'den bağımsız, daha uzun pencere. */
+    public function perfOpen(): bool
+    {
+        if ($this->status !== 'completed') {
+            return false;
+        }
+
+        if (self::ratingUnlimited()) {
+            return true;
+        }
+
+        return $this->perfClosesAt() !== null && now()->lt($this->perfClosesAt());
     }
 }

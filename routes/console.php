@@ -16,3 +16,9 @@ Schedule::call(fn () => app(PushNotifier::class)->sendDueReminders())
     ->hourly()
     ->name('match-reminders')
     ->withoutOverlapping();
+
+// Maç özeti push'u: maçtan ~24 saat sonra skor + MVP + golcü (maç başına 1 kez) + rozet taraması.
+Schedule::call(fn () => app(PushNotifier::class)->sendDueDigests())
+    ->hourly()
+    ->name('match-digests')
+    ->withoutOverlapping();

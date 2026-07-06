@@ -17,6 +17,9 @@
                         📅 {{ $match->starts_at->translatedFormat('d F Y, l H:i') }}
                         @if ($match->location) · 📍 {{ $match->location }} @endif
                     </p>
+                    @if ($match->status === 'completed' && $match->result_edited_at)
+                        <p class="text-xs text-pitch-muted mt-1">✏️ Sonuç sonradan düzenlendi — {{ $match->result_edited_at->translatedFormat('d F H:i') }}{{ $match->resultEditor ? ', '.$match->resultEditor->name : '' }}</p>
+                    @endif
                 </div>
                 <div class="shrink-0 text-end">
                     @if ($match->status === 'scheduled')
@@ -124,7 +127,51 @@
                     <p class="text-sm text-bibB bg-bibB/10 border border-bibB/30 rounded-md p-3">{{ $templateNotice }}</p>
                 @endif
             @endif
+
+            {{-- Başkan: geçmiş maçın sonucunu düzeltme --}}
+            @if ($canManage && $match->status === 'completed')
+                <div class="pt-3 border-t border-pitch-line">
+                    <x-secondary-button wire:click="$toggle('showResultForm')" class="w-full sm:w-auto">
+                        {{ $showResultForm ? 'Vazgeç' : '✏️ Sonucu Düzenle' }}
+                    </x-secondary-button>
+                    <p class="text-xs text-pitch-muted mt-2">Skoru ve golcüleri sonradan düzeltebilirsin — oylama süreleri uzamaz, bildirim tekrarlanmaz.</p>
+                </div>
+            @endif
         </div>
+
+        {{-- Başkan: hazır hatırlatma bildirimleri --}}
+        @if ($canManage && $match->status !== 'cancelled')
+            @php
+                $reminderTypes = [];
+                if ($match->status === 'scheduled') {
+                    $reminderTypes['rsvp'] = '📋 RSVP hatırlat';
+                    if ($match->squad_status === 'voting') $reminderTypes['squad_vote'] = '🗳️ Kadro oylaması hatırlat';
+                    if ($match->squad_status === 'approved') $reminderTypes['squad_announce'] = '📣 Kadroyu duyur';
+                } else {
+                    if ($match->mvpOpen()) $reminderTypes['mvp'] = '🏆 MVP hatırlat';
+                    if ($match->perfOpen()) $reminderTypes['perf'] = '📈 Performans hatırlat';
+                }
+            @endphp
+            @if ($reminderTypes)
+                <div class="bg-pitch-surface border border-pitch-line rounded-xl p-4 sm:p-6 space-y-3">
+                    <div class="flex items-center justify-between flex-wrap gap-2">
+                        <h3 class="font-display uppercase tracking-wider text-lg font-semibold">📣 Hatırlatma Gönder <span class="text-xs text-pitch-muted font-normal tracking-normal">(başkan)</span></h3>
+                        <span class="text-xs text-pitch-muted bg-pitch-bg border border-pitch-line rounded-full px-3 py-1">30 dk'da 1 bildirim</span>
+                    </div>
+                    <div class="grid grid-cols-2 gap-2 sm:flex sm:flex-wrap">
+                        @foreach ($reminderTypes as $type => $label)
+                            <x-secondary-button wire:click="sendReminder('{{ $type }}')" class="w-full sm:w-auto {{ count($reminderTypes) % 2 === 1 && $loop->last ? 'col-span-2' : '' }}">
+                                {{ $label }}
+                            </x-secondary-button>
+                        @endforeach
+                    </div>
+                    @if ($reminderNotice)
+                        <p class="text-sm text-bibB">{{ $reminderNotice }}</p>
+                    @endif
+                    <p class="text-xs text-pitch-muted">Hatırlatma yalnızca işini henüz yapmamış kişilere gider (RSVP vermeyenler, oy kullanmayanlar vb.).</p>
+                </div>
+            @endif
+        @endif
 
         {{-- RSVP — kadro kurulduktan sonra kişisel "geliyor musun?" sorusu gizlenir --}}
         @if ($match->status === 'scheduled' && ($match->squad_status === 'none' || $canManage))
@@ -409,7 +456,7 @@
         @if ($showResultForm && $canManage)
             <div class="bg-pitch-surface border border-pitch-line rounded-xl">
                 <form wire:submit="saveResult" class="p-6 space-y-4">
-                    <h3 class="font-display uppercase tracking-wider text-lg font-semibold">Maç Bitti Mi?</h3>
+                    <h3 class="font-display uppercase tracking-wider text-lg font-semibold">{{ $match->status === 'completed' ? '✏️ Sonucu Düzenle' : 'Maç Bitti Mi?' }}</h3>
                     <div class="flex items-center justify-center sm:justify-start gap-3">
                         <span class="font-bold text-bibA">Turuncu</span>
                         <x-text-input wire:model="teamAScore" type="number" min="0" max="99" class="w-20 text-center text-lg font-bold" />
@@ -439,8 +486,8 @@
                         </div>
                     @endif
 
-                    <x-primary-button class="w-full sm:w-auto">🏁 Sonucu Kaydet ve Maçı Bitir</x-primary-button>
-                    <p class="text-xs text-pitch-muted">Skor kaydedilince MVP oylaması <strong class="text-pitch-ink">24 saat</strong> açılır ve haftalık otomatik maç ayarlıysa sıradaki maç açılır.</p>
+                    <x-primary-button class="w-full sm:w-auto">{{ $match->status === 'completed' ? '💾 Değişiklikleri Kaydet' : '🏁 Sonucu Kaydet ve Maçı Bitir' }}</x-primary-button>
+                    <p class="text-xs text-pitch-muted">Skor kaydedilince MVP ve performans oylaması <strong class="text-pitch-ink">1 hafta</strong> (bir sonraki maça kadar) açık kalır; haftalık otomatik maç ayarlıysa sıradaki maç açılır.</p>
                 </form>
             </div>
         @endif
@@ -462,8 +509,9 @@
                 <div class="flex items-center justify-between flex-wrap gap-2">
                     <h3 class="font-display uppercase tracking-wider text-lg font-semibold">🏆 Maçın Adamı (MVP)</h3>
                     @if ($match->mvpOpen())
+                        @php $mvpHoursLeft = (int) ceil(now()->diffInHours($match->mvp_closes_at, true)); @endphp
                         <span class="text-xs text-gold bg-gold/10 border border-gold/30 rounded-full px-3 py-1">
-                            {{ \App\Models\FootballMatch::ratingUnlimited() ? 'Oylama açık (sınırsız)' : 'Oylama açık — '.(int) ceil(now()->diffInHours($match->mvp_closes_at, true)).' saat kaldı' }}
+                            {{ \App\Models\FootballMatch::ratingUnlimited() ? 'Oylama açık (sınırsız)' : 'Oylama açık — '.($mvpHoursLeft > 48 ? (int) ceil($mvpHoursLeft / 24).' gün kaldı' : $mvpHoursLeft.' saat kaldı') }}
                         </span>
                     @elseif ($match->mvp_closes_at)
                         <span class="text-xs text-pitch-muted bg-pitch-bg border border-pitch-line rounded-full px-3 py-1">Oylama kapandı</span>
@@ -508,7 +556,8 @@
                 <div class="flex items-center justify-between flex-wrap gap-2">
                     <h3 class="font-display uppercase tracking-wider text-lg font-semibold">📈 Performans Puanı</h3>
                     @if ($perfOpen)
-                        <span class="text-xs text-gold bg-gold/10 border border-gold/30 rounded-full px-3 py-1">{{ \App\Models\FootballMatch::ratingUnlimited() ? 'Açık (sınırsız)' : 'Açık — '.(int) ceil(now()->diffInHours($match->mvp_closes_at, true)).' saat kaldı' }}</span>
+                        @php $perfHoursLeft = (int) ceil(now()->diffInHours($match->perfClosesAt(), true)); @endphp
+                        <span class="text-xs text-gold bg-gold/10 border border-gold/30 rounded-full px-3 py-1">{{ \App\Models\FootballMatch::ratingUnlimited() ? 'Açık (sınırsız)' : 'Açık — '.($perfHoursLeft > 48 ? (int) ceil($perfHoursLeft / 24).' gün kaldı' : $perfHoursLeft.' saat kaldı') }}</span>
                     @else
                         <span class="text-xs text-pitch-muted bg-pitch-bg border border-pitch-line rounded-full px-3 py-1">Kapandı</span>
                     @endif

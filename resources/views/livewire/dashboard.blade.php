@@ -72,7 +72,8 @@
                         <a href="{{ route('matches.show', $match) }}" wire:navigate
                            class="flex items-center justify-between gap-3 border border-pitch-line rounded-lg px-4 py-3 hover:bg-pitch-surface2 transition">
                             <span class="min-w-0 break-words"><span class="text-gold font-semibold">MVP seç 🏆</span> · {{ $match->title }} <span class="text-pitch-muted text-sm">({{ $match->group->name }})</span></span>
-                            <span class="text-pitch-muted text-sm shrink-0">{{ (int) ceil(now()->diffInHours($match->mvp_closes_at, true)) }} saat kaldı →</span>
+                            @php $mvpH = (int) ceil(now()->diffInHours($match->mvp_closes_at, true)); @endphp
+                            <span class="text-pitch-muted text-sm shrink-0">{{ $mvpH > 48 ? (int) ceil($mvpH / 24).' gün' : $mvpH.' saat' }} kaldı →</span>
                         </a>
                     @endforeach
                 </div>
