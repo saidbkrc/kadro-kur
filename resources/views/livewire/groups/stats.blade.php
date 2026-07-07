@@ -39,6 +39,31 @@
                     @endif
                 </div>
 
+                {{-- Takım kimyası --}}
+                <div class="min-w-0 bg-pitch-surface border border-pitch-line rounded-xl p-4 sm:p-6">
+                    <h3 class="font-display uppercase tracking-wider text-lg font-semibold mb-1">🧪 Takım Kimyası</h3>
+                    <p class="text-xs text-pitch-muted mb-3">Aynı takımda en çok kazanan ikililer (en az {{ \App\Services\TeamChemistry::MIN_TOGETHER }} ortak maç).</p>
+                    @if ($chemistry->isEmpty())
+                        <p class="text-pitch-muted text-sm">Henüz yeterli veri yok — ikililer aynı takımda {{ \App\Services\TeamChemistry::MIN_TOGETHER }} maç oynayınca burada belirir.</p>
+                    @else
+                        <div class="space-y-2">
+                            @foreach ($chemistry as $i => $pair)
+                                <div class="flex items-center gap-3">
+                                    <span class="font-display font-bold w-6 text-center {{ $i === 0 ? 'text-gold' : 'text-pitch-muted' }}">{{ $i === 0 ? '🧪' : ($i + 1).'.' }}</span>
+                                    <span class="text-sm font-semibold min-w-0 truncate">{{ $pair['a']->name }} <span class="text-pitch-muted font-normal">+</span> {{ $pair['b']->name }}</span>
+                                    <div class="ms-auto flex items-center gap-2 shrink-0">
+                                        <div class="w-20 h-1.5 rounded-full bg-pitch-bg border border-pitch-line overflow-hidden hidden sm:block">
+                                            <div class="h-full bg-gradient-to-r from-pitch-green to-bibB" style="width: {{ $pair['rate'] }}%"></div>
+                                        </div>
+                                        <span class="font-display font-bold text-bibB w-12 text-end">%{{ $pair['rate'] }}</span>
+                                        <span class="text-xs text-pitch-muted w-12 text-end">{{ $pair['together'] }} maç</span>
+                                    </div>
+                                </div>
+                            @endforeach
+                        </div>
+                    @endif
+                </div>
+
                 {{-- Oyuncu istatistikleri --}}
                 <div class="min-w-0 bg-pitch-surface border border-pitch-line rounded-xl p-4 sm:p-6">
                     <h3 class="font-display uppercase tracking-wider text-lg font-semibold mb-3">Oyuncu İstatistikleri</h3>

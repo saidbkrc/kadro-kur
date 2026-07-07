@@ -907,6 +907,46 @@ class KadroFlowTest extends TestCase
         );
     }
 
+    public function test_takim_kimyasi_ikili_kazanma_oranini_hesaplar(): void
+    {
+        $owner = User::factory()->create();
+        $group = $this->makeGroup($owner);
+        $p1 = $group->playerFor($owner);
+        $p2 = $this->addMember($group);
+        $p3 = $this->addMember($group);
+
+        // p1+p2 hep A takımında: 3 maçta 2 galibiyet 1 mağlubiyet → %67
+        foreach ([[3, 1], [2, 0], [0, 1]] as $i => [$a, $b]) {
+            $match = $group->matches()->create([
+                'created_by' => $owner->id, 'title' => "Maç {$i}",
+                'starts_at' => now()->subDays(9 - $i), 'capacity' => 14,
+                'status' => 'completed', 'team_a_score' => $a, 'team_b_score' => $b,
+            ]);
+            $match->rsvps()->create(['player_id' => $p1->id, 'status' => 'going', 'team' => 'A']);
+            $match->rsvps()->create(['player_id' => $p2->id, 'status' => 'going', 'team' => 'A']);
+            $match->rsvps()->create(['player_id' => $p3->id, 'status' => 'going', 'team' => 'B']);
+        }
+
+        $pairs = app(\App\Services\TeamChemistry::class)->pairsForGroup($group);
+
+        $this->assertCount(1, $pairs, 'Sadece 3+ ortak maçlı ikili listelenir (p3 kimseyle 3 maç aynı takımda değil... p3 B takımında yalnız)');
+        $this->assertSame(3, $pairs[0]['together']);
+        $this->assertSame(2, $pairs[0]['wins']);
+        $this->assertSame(67, $pairs[0]['rate']);
+
+        // Profilde en uyumlu ortak görünür
+        $this->actingAs($owner)->get(route('groups.player', [$group, $p1]))
+            ->assertOk()
+            ->assertSee('En uyumlu ortağı')
+            ->assertSee($p2->name);
+
+        // İstatistik sayfasında kimya kartı
+        $this->actingAs($owner)->get(route('groups.stats', $group))
+            ->assertOk()
+            ->assertSee('Takım Kimyası')
+            ->assertSee('%67');
+    }
+
     public function test_oyuncu_karti_ve_foto_yukleme(): void
     {
         \Illuminate\Support\Facades\Storage::fake('public');
@@ -931,6 +971,11 @@ class KadroFlowTest extends TestCase
         $p1->refresh();
         $this->assertNotNull($p1->photo_path);
         \Illuminate\Support\Facades\Storage::disk('public')->assertExists($p1->photo_path);
+
+        // Sunucuda kare kırpılıp küçültülür (ekranı kaplamasın): 400x400 girdi → 400x400 jpeg, 512 üstü olamaz
+        [$w, $h] = getimagesizefromstring(\Illuminate\Support\Facades\Storage::disk('public')->get($p1->photo_path));
+        $this->assertSame($w, $h, 'Kart fotoğrafı kare olmalı');
+        $this->assertLessThanOrEqual(512, $w);
 
         // Başkasının kartına yükleyemez (profil sayfası onun, foto başkasının olur → 403)
         Livewire::actingAs($owner)

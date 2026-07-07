@@ -53,7 +53,11 @@ class PlayerProfile extends Component
             Storage::disk('public')->delete($this->player->photo_path);
         }
 
-        $this->player->update(['photo_path' => $this->photo->store('oyuncu-foto', 'public')]);
+        // Kare kırp + 512px'e küçült (telefon fotoğrafları dev gelmesin)
+        $path = 'oyuncu-foto/'.uniqid().'.jpg';
+        Storage::disk('public')->put($path, \App\Support\SquareImage::make($this->photo));
+
+        $this->player->update(['photo_path' => $path]);
         $this->photo = null;
         $this->player->refresh();
     }
@@ -90,6 +94,7 @@ class PlayerProfile extends Component
             'compareStats' => $compareStats,
             'myEarned' => $earnedCount($stats),
             'compareEarned' => $compareStats !== null ? $earnedCount($compareStats) : null,
+            'bestPartner' => app(\App\Services\TeamChemistry::class)->bestPartnerFor($this->player->id, $this->group),
         ]);
     }
 }

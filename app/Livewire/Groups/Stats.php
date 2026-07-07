@@ -5,6 +5,7 @@ namespace App\Livewire\Groups;
 use App\Models\FootballMatch;
 use App\Models\Group;
 use App\Services\PlayerBadges;
+use App\Services\TeamChemistry;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\View\View;
 use Livewire\Attributes\Layout;
@@ -110,6 +111,7 @@ class Stats extends Component
             'playerStats' => $playerStats,
             'topScorers' => $topScorers,
             'earnedIcons' => $earnedIcons,
+            'chemistry' => app(TeamChemistry::class)->pairsForGroup($this->group)->take(5),
         ]);
     }
 }

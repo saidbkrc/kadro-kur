@@ -41,6 +41,15 @@
             @endforeach
         </div>
 
+        @if ($bestPartner)
+            @php $partner = $bestPartner['a']->id === $player->id ? $bestPartner['b'] : $bestPartner['a']; @endphp
+            <div class="bg-pitch-surface border border-pitch-line rounded-xl px-4 py-3 text-sm flex items-center gap-2 flex-wrap">
+                <span>🧪 En uyumlu ortağı:</span>
+                <a href="{{ route('groups.player', [$group, $partner]) }}" wire:navigate class="font-semibold text-bibB hover:underline">{{ $partner->name }}</a>
+                <span class="text-pitch-muted">— birlikte %{{ $bestPartner['rate'] }} kazanma ({{ $bestPartner['together'] }} maç)</span>
+            </div>
+        @endif
+
         {{-- Kafa kafaya karşılaştırma --}}
         <div class="bg-pitch-surface border border-pitch-line rounded-xl p-4 sm:p-6 space-y-4">
             <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
