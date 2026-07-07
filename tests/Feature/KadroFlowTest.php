@@ -1091,6 +1091,36 @@ class KadroFlowTest extends TestCase
         Notification::assertNothingSent();
     }
 
+    public function test_gecmis_macin_kadro_oylamasi_bekleyenlerde_gorunmez(): void
+    {
+        $owner = User::factory()->create();
+        $group = $this->makeGroup($owner);
+        $ownPlayer = $group->playerFor($owner);
+        $friend = $this->addMember($group);
+
+        // Geçmişte kalmış, kadrosu hâlâ "voting" durumunda maç
+        $past = $group->matches()->create([
+            'created_by' => $owner->id,
+            'title' => 'Geçen haftaki maç',
+            'starts_at' => now()->subDays(3),
+            'capacity' => 14,
+            'squad_status' => 'voting',
+        ]);
+        $past->rsvps()->create(['player_id' => $ownPlayer->id, 'status' => 'going', 'team' => 'A']);
+        $past->rsvps()->create(['player_id' => $friend->id, 'status' => 'going', 'team' => 'B']);
+
+        // Gelecekteki maç oylamada → görünmeli
+        $future = $this->makeMatch($group);
+        $future->setRsvp($ownPlayer, 'going');
+        $future->setRsvp($friend, 'going');
+        $future->applySquad([$ownPlayer->id], [$friend->id]);
+
+        $this->actingAs($owner)->get(route('dashboard'))
+            ->assertOk()
+            ->assertDontSee('Geçen haftaki maç')
+            ->assertSee($future->title);
+    }
+
     public function test_sayfalar_acilir(): void
     {
         $owner = User::factory()->create();

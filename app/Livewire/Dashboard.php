@@ -81,10 +81,12 @@ class Dashboard extends Component
         // RSVP bekleyen yaklaşan maçlar
         $needsRsvp = $upcoming->filter(fn ($m) => ! isset($myRsvps[$m->id]))->values();
 
-        // Kadro oylaması bekleyen
+        // Kadro oylaması bekleyen — maç henüz oynanmamış olmalı (geçmiş maçın kadrosunu oylamak anlamsız)
         $squadVotes = FootballMatch::with('group')
             ->whereIn('group_id', $groupIds)
             ->where('squad_status', 'voting')
+            ->where('status', 'scheduled')
+            ->where('starts_at', '>=', now())
             ->get()
             ->filter(fn ($m) => in_array($user->id, $m->squadVoterIds(), true)
                 && ! $m->squadVotes()->where('user_id', $user->id)->exists())
