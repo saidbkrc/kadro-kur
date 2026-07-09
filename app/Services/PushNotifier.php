@@ -185,6 +185,18 @@ class PushNotifier
         }
     }
 
+    /** Maç iptal edildi → tüm grup üyeleri (iptal eden hariç). */
+    public function matchCancelled(FootballMatch $match, ?int $exceptUserId = null): void
+    {
+        $this->send(
+            $this->groupMembers($match, $exceptUserId),
+            '❌ Maç iptal edildi: '.$match->title,
+            $match->starts_at->translatedFormat('d F l H:i').' maçı oynanmayacak.',
+            route('matches.show', $match),
+            'mac-'.$match->id.'-iptal',
+        );
+    }
+
     /** Nitelik 3 onaya ulaşınca oyuncuya tek bildirim (her onayda değil — spam yok). */
     public function traitMilestone(Player $player, string $traitKey): void
     {

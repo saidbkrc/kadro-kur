@@ -67,7 +67,7 @@
                             {{ $showResultForm ? 'Vazgeç' : '📝 Sonucu Gir' }}
                         </x-secondary-button>
                         <x-danger-button type="button" wire:click="cancelMatch" class="w-full sm:w-auto"
-                                data-confirm="Maç iptal edilecek. Emin misin?">
+                                data-confirm="Maç iptal edilecek ve üyeler bilgilendirilecek. Haftalık otomatik maç açıksa bu hafta atlanır, sıradaki haftanın maçı otomatik açılır. Emin misin?">
                             Maçı İptal Et
                         </x-danger-button>
                     </div>

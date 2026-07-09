@@ -59,10 +59,19 @@ class MatchScheduler
             ->addDays($group->match_day - 1)
             ->setTime($hour, $minute);
 
-        while ($candidate->isPast()) {
+        // Geçmiş haftaları ve o slotta zaten maç açılmış haftaları atla —
+        // iptal edilmiş maç da slotu doldurur (tek seferlik erteleme: iptal et → sonraki hafta açılır)
+        $guard = 0;
+        while (($candidate->isPast() || $this->slotTaken($group, $candidate)) && $guard++ < 52) {
             $candidate->addWeek();
         }
 
         return $candidate;
+    }
+
+    /** Bu tarihte (iptal edilmiş dahil) maç var mı? Varsa o hafta bilinçli şekilde işlenmiş demektir. */
+    protected function slotTaken(Group $group, Carbon $when): bool
+    {
+        return $group->matches()->where('starts_at', $when)->exists();
     }
 }

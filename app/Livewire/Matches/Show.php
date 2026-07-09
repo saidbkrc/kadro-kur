@@ -428,6 +428,13 @@ class Show extends Component
         abort_unless($this->match->canManage(Auth::user()), 403);
 
         $this->match->update(['status' => 'cancelled']);
+
+        app(PushNotifier::class)->matchCancelled($this->match, Auth::id());
+
+        // Tek seferlik erteleme: iptal edilen slot dolu sayılır, otomatik maç bir SONRAKİ haftaya açılır
+        app(MatchScheduler::class)->ensureUpcomingMatch($this->match->group);
+
+        $this->match->refresh();
     }
 
     /* ---------- başkan hatırlatmaları ---------- */
