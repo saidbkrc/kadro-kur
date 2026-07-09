@@ -180,19 +180,24 @@
                     Henüz onaylanmış nitelik yok{{ $player->user_id !== auth()->id() ? ' — ilk onayı sen ver!' : ' — takım arkadaşların onayladıkça burada birikecek.' }}
                 </p>
             @else
-                <div class="flex flex-wrap gap-2">
-                    @foreach ($traitCounts as $key => $count)
-                        @php $trait = \App\Support\PlayerTraits::ALL[$key] ?? null; @endphp
-                        @if ($trait)
-                            <span title="{{ $trait['desc'] }}"
-                                  class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full border text-sm font-semibold
-                                         {{ $loop->index < 3 ? 'border-gold/50 bg-gold/10 text-gold' : 'border-pitch-line bg-pitch-bg text-pitch-ink' }}">
-                                {{ $trait['icon'] }} {{ $trait['name'] }}
-                                <span class="{{ $loop->index < 3 ? 'text-gold/80' : 'text-pitch-muted' }} font-normal">×{{ $count }}</span>
-                                @if ($myTraits->contains($key))<span class="text-bibB" title="Senin onayın">✓</span>@endif
-                            </span>
-                        @endif
-                    @endforeach
+                <div x-data="{ info: null }">
+                    <div class="flex flex-wrap gap-2">
+                        @foreach ($traitCounts as $key => $count)
+                            @php $trait = \App\Support\PlayerTraits::ALL[$key] ?? null; @endphp
+                            @if ($trait)
+                                <button type="button"
+                                        @click="info = info === @js($trait['icon'].' '.$trait['name'].': '.$trait['desc']) ? null : @js($trait['icon'].' '.$trait['name'].': '.$trait['desc'])"
+                                        class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full border text-sm font-semibold transition active:scale-95
+                                               {{ $loop->index < 3 ? 'border-gold/50 bg-gold/10 text-gold' : 'border-pitch-line bg-pitch-bg text-pitch-ink' }}">
+                                    {{ $trait['icon'] }} {{ $trait['name'] }}
+                                    <span class="{{ $loop->index < 3 ? 'text-gold/80' : 'text-pitch-muted' }} font-normal">×{{ $count }}</span>
+                                    @if ($myTraits->contains($key))<span class="text-bibB">✓</span>@endif
+                                </button>
+                            @endif
+                        @endforeach
+                    </div>
+                    <p x-show="info" x-cloak x-text="info" @click.outside="info = null"
+                       class="mt-2 text-xs text-pitch-muted bg-pitch-bg border border-pitch-line rounded-md px-3 py-2"></p>
                 </div>
             @endif
 
@@ -214,10 +219,11 @@
                                         $mine = $myTraits->contains($key);
                                         $full = ! $mine && $myTraits->count() >= \App\Support\PlayerTraits::MAX_PER_ENDORSER;
                                     @endphp
-                                    <button type="button" wire:click="toggleTrait('{{ $key }}')" title="{{ $trait['desc'] }}"
-                                            class="text-start text-xs px-3 py-2 rounded-md border transition
-                                                   {{ $mine ? 'border-bibB bg-bibB/10 text-bibB font-semibold' : ($full ? 'border-pitch-line text-pitch-muted opacity-40' : 'border-pitch-line hover:bg-pitch-surface2') }}">
-                                        {{ $trait['icon'] }} {{ $trait['name'] }}{{ $mine ? ' ✓' : '' }}
+                                    <button type="button" wire:click="toggleTrait('{{ $key }}')"
+                                            class="text-start px-3 py-2 rounded-md border transition
+                                                   {{ $mine ? 'border-bibB bg-bibB/10' : ($full ? 'border-pitch-line opacity-40' : 'border-pitch-line hover:bg-pitch-surface2') }}">
+                                        <span class="block text-xs {{ $mine ? 'text-bibB font-semibold' : 'text-pitch-ink font-medium' }}">{{ $trait['icon'] }} {{ $trait['name'] }}{{ $mine ? ' ✓' : '' }}</span>
+                                        <span class="block text-[10px] leading-snug text-pitch-muted mt-0.5">{{ $trait['desc'] }}</span>
                                     </button>
                                 @endforeach
                             </div>
