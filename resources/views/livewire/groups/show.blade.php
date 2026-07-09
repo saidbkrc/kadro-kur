@@ -236,6 +236,23 @@
                                             {{ $ovrPublic ? $player->ratingCount().' oylama' : $player->ratingCount().'/'.$minRatings.' oylama' }}
                                         @endif
                                     </div>
+
+                                    @php
+                                        $rowIcons = $earnedIcons[$player->id] ?? [];
+                                        $rowTraits = $topTraits[$player->id] ?? collect();
+                                    @endphp
+                                    @if ($rowIcons !== [] || $rowTraits->isNotEmpty())
+                                        <div class="flex items-center gap-1.5 mt-1.5 flex-wrap min-w-0">
+                                            @foreach ($rowTraits as $trait)
+                                                <span class="text-[10px] font-semibold px-1.5 py-0.5 rounded-full bg-gold/10 text-gold border border-gold/30 whitespace-nowrap">
+                                                    {{ $trait['icon'] }} {{ $trait['name'] }}
+                                                </span>
+                                            @endforeach
+                                            @if ($rowIcons !== [])
+                                                <span class="text-xs" title="Rozetler">@foreach (array_slice($rowIcons, 0, 5) as $icon){{ $icon }}@endforeach</span>
+                                            @endif
+                                        </div>
+                                    @endif
                                 </div>
                             </div>
                             <div class="flex items-center gap-2 flex-wrap shrink-0 w-full sm:w-auto [&>*]:flex-1 sm:[&>*]:flex-none">

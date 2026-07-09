@@ -561,6 +561,44 @@ class KadroFlowTest extends TestCase
         $this->assertNull(app(MatchScheduler::class)->ensureUpcomingMatch($group));
     }
 
+    public function test_mac_iptali_haftayi_atlar_sonraki_hafta_acilir(): void
+    {
+        Notification::fake();
+
+        $owner = User::factory()->create();
+        $group = $this->makeGroup($owner);
+        $member = $this->addMember($group);
+
+        $group->update([
+            'match_day' => 2, // Salı
+            'match_time' => '21:00',
+            'auto_schedule' => true,
+        ]);
+
+        $match = app(MatchScheduler::class)->ensureUpcomingMatch($group->refresh());
+        $cancelledDate = $match->starts_at->copy();
+
+        // Başkan maçı iptal eder (tek seferlik erteleme)
+        Livewire::actingAs($owner)
+            ->test(Matches\Show::class, ['match' => $match])
+            ->call('cancelMatch');
+
+        $this->assertSame('cancelled', $match->refresh()->status);
+
+        // Üyeye iptal bildirimi gider
+        Notification::assertSentTo($member->user, MatchPushNotification::class,
+            fn ($n) => str_contains($n->title, 'iptal'));
+
+        // Sıradaki haftanın maçı otomatik açıldı — iptal edilen slot değil, 1 hafta sonrası
+        $next = $group->matches()->where('status', 'scheduled')->where('starts_at', '>=', now())->first();
+        $this->assertNotNull($next);
+        $this->assertTrue($next->starts_at->equalTo($cancelledDate->addWeek()), 'Yeni maç iptal edilenin 1 hafta sonrası olmalı');
+
+        // Scheduler tekrar çalışsa bile iptal edilen slotu yeniden AÇMAZ
+        $this->assertNull(app(MatchScheduler::class)->ensureUpcomingMatch($group));
+        $this->assertSame(1, $group->matches()->where('starts_at', $cancelledDate)->count());
+    }
+
     public function test_davet_linki_girissiz_acilir_kayit_sonrasi_geri_donulur(): void
     {
         $owner = User::factory()->create();
@@ -984,6 +1022,29 @@ class KadroFlowTest extends TestCase
             ->assertStatus(403);
 
         $this->assertNull($other->refresh()->photo_path);
+    }
+
+    public function test_havuzda_rozet_ikonu_ve_nitelik_etiketi_gorunur(): void
+    {
+        $owner = User::factory()->create();
+        $group = $this->makeGroup($owner);
+        $p1 = $group->playerFor($owner);
+        $m1 = $this->addMember($group);
+
+        // p1 bir maç oynadı → 🐣 İlk Maç rozeti
+        $match = $group->matches()->create([
+            'created_by' => $owner->id, 'title' => 'Maç', 'starts_at' => now()->subDay(),
+            'capacity' => 14, 'status' => 'completed', 'team_a_score' => 1, 'team_b_score' => 0,
+        ]);
+        $match->rsvps()->create(['player_id' => $p1->id, 'status' => 'going', 'team' => 'A']);
+
+        // p1'e nitelik onayı
+        $p1->traitEndorsements()->create(['trait_key' => 'maestro', 'endorser_id' => $m1->user_id]);
+
+        $this->actingAs($owner)->get(route('groups.show', $group))
+            ->assertOk()
+            ->assertSee('Maestro')  // nitelik etiketi
+            ->assertSee('🐣');      // rozet ikonu
     }
 
     public function test_nitelik_onayi_toggle_sinir_ve_esik_bildirimi(): void

@@ -372,8 +372,27 @@ class Show extends Component
             ->sortByDesc(fn (Player $p) => $p->overall())
             ->values();
 
+        // Havuz satırları için: kazanılan rozet ikonları + en çok onaylanan nitelikler
+        $badgeService = app(\App\Services\PlayerBadges::class);
+        $earnedIcons = $badgeService->statsForGroup($this->group)->map(
+            fn (array $s) => collect($badgeService->evaluate($s))->where('earned', true)->pluck('icon')->all()
+        );
+
+        $topTraits = \App\Models\PlayerTraitEndorsement::whereIn('player_id', $players->pluck('id'))
+            ->selectRaw('player_id, trait_key, count(*) as c')
+            ->groupBy('player_id', 'trait_key')
+            ->orderByDesc('c')
+            ->get()
+            ->groupBy('player_id')
+            ->map(fn ($rows) => $rows->take(2)
+                ->map(fn ($r) => ['key' => $r->trait_key, 'c' => $r->c] + (\App\Support\PlayerTraits::ALL[$r->trait_key] ?? []))
+                ->filter(fn ($t) => isset($t['name']))
+                ->values());
+
         return view('livewire.groups.show', [
             'players' => $players,
+            'earnedIcons' => $earnedIcons,
+            'topTraits' => $topTraits,
             'myPlayer' => $this->group->playerFor(Auth::user()),
             'unlinkedMembers' => $this->group->members()
                 ->whereNotIn('users.id', $this->group->players()->whereNotNull('user_id')->pluck('user_id'))
