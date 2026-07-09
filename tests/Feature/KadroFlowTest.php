@@ -986,6 +986,60 @@ class KadroFlowTest extends TestCase
         $this->assertNull($other->refresh()->photo_path);
     }
 
+    public function test_nitelik_onayi_toggle_sinir_ve_esik_bildirimi(): void
+    {
+        Notification::fake();
+
+        $owner = User::factory()->create();
+        $group = $this->makeGroup($owner);
+        $target = $group->playerFor($owner);
+        $m1 = $this->addMember($group);
+        $m2 = $this->addMember($group);
+        $m3 = $this->addMember($group);
+
+        // Onayla → kayıt oluşur; tekrar tıkla → geri çekilir
+        Livewire::actingAs($m1->user)
+            ->test(Groups\PlayerProfile::class, ['group' => $group, 'player' => $target])
+            ->call('toggleTrait', 'maestro')
+            ->call('toggleTrait', 'maestro');
+        $this->assertSame(0, $target->traitEndorsements()->count());
+
+        // Kişi başı en fazla 3 nitelik: 4.'de uyarı, kayıt yazılmaz
+        Livewire::actingAs($m1->user)
+            ->test(Groups\PlayerProfile::class, ['group' => $group, 'player' => $target])
+            ->call('toggleTrait', 'maestro')
+            ->call('toggleTrait', 'buz_adam')
+            ->call('toggleTrait', 'joker')
+            ->call('toggleTrait', 'fuze')
+            ->assertSet('traitNotice', fn ($v) => str_contains((string) $v, 'en fazla'));
+        $this->assertSame(3, $target->traitEndorsements()->where('endorser_id', $m1->user_id)->count());
+
+        // Kendine onay yok
+        Livewire::actingAs($owner)
+            ->test(Groups\PlayerProfile::class, ['group' => $group, 'player' => $target])
+            ->call('toggleTrait', 'maestro')
+            ->assertStatus(403);
+
+        // 3. onayda tek push gider (m1 zaten maestro onayladı; m2 + m3 ile 3 olur)
+        Livewire::actingAs($m2->user)
+            ->test(Groups\PlayerProfile::class, ['group' => $group, 'player' => $target])
+            ->call('toggleTrait', 'maestro');
+        Notification::assertNotSentTo($owner, MatchPushNotification::class,
+            fn ($n) => str_contains($n->body, 'Maestro'));
+
+        Livewire::actingAs($m3->user)
+            ->test(Groups\PlayerProfile::class, ['group' => $group, 'player' => $target])
+            ->call('toggleTrait', 'maestro');
+        Notification::assertSentTo($owner, MatchPushNotification::class,
+            fn ($n) => str_contains($n->body, 'Maestro') && str_contains($n->body, '3 onaya'));
+
+        // Bilinmeyen nitelik anahtarı reddedilir
+        Livewire::actingAs($m1->user)
+            ->test(Groups\PlayerProfile::class, ['group' => $group, 'player' => $target])
+            ->call('toggleTrait', 'uydurma_nitelik')
+            ->assertStatus(400);
+    }
+
     public function test_oyuncu_profili_izolasyon_korunur(): void
     {
         $ownerA = User::factory()->create();

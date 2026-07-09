@@ -70,6 +70,12 @@ class Player extends Model
         return $this->hasMany(PlayerBadge::class);
     }
 
+    /** Takım arkadaşlarının verdiği nitelik onayları. */
+    public function traitEndorsements(): HasMany
+    {
+        return $this->hasMany(PlayerTraitEndorsement::class);
+    }
+
     public function isGuest(): bool
     {
         return $this->user_id === null;

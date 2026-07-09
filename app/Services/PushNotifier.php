@@ -185,6 +185,24 @@ class PushNotifier
         }
     }
 
+    /** Nitelik 3 onaya ulaşınca oyuncuya tek bildirim (her onayda değil — spam yok). */
+    public function traitMilestone(Player $player, string $traitKey): void
+    {
+        $trait = \App\Support\PlayerTraits::ALL[$traitKey] ?? null;
+
+        if ($trait === null || $player->user === null) {
+            return; // bilinmeyen nitelik ya da misafir (hesabı yok)
+        }
+
+        $this->send(
+            collect([$player->user]),
+            '🏷️ Takım arkadaşların onayladı!',
+            $trait['icon'].' '.$trait['name'].' niteliğin 3 onaya ulaştı — profiline göz at.',
+            route('groups.player', [$player->group_id, $player->id]),
+            'nitelik-'.$player->id.'-'.$traitKey,
+        );
+    }
+
     /**
      * Maç özeti: maçtan ~24 saat sonra skor + MVP lideri + golcü tek bildirimde
      * (maç başına 1 kez, digest_sent_at ile). Scheduler her saat çağırır.

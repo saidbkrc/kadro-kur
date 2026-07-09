@@ -164,6 +164,69 @@
             @endif
         </div>
 
+        {{-- Nitelikler (takım arkadaşı onayları) --}}
+        <div class="bg-pitch-surface border border-pitch-line rounded-xl p-4 sm:p-6 space-y-4">
+            <div class="flex items-center justify-between flex-wrap gap-2">
+                <h3 class="font-display uppercase tracking-wider text-lg font-semibold">🏷️ Nitelikler</h3>
+                @if ($player->user_id !== auth()->id())
+                    <x-secondary-button wire:click="$toggle('showTraitPicker')" class="w-full sm:w-auto">
+                        {{ $showTraitPicker ? 'Kapat' : '➕ Nitelik Onayla' }}
+                    </x-secondary-button>
+                @endif
+            </div>
+
+            @if ($traitCounts->isEmpty())
+                <p class="text-sm text-pitch-muted">
+                    Henüz onaylanmış nitelik yok{{ $player->user_id !== auth()->id() ? ' — ilk onayı sen ver!' : ' — takım arkadaşların onayladıkça burada birikecek.' }}
+                </p>
+            @else
+                <div class="flex flex-wrap gap-2">
+                    @foreach ($traitCounts as $key => $count)
+                        @php $trait = \App\Support\PlayerTraits::ALL[$key] ?? null; @endphp
+                        @if ($trait)
+                            <span title="{{ $trait['desc'] }}"
+                                  class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full border text-sm font-semibold
+                                         {{ $loop->index < 3 ? 'border-gold/50 bg-gold/10 text-gold' : 'border-pitch-line bg-pitch-bg text-pitch-ink' }}">
+                                {{ $trait['icon'] }} {{ $trait['name'] }}
+                                <span class="{{ $loop->index < 3 ? 'text-gold/80' : 'text-pitch-muted' }} font-normal">×{{ $count }}</span>
+                                @if ($myTraits->contains($key))<span class="text-bibB" title="Senin onayın">✓</span>@endif
+                            </span>
+                        @endif
+                    @endforeach
+                </div>
+            @endif
+
+            @if ($showTraitPicker && $player->user_id !== auth()->id())
+                <div class="border-t border-pitch-line pt-3 space-y-4">
+                    <p class="text-xs text-pitch-muted">
+                        En iyi bildiği {{ \App\Support\PlayerTraits::MAX_PER_ENDORSER }} şeyi seç ({{ $myTraits->count() }}/{{ \App\Support\PlayerTraits::MAX_PER_ENDORSER }} kullandın) — tekrar tıklayarak geri çekebilirsin. Onaylar anonimdir, sadece sayı görünür.
+                    </p>
+                    @if ($traitNotice)
+                        <p class="text-sm text-gold bg-gold/10 border border-gold/30 rounded-md px-3 py-2">{{ $traitNotice }}</p>
+                    @endif
+
+                    @foreach (\App\Support\PlayerTraits::grouped() as $cat => $traits)
+                        <div>
+                            <div class="text-[11px] tracking-[.14em] text-pitch-muted mb-2">{{ mb_strtoupper($cat, 'UTF-8') }}</div>
+                            <div class="grid grid-cols-2 gap-2">
+                                @foreach ($traits as $key => $trait)
+                                    @php
+                                        $mine = $myTraits->contains($key);
+                                        $full = ! $mine && $myTraits->count() >= \App\Support\PlayerTraits::MAX_PER_ENDORSER;
+                                    @endphp
+                                    <button type="button" wire:click="toggleTrait('{{ $key }}')" title="{{ $trait['desc'] }}"
+                                            class="text-start text-xs px-3 py-2 rounded-md border transition
+                                                   {{ $mine ? 'border-bibB bg-bibB/10 text-bibB font-semibold' : ($full ? 'border-pitch-line text-pitch-muted opacity-40' : 'border-pitch-line hover:bg-pitch-surface2') }}">
+                                        {{ $trait['icon'] }} {{ $trait['name'] }}{{ $mine ? ' ✓' : '' }}
+                                    </button>
+                                @endforeach
+                            </div>
+                        </div>
+                    @endforeach
+                </div>
+            @endif
+        </div>
+
         {{-- Rozetler --}}
         @php
             $earnedCount = collect($badges)->where('earned', true)->count();

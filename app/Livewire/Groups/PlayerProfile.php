@@ -30,6 +30,11 @@ class PlayerProfile extends Component
     /** Kart fotoğrafı yüklemesi (sadece oyuncunun kendisi). */
     public $photo = null;
 
+    /** Nitelik onaylama paneli açık mı + geri bildirim mesajı */
+    public bool $showTraitPicker = false;
+
+    public ?string $traitNotice = null;
+
     public function mount(Group $group, Player $player): void
     {
         abort_unless($group->isMember(Auth::user()), 403);
@@ -60,6 +65,40 @@ class PlayerProfile extends Component
         $this->player->update(['photo_path' => $path]);
         $this->photo = null;
         $this->player->refresh();
+    }
+
+    /** Nitelik onayla / geri çek (LinkedIn tarzı toggle). Kendine onay yok, kişi başı en fazla 3. */
+    public function toggleTrait(string $key): void
+    {
+        abort_unless(array_key_exists($key, \App\Support\PlayerTraits::ALL), 400);
+        abort_if($this->player->user_id === Auth::id(), 403); // kendine onay yok
+
+        $existing = $this->player->traitEndorsements()
+            ->where('trait_key', $key)
+            ->where('endorser_id', Auth::id())
+            ->first();
+
+        if ($existing) {
+            $existing->delete();
+            $this->traitNotice = null;
+
+            return;
+        }
+
+        $mine = $this->player->traitEndorsements()->where('endorser_id', Auth::id())->count();
+        if ($mine >= \App\Support\PlayerTraits::MAX_PER_ENDORSER) {
+            $this->traitNotice = 'Bir oyuncuya en fazla '.\App\Support\PlayerTraits::MAX_PER_ENDORSER.' nitelik onaylayabilirsin — önce birini geri çek.';
+
+            return;
+        }
+
+        $this->player->traitEndorsements()->create(['trait_key' => $key, 'endorser_id' => Auth::id()]);
+        $this->traitNotice = null;
+
+        // Tam 3. onayda oyuncuya tek push (her onayda değil)
+        if ($this->player->traitEndorsements()->where('trait_key', $key)->count() === 3) {
+            app(\App\Services\PushNotifier::class)->traitMilestone($this->player, $key);
+        }
     }
 
     public function render(PlayerBadges $badges): View
@@ -95,6 +134,14 @@ class PlayerProfile extends Component
             'myEarned' => $earnedCount($stats),
             'compareEarned' => $compareStats !== null ? $earnedCount($compareStats) : null,
             'bestPartner' => app(\App\Services\TeamChemistry::class)->bestPartnerFor($this->player->id, $this->group),
+            'traitCounts' => $this->player->traitEndorsements()
+                ->selectRaw('trait_key, count(*) as c')
+                ->groupBy('trait_key')
+                ->orderByDesc('c')
+                ->pluck('c', 'trait_key'),
+            'myTraits' => $this->player->traitEndorsements()
+                ->where('endorser_id', Auth::id())
+                ->pluck('trait_key'),
         ]);
     }
 }
