@@ -46,6 +46,14 @@ class Show extends Component
     /** Başkanın hatırlatma paneli geri bildirimi */
     public ?string $reminderNotice = null;
 
+    /** Performans puanları: [player_id => 1-10] — Kaydet'e basılana dek DB'ye yazılmaz */
+    public array $perfScores = [];
+
+    /** Değişen (henüz kaydedilmemiş) puanların player_id'leri */
+    public array $perfDirty = [];
+
+    public bool $perfSaved = false;
+
     public ?int $teamAScore = null;
 
     public ?int $teamBScore = null;
@@ -61,6 +69,11 @@ class Show extends Component
         $this->teamAScore = $match->team_a_score;
         $this->teamBScore = $match->team_b_score;
         $this->goals = $match->goals()->pluck('count', 'player_id')->all();
+        $this->perfScores = $match->performanceRatings()
+            ->where('rater_id', Auth::id())
+            ->pluck('score', 'player_id')
+            ->map(fn ($s) => (int) $s)
+            ->all();
     }
 
     /* ---------- RSVP ---------- */
@@ -402,6 +415,40 @@ class Show extends Component
             ['match_id' => $this->match->id, 'voter_id' => Auth::id()],
             ['player_id' => $playerId],
         );
+    }
+
+    /** +/- ile puanı yerelde değiştirir — Kaydet'e basılana dek DB'ye yazılmaz. */
+    public function adjustPerf(int $playerId, int $delta): void
+    {
+        $this->perfScores[$playerId] = max(1, min(10, ($this->perfScores[$playerId] ?? 5) + $delta));
+        $this->perfDirty[$playerId] = true;
+        $this->perfSaved = false;
+    }
+
+    /** Değişen puanları topluca kaydeder (pencere + katılım + misafir kontrolleriyle). */
+    public function savePerformance(): void
+    {
+        abort_unless($this->match->perfOpen(), 403);
+
+        $participants = $this->match->mainListRsvps();
+        $myPlayer = $participants->pluck('player')->firstWhere('user_id', Auth::id());
+        abort_if($myPlayer === null, 403);
+
+        foreach (array_keys($this->perfDirty) as $playerId) {
+            $target = $participants->firstWhere('player_id', $playerId)?->player;
+
+            if ($target === null || $target->id === $myPlayer->id || $target->isGuest()) {
+                continue; // kadroda olmayan / kendisi / misafir sessizce atlanır
+            }
+
+            MatchPerformanceRating::updateOrCreate(
+                ['match_id' => $this->match->id, 'rater_id' => Auth::id(), 'player_id' => $playerId],
+                ['score' => max(1, min(10, (int) ($this->perfScores[$playerId] ?? 5)))],
+            );
+        }
+
+        $this->perfDirty = [];
+        $this->perfSaved = true;
     }
 
     /** Maç sonu performans puanı: pencere 1 hafta (perfOpen), asıl kadrodakiler, kendine yok, anonim, güncellenebilir. */

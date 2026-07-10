@@ -16,6 +16,7 @@
     <div class="font-display uppercase tracking-wide text-xs font-bold {{ $earned ? 'text-pitch-ink' : 'text-pitch-muted' }}">
         {{ $badge['name'] }}
     </div>
+    <div class="text-[10px] leading-snug text-pitch-muted mt-0.5">{{ $badge['desc'] }}</div>
 
     @if ($earned)
         <div class="text-[10px] text-gold tracking-widest mt-0.5">KAZANILDI</div>

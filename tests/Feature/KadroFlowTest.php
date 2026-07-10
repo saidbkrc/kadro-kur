@@ -1047,6 +1047,39 @@ class KadroFlowTest extends TestCase
             ->assertSee('🐣');      // rozet ikonu
     }
 
+    public function test_performans_puanlari_kaydet_butonuyla_yazilir(): void
+    {
+        $owner = User::factory()->create();
+        $group = $this->makeGroup($owner);
+        $ownPlayer = $group->playerFor($owner);
+        $friend = $this->addMember($group);
+
+        $match = $group->matches()->create([
+            'created_by' => $owner->id, 'title' => 'Dünkü maç', 'starts_at' => now()->subDay(),
+            'capacity' => 14, 'status' => 'completed', 'team_a_score' => 2, 'team_b_score' => 1,
+            'mvp_closes_at' => now()->addDays(5),
+        ]);
+        $match->rsvps()->create(['player_id' => $ownPlayer->id, 'status' => 'going', 'team' => 'A']);
+        $match->rsvps()->create(['player_id' => $friend->id, 'status' => 'going', 'team' => 'B']);
+
+        // +/- yerelde birikir, Kaydet'e basmadan DB'ye yazılmaz
+        $c = Livewire::actingAs($owner)
+            ->test(Matches\Show::class, ['match' => $match])
+            ->call('adjustPerf', $friend->id, 1)
+            ->call('adjustPerf', $friend->id, 1)
+            ->call('adjustPerf', $friend->id, 1); // 5 → 8
+        $this->assertSame(0, $match->performanceRatings()->count());
+
+        $c->call('savePerformance')->assertSet('perfSaved', true);
+        $this->assertSame(8, (int) $match->performanceRatings()
+            ->where('rater_id', $owner->id)->where('player_id', $friend->id)->value('score'));
+
+        // Tekrar açılınca mevcut puan yüklenir (5 değil 8'den devam)
+        Livewire::actingAs($owner)
+            ->test(Matches\Show::class, ['match' => $match])
+            ->assertSet('perfScores', [$friend->id => 8]);
+    }
+
     public function test_nitelik_onayi_toggle_sinir_ve_esik_bildirimi(): void
     {
         Notification::fake();
@@ -1058,46 +1091,52 @@ class KadroFlowTest extends TestCase
         $m2 = $this->addMember($group);
         $m3 = $this->addMember($group);
 
-        // Onayla → kayıt oluşur; tekrar tıkla → geri çekilir
-        Livewire::actingAs($m1->user)
+        // Seçim yerelde birikir, Kaydet'e basmadan DB'ye yazılmaz
+        $c = Livewire::actingAs($m1->user)
             ->test(Groups\PlayerProfile::class, ['group' => $group, 'player' => $target])
-            ->call('toggleTrait', 'maestro')
-            ->call('toggleTrait', 'maestro');
+            ->call('toggleTraitSelection', 'maestro');
         $this->assertSame(0, $target->traitEndorsements()->count());
 
-        // Kişi başı en fazla 3 nitelik: 4.'de uyarı, kayıt yazılmaz
+        // Kaydet → yazılır; seçim kaldırılıp tekrar kaydedilince silinir
+        $c->call('saveTraits');
+        $this->assertSame(1, $target->traitEndorsements()->count());
+        $c->call('toggleTraitSelection', 'maestro')->call('saveTraits');
+        $this->assertSame(0, $target->traitEndorsements()->count());
+
+        // Kişi başı en fazla 3 nitelik: 4. seçimde uyarı, seçilmez
         Livewire::actingAs($m1->user)
             ->test(Groups\PlayerProfile::class, ['group' => $group, 'player' => $target])
-            ->call('toggleTrait', 'maestro')
-            ->call('toggleTrait', 'buz_adam')
-            ->call('toggleTrait', 'joker')
-            ->call('toggleTrait', 'fuze')
-            ->assertSet('traitNotice', fn ($v) => str_contains((string) $v, 'en fazla'));
+            ->call('toggleTraitSelection', 'maestro')
+            ->call('toggleTraitSelection', 'buz_adam')
+            ->call('toggleTraitSelection', 'joker')
+            ->call('toggleTraitSelection', 'fuze')
+            ->assertSet('traitNotice', fn ($v) => str_contains((string) $v, 'en fazla'))
+            ->call('saveTraits');
         $this->assertSame(3, $target->traitEndorsements()->where('endorser_id', $m1->user_id)->count());
 
         // Kendine onay yok
         Livewire::actingAs($owner)
             ->test(Groups\PlayerProfile::class, ['group' => $group, 'player' => $target])
-            ->call('toggleTrait', 'maestro')
+            ->call('toggleTraitSelection', 'maestro')
             ->assertStatus(403);
 
         // 3. onayda tek push gider (m1 zaten maestro onayladı; m2 + m3 ile 3 olur)
         Livewire::actingAs($m2->user)
             ->test(Groups\PlayerProfile::class, ['group' => $group, 'player' => $target])
-            ->call('toggleTrait', 'maestro');
+            ->call('toggleTraitSelection', 'maestro')->call('saveTraits');
         Notification::assertNotSentTo($owner, MatchPushNotification::class,
             fn ($n) => str_contains($n->body, 'Maestro'));
 
         Livewire::actingAs($m3->user)
             ->test(Groups\PlayerProfile::class, ['group' => $group, 'player' => $target])
-            ->call('toggleTrait', 'maestro');
+            ->call('toggleTraitSelection', 'maestro')->call('saveTraits');
         Notification::assertSentTo($owner, MatchPushNotification::class,
             fn ($n) => str_contains($n->body, 'Maestro') && str_contains($n->body, '3 onaya'));
 
         // Bilinmeyen nitelik anahtarı reddedilir
         Livewire::actingAs($m1->user)
             ->test(Groups\PlayerProfile::class, ['group' => $group, 'player' => $target])
-            ->call('toggleTrait', 'uydurma_nitelik')
+            ->call('toggleTraitSelection', 'uydurma_nitelik')
             ->assertStatus(400);
     }
 

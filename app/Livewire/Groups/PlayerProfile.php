@@ -67,38 +67,75 @@ class PlayerProfile extends Component
         $this->player->refresh();
     }
 
-    /** Nitelik onayla / geri çek (LinkedIn tarzı toggle). Kendine onay yok, kişi başı en fazla 3. */
-    public function toggleTrait(string $key): void
+    /** Panelde biriktirilen seçim — "Kaydet" basılana dek DB'ye yazılmaz. */
+    public array $selectedTraits = [];
+
+    /** Paneli aç/kapat; açılırken seçim mevcut onaylardan başlatılır. */
+    public function openTraitPicker(): void
+    {
+        $this->showTraitPicker = ! $this->showTraitPicker;
+        $this->traitNotice = null;
+
+        if ($this->showTraitPicker) {
+            $this->selectedTraits = $this->player->traitEndorsements()
+                ->where('endorser_id', Auth::id())
+                ->pluck('trait_key')
+                ->all();
+        }
+    }
+
+    /** Seçimi yerel olarak değiştirir (kaydetmez). Kişi başı en fazla 3. */
+    public function toggleTraitSelection(string $key): void
     {
         abort_unless(array_key_exists($key, \App\Support\PlayerTraits::ALL), 400);
         abort_if($this->player->user_id === Auth::id(), 403); // kendine onay yok
 
-        $existing = $this->player->traitEndorsements()
-            ->where('trait_key', $key)
-            ->where('endorser_id', Auth::id())
-            ->first();
-
-        if ($existing) {
-            $existing->delete();
+        if (in_array($key, $this->selectedTraits, true)) {
+            $this->selectedTraits = array_values(array_diff($this->selectedTraits, [$key]));
             $this->traitNotice = null;
 
             return;
         }
 
-        $mine = $this->player->traitEndorsements()->where('endorser_id', Auth::id())->count();
-        if ($mine >= \App\Support\PlayerTraits::MAX_PER_ENDORSER) {
-            $this->traitNotice = 'Bir oyuncuya en fazla '.\App\Support\PlayerTraits::MAX_PER_ENDORSER.' nitelik onaylayabilirsin — önce birini geri çek.';
+        if (count($this->selectedTraits) >= \App\Support\PlayerTraits::MAX_PER_ENDORSER) {
+            $this->traitNotice = 'Bir oyuncuya en fazla '.\App\Support\PlayerTraits::MAX_PER_ENDORSER.' nitelik onaylayabilirsin — önce birini kaldır.';
 
             return;
         }
 
-        $this->player->traitEndorsements()->create(['trait_key' => $key, 'endorser_id' => Auth::id()]);
+        $this->selectedTraits[] = $key;
         $this->traitNotice = null;
+    }
 
-        // Tam 3. onayda oyuncuya tek push (her onayda değil)
-        if ($this->player->traitEndorsements()->where('trait_key', $key)->count() === 3) {
-            app(\App\Services\PushNotifier::class)->traitMilestone($this->player, $key);
+    /** Seçimi kaydeder: eklenenler yazılır, kaldırılanlar silinir. */
+    public function saveTraits(): void
+    {
+        abort_if($this->player->user_id === Auth::id(), 403);
+        abort_if(count($this->selectedTraits) > \App\Support\PlayerTraits::MAX_PER_ENDORSER, 400);
+
+        $valid = collect($this->selectedTraits)
+            ->filter(fn ($k) => array_key_exists($k, \App\Support\PlayerTraits::ALL))
+            ->unique()->values();
+
+        $current = $this->player->traitEndorsements()
+            ->where('endorser_id', Auth::id())
+            ->pluck('trait_key');
+
+        $this->player->traitEndorsements()
+            ->where('endorser_id', Auth::id())
+            ->whereIn('trait_key', $current->diff($valid))
+            ->delete();
+
+        foreach ($valid->diff($current) as $key) {
+            $this->player->traitEndorsements()->create(['trait_key' => $key, 'endorser_id' => Auth::id()]);
+
+            // Tam 3. onayda oyuncuya tek push (her onayda değil)
+            if ($this->player->traitEndorsements()->where('trait_key', $key)->count() === 3) {
+                app(\App\Services\PushNotifier::class)->traitMilestone($this->player, $key);
+            }
         }
+
+        $this->traitNotice = '✓ Kaydedildi.';
     }
 
     public function render(PlayerBadges $badges): View

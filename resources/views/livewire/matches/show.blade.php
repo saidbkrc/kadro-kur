@@ -568,19 +568,30 @@
                     <div class="space-y-1.5">
                         @foreach ($going as $rsvp)
                             @if ((! $myPlayer || $rsvp->player_id !== $myPlayer->id) && ! $rsvp->player->isGuest())
-                                @php $cur = (int) ($myPerfRatings->get($rsvp->player_id) ?? 5); $rated = $myPerfRatings->has($rsvp->player_id); @endphp
+                                @php $cur = (int) ($perfScores[$rsvp->player_id] ?? 5); $dokunuldu = isset($perfScores[$rsvp->player_id]); @endphp
                                 <div class="flex items-center justify-between gap-2 bg-pitch-bg border border-pitch-line rounded-lg px-3 py-2">
-                                    <span class="text-sm font-medium">{{ $rsvp->player->name }}</span>
+                                    <span class="text-sm font-medium min-w-0 truncate">{{ $rsvp->player->name }}</span>
                                     <div class="flex items-center gap-1.5 shrink-0">
-                                        <button type="button" wire:click="ratePerformance({{ $rsvp->player_id }}, {{ max(1, $cur - 1) }})"
+                                        <button type="button" wire:click="adjustPerf({{ $rsvp->player_id }}, -1)"
                                                 class="w-9 h-9 rounded-md bg-pitch-surface2 border border-pitch-line text-xl font-bold leading-none hover:brightness-125 active:scale-95 transition">−</button>
-                                        <span class="w-8 text-center font-display text-xl font-bold {{ $rated ? 'text-bibB' : 'text-pitch-muted/60' }}">{{ $cur }}</span>
-                                        <button type="button" wire:click="ratePerformance({{ $rsvp->player_id }}, {{ min(10, $cur + 1) }})"
+                                        <span class="w-8 text-center font-display text-xl font-bold {{ $dokunuldu ? 'text-bibB' : 'text-pitch-muted/60' }}">{{ $cur }}</span>
+                                        <button type="button" wire:click="adjustPerf({{ $rsvp->player_id }}, 1)"
                                                 class="w-9 h-9 rounded-md bg-pitch-surface2 border border-pitch-line text-xl font-bold leading-none hover:brightness-125 active:scale-95 transition">+</button>
                                     </div>
                                 </div>
                             @endif
                         @endforeach
+                    </div>
+
+                    <div class="flex flex-col sm:flex-row sm:items-center gap-3">
+                        <x-primary-button type="button" wire:click="savePerformance" class="w-full sm:w-auto">
+                            Puanları Kaydet
+                        </x-primary-button>
+                        @if ($perfSaved)
+                            <span class="text-sm text-bibB text-center sm:text-start">Kaydedildi ✓</span>
+                        @elseif ($perfDirty !== [])
+                            <span class="text-sm text-gold text-center sm:text-start">Kaydedilmemiş değişiklik var</span>
+                        @endif
                     </div>
                 @elseif (! $perfOpen && $perfAverages->isNotEmpty())
                     <p class="text-sm text-pitch-muted">Bu maçın performans ortalamaları:</p>

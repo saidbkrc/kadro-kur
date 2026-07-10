@@ -169,7 +169,7 @@
             <div class="flex items-center justify-between flex-wrap gap-2">
                 <h3 class="font-display uppercase tracking-wider text-lg font-semibold">🏷️ Nitelikler</h3>
                 @if ($player->user_id !== auth()->id())
-                    <x-secondary-button wire:click="$toggle('showTraitPicker')" class="w-full sm:w-auto">
+                    <x-secondary-button wire:click="openTraitPicker" class="w-full sm:w-auto">
                         {{ $showTraitPicker ? 'Kapat' : '➕ Nitelik Onayla' }}
                     </x-secondary-button>
                 @endif
@@ -204,11 +204,8 @@
             @if ($showTraitPicker && $player->user_id !== auth()->id())
                 <div class="border-t border-pitch-line pt-3 space-y-4">
                     <p class="text-xs text-pitch-muted">
-                        En iyi bildiği {{ \App\Support\PlayerTraits::MAX_PER_ENDORSER }} şeyi seç ({{ $myTraits->count() }}/{{ \App\Support\PlayerTraits::MAX_PER_ENDORSER }} kullandın) — tekrar tıklayarak geri çekebilirsin. Onaylar anonimdir, sadece sayı görünür.
+                        En iyi bildiği {{ \App\Support\PlayerTraits::MAX_PER_ENDORSER }} şeyi seç ({{ count($selectedTraits) }}/{{ \App\Support\PlayerTraits::MAX_PER_ENDORSER }}), sonra <strong class="text-pitch-ink">Kaydet</strong>'e bas. Onaylar anonimdir, sadece sayı görünür.
                     </p>
-                    @if ($traitNotice)
-                        <p class="text-sm text-gold bg-gold/10 border border-gold/30 rounded-md px-3 py-2">{{ $traitNotice }}</p>
-                    @endif
 
                     @foreach (\App\Support\PlayerTraits::grouped() as $cat => $traits)
                         <div>
@@ -216,19 +213,26 @@
                             <div class="grid grid-cols-2 gap-2">
                                 @foreach ($traits as $key => $trait)
                                     @php
-                                        $mine = $myTraits->contains($key);
-                                        $full = ! $mine && $myTraits->count() >= \App\Support\PlayerTraits::MAX_PER_ENDORSER;
+                                        $secili = in_array($key, $selectedTraits, true);
+                                        $full = ! $secili && count($selectedTraits) >= \App\Support\PlayerTraits::MAX_PER_ENDORSER;
                                     @endphp
-                                    <button type="button" wire:click="toggleTrait('{{ $key }}')"
+                                    <button type="button" wire:click="toggleTraitSelection('{{ $key }}')"
                                             class="text-start px-3 py-2 rounded-md border transition
-                                                   {{ $mine ? 'border-bibB bg-bibB/10' : ($full ? 'border-pitch-line opacity-40' : 'border-pitch-line hover:bg-pitch-surface2') }}">
-                                        <span class="block text-xs {{ $mine ? 'text-bibB font-semibold' : 'text-pitch-ink font-medium' }}">{{ $trait['icon'] }} {{ $trait['name'] }}{{ $mine ? ' ✓' : '' }}</span>
+                                                   {{ $secili ? 'border-bibB bg-bibB/10' : ($full ? 'border-pitch-line opacity-40' : 'border-pitch-line hover:bg-pitch-surface2') }}">
+                                        <span class="block text-xs {{ $secili ? 'text-bibB font-semibold' : 'text-pitch-ink font-medium' }}">{{ $trait['icon'] }} {{ $trait['name'] }}{{ $secili ? ' ✓' : '' }}</span>
                                         <span class="block text-[10px] leading-snug text-pitch-muted mt-0.5">{{ $trait['desc'] }}</span>
                                     </button>
                                 @endforeach
                             </div>
                         </div>
                     @endforeach
+
+                    <div class="flex flex-col sm:flex-row sm:items-center gap-3 pt-1">
+                        <x-primary-button type="button" wire:click="saveTraits" class="w-full sm:w-auto">Kaydet</x-primary-button>
+                        @if ($traitNotice)
+                            <span class="text-sm {{ str_starts_with($traitNotice, '✓') ? 'text-bibB' : 'text-gold' }} text-center sm:text-start">{{ $traitNotice }}</span>
+                        @endif
+                    </div>
                 </div>
             @endif
         </div>
