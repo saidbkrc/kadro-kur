@@ -14,6 +14,14 @@ use Livewire\Component;
 #[Layout('layouts.app')]
 class Dashboard extends Component
 {
+    /** Tanıtım turu kapatıldığında işaretlenir — bir daha otomatik açılmaz ("Rehber" butonuyla açılır). */
+    public function markTutorialSeen(): void
+    {
+        if (Auth::user()->tutorial_seen_at === null) {
+            Auth::user()->forceFill(['tutorial_seen_at' => now()])->save();
+        }
+    }
+
     public function render(): View
     {
         $user = Auth::user();

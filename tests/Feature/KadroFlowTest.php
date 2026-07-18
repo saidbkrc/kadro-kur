@@ -1275,6 +1275,34 @@ class KadroFlowTest extends TestCase
             ->assertSee($future->title);
     }
 
+    public function test_tanitim_turu_ilk_giriste_gorunur_ve_isaretlenir(): void
+    {
+        $owner = User::factory()->create();
+        $this->makeGroup($owner);
+
+        // İlk giriş: modal içerik + Rehber butonu sayfada
+        $this->assertNull($owner->tutorial_seen_at);
+        $this->actingAs($owner)->get(route('dashboard'))
+            ->assertOk()
+            ->assertSee('Hoş Geldin')
+            ->assertSee('Rehber')
+            ->assertSee('Dengeli Kadro');
+
+        // Kapatınca işaretlenir, bir daha otomatik açılmaz (auto-open false olur)
+        Livewire::actingAs($owner)
+            ->test(\App\Livewire\Dashboard::class)
+            ->call('markTutorialSeen');
+
+        $seenAt = $owner->refresh()->tutorial_seen_at;
+        $this->assertNotNull($seenAt);
+
+        // İkinci çağrı tarihi değiştirmez (idempotent)
+        Livewire::actingAs($owner)
+            ->test(\App\Livewire\Dashboard::class)
+            ->call('markTutorialSeen');
+        $this->assertTrue($seenAt->equalTo($owner->refresh()->tutorial_seen_at));
+    }
+
     public function test_sayfalar_acilir(): void
     {
         $owner = User::factory()->create();

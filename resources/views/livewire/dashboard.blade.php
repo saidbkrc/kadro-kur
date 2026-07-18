@@ -5,7 +5,13 @@
         <div class="relative overflow-hidden rounded-2xl border border-pitch-line bg-gradient-to-br from-pitch-surface2 to-pitch-surface p-6 sm:p-8">
             <div class="absolute -right-8 -top-10 text-[160px] leading-none opacity-10 select-none pointer-events-none">⚽</div>
             <div class="relative">
-                <div class="text-sm text-pitch-muted">{{ now()->translatedFormat('l, d F Y') }}</div>
+                <div class="flex items-center justify-between gap-2">
+                    <div class="text-sm text-pitch-muted">{{ now()->translatedFormat('l, d F Y') }}</div>
+                    <button type="button" @click="window.dispatchEvent(new CustomEvent('open-tutorial'))"
+                            class="shrink-0 text-xs px-3 py-1.5 rounded-md bg-pitch-surface border border-pitch-line hover:brightness-125 transition">
+                        🎓 Rehber
+                    </button>
+                </div>
                 <h2 class="font-display uppercase tracking-wider text-3xl font-bold mt-1">Merhaba, {{ auth()->user()->name }} 👋</h2>
                 @if ($groups->isEmpty())
                     <p class="text-pitch-muted mt-2 max-w-xl">Henüz bir grubun yok. İlk grubunu kurup davet linkiyle arkadaşlarını çağır, maç açıp dengeli kadrolar kurmaya başla.</p>
@@ -160,4 +166,7 @@
             </div>
         </div>
     </div>
+
+    {{-- Tanıtım turu: ilk girişte otomatik açılır, "Rehber" butonuyla tekrar açılabilir --}}
+    <x-tutorial-modal :auto-open="auth()->user()->tutorial_seen_at === null" />
 </div>
