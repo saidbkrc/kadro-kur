@@ -177,6 +177,29 @@ class Player extends Model
         return $perMatch->isEmpty() ? null : round($perMatch->avg(), 2);
     }
 
+    /**
+     * Gelişim grafiği için maç maç performans geçmişi (eskiden yeniye).
+     *
+     * @return \Illuminate\Support\Collection<int, array{date: \Illuminate\Support\Carbon, score: float}>
+     */
+    public function performanceHistory(int $limit = 10): \Illuminate\Support\Collection
+    {
+        return MatchPerformanceRating::query()
+            ->where('match_performance_ratings.player_id', $this->id)
+            ->join('matches', 'matches.id', '=', 'match_performance_ratings.match_id')
+            ->groupBy('match_performance_ratings.match_id', 'matches.starts_at')
+            ->orderByDesc('matches.starts_at')
+            ->limit($limit)
+            ->selectRaw('matches.starts_at as played_at, AVG(match_performance_ratings.score) as avg_score')
+            ->get()
+            ->reverse() // grafik soldan sağa: eski → yeni
+            ->map(fn ($row) => [
+                'date' => \Illuminate\Support\Carbon::parse($row->played_at),
+                'score' => round((float) $row->avg_score, 1),
+            ])
+            ->values();
+    }
+
     /** FC26 tarzı nihai puan: OVR×0.8 + son 5 maç performansı×0.2. Performans yoksa sadece OVR. */
     public function displayRating(): float
     {

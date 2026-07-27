@@ -162,6 +162,16 @@
                 <div wire:loading wire:target="photo" class="mt-1 text-center text-xs text-pitch-muted">Yükleniyor…</div>
                 <x-input-error :messages="$errors->get('photo')" class="mt-1 text-center" />
             @endif
+
+            {{-- Gelişim grafiği: maç maç performans puanı --}}
+            @if ($formHistory->count() >= 2)
+                <div class="w-full max-w-md mx-auto mt-5 bg-pitch-surface border border-pitch-line rounded-xl p-4">
+                    <x-form-chart :history="$formHistory" />
+                    <p class="text-[10px] text-pitch-muted mt-2 leading-snug">
+                        Maç sonrası takım arkadaşlarının verdiği puanların maç başına ortalaması. Son 5 maçın ortalaması genel puanına %20 oranında yansır.
+                    </p>
+                </div>
+            @endif
         </div>
 
         {{-- Nitelikler (takım arkadaşı onayları) --}}

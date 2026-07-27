@@ -171,6 +171,7 @@ class PlayerProfile extends Component
             'myEarned' => $earnedCount($stats),
             'compareEarned' => $compareStats !== null ? $earnedCount($compareStats) : null,
             'bestPartner' => app(\App\Services\TeamChemistry::class)->bestPartnerFor($this->player->id, $this->group),
+            'formHistory' => $this->player->isGuest() ? collect() : $this->player->performanceHistory(),
             'traitCounts' => $this->player->traitEndorsements()
                 ->selectRaw('trait_key, count(*) as c')
                 ->groupBy('trait_key')

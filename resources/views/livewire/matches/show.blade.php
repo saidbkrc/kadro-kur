@@ -505,6 +505,29 @@
                 </div>
             @endif
 
+            {{-- Paylaşılabilir maç kartı: tarayıcıda canvas ile üretilir, native paylaşımla WhatsApp'a gider --}}
+            @if ($shareCard)
+                <div class="bg-pitch-surface border border-pitch-line rounded-xl p-4 sm:p-6 space-y-3"
+                     x-data="macKarti(@js($shareCard))">
+                    <div class="flex items-center justify-between flex-wrap gap-2">
+                        <h3 class="font-display uppercase tracking-wider text-lg font-semibold">📲 Maç Kartı</h3>
+                        <span class="text-xs text-pitch-muted">Gruba atmak için hazır</span>
+                    </div>
+
+                    <canvas x-ref="tuval" class="w-full max-w-xs mx-auto rounded-xl border border-pitch-line"></canvas>
+
+                    <div class="grid grid-cols-2 gap-2 sm:flex sm:flex-wrap">
+                        <x-primary-button type="button" x-on:click="paylas()" class="w-full sm:w-auto">
+                            📲 Paylaş
+                        </x-primary-button>
+                        <x-secondary-button type="button" x-on:click="indir()" class="w-full sm:w-auto">
+                            ⬇️ İndir
+                        </x-secondary-button>
+                    </div>
+                    <p class="text-xs text-pitch-muted" x-text="durum"></p>
+                </div>
+            @endif
+
             <div class="bg-pitch-surface border border-pitch-line rounded-xl p-6 space-y-4">
                 <div class="flex items-center justify-between flex-wrap gap-2">
                     <h3 class="font-display uppercase tracking-wider text-lg font-semibold">🏆 Maçın Adamı (MVP)</h3>
@@ -616,6 +639,100 @@
 
     @script
     <script>
+        /* Maç kartı: canvas'ta çizilir (Türkçe karakterler sorunsuz), Web Share API ile paylaşılır */
+        Alpine.data('macKarti', (veri) => ({
+            durum: '',
+            blob: null,
+
+            init() {
+                this.$nextTick(() => this.ciz());
+            },
+
+            ciz() {
+                const W = 1080, H = 1080, c = this.$refs.tuval;
+                c.width = W; c.height = H;
+                const x = c.getContext('2d');
+                const f = (b, s) => `${b} ${s}px "Barlow Condensed", Figtree, system-ui, sans-serif`;
+
+                // Zemin
+                const g = x.createLinearGradient(0, 0, 0, H);
+                g.addColorStop(0, '#16294E'); g.addColorStop(1, '#0F1F41');
+                x.fillStyle = g; x.fillRect(0, 0, W, H);
+                x.strokeStyle = 'rgba(255,200,61,.35)'; x.lineWidth = 6;
+                x.strokeRect(24, 24, W - 48, H - 48);
+
+                x.textAlign = 'center';
+
+                // Başlık
+                x.fillStyle = '#92A5CC'; x.font = f('600', 30);
+                x.fillText(veri.group.toUpperCase(), W / 2, 110);
+                x.fillStyle = '#EDF2FB'; x.font = f('700', 46);
+                x.fillText(veri.title, W / 2, 168);
+                x.fillStyle = '#92A5CC'; x.font = f('500', 28);
+                x.fillText(veri.date, W / 2, 212);
+
+                // Skor
+                x.font = f('800', 150);
+                x.fillStyle = '#FF7A1A'; x.textAlign = 'right'; x.fillText(veri.scoreA, W / 2 - 45, 380);
+                x.fillStyle = '#92A5CC'; x.textAlign = 'center'; x.fillText(':', W / 2, 372);
+                x.fillStyle = '#C8F04B'; x.textAlign = 'left'; x.fillText(veri.scoreB, W / 2 + 45, 380);
+
+                x.textAlign = 'center'; x.font = f('600', 26);
+                x.fillStyle = '#FF7A1A'; x.fillText('TURUNCU', W / 2 - 165, 430);
+                x.fillStyle = '#C8F04B'; x.fillText('YEŞİL', W / 2 + 165, 430);
+
+                // Kadrolar
+                x.font = f('500', 30);
+                const yaz = (liste, cx, renk) => {
+                    x.fillStyle = renk;
+                    liste.slice(0, 9).forEach((ad, i) => x.fillText(ad, cx, 500 + i * 46));
+                };
+                yaz(veri.teamA, W / 2 - 250, '#EDF2FB');
+                yaz(veri.teamB, W / 2 + 250, '#EDF2FB');
+
+                // Alt bilgi: MVP + golcüler
+                let y = 940;
+                if (veri.mvp) {
+                    x.fillStyle = '#FFC83D'; x.font = f('700', 34);
+                    x.fillText('🏆 Maçın Adamı: ' + veri.mvp, W / 2, y);
+                    y += 46;
+                }
+                if (veri.scorers.length) {
+                    x.fillStyle = '#92A5CC'; x.font = f('500', 26);
+                    x.fillText('⚽ ' + veri.scorers.join(' · '), W / 2, y);
+                }
+
+                x.fillStyle = 'rgba(146,165,204,.6)'; x.font = f('600', 24);
+                x.fillText('KADRO KUR', W / 2, H - 48);
+
+                c.toBlob((b) => { this.blob = b; }, 'image/png');
+            },
+
+            async paylas() {
+                if (!this.blob) return;
+                const dosya = new File([this.blob], 'mac-karti.png', { type: 'image/png' });
+
+                if (navigator.canShare && navigator.canShare({ files: [dosya] })) {
+                    try {
+                        await navigator.share({ files: [dosya], title: veri.title });
+                        this.durum = '';
+                    } catch (e) { /* kullanıcı vazgeçti */ }
+                } else {
+                    this.indir();
+                    this.durum = 'Tarayıcın doğrudan paylaşımı desteklemiyor — kart indirildi, galeriden paylaşabilirsin.';
+                }
+            },
+
+            indir() {
+                if (!this.blob) return;
+                const a = document.createElement('a');
+                a.href = URL.createObjectURL(this.blob);
+                a.download = 'mac-karti.png';
+                a.click();
+                URL.revokeObjectURL(a.href);
+            },
+        }));
+
         const PW = 1000, PH = 560;
         let drag = null;
 

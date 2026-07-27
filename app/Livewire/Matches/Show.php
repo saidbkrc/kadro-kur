@@ -581,7 +581,36 @@ class Show extends Component
                 ->selectRaw('player_id, ROUND(AVG(score), 1) as avg_score')
                 ->groupBy('player_id')
                 ->pluck('avg_score', 'player_id'),
+            'shareCard' => $this->match->status === 'completed' ? $this->shareCardData($teamA, $teamB) : null,
         ]);
+    }
+
+    /** Paylaşılabilir maç kartı verisi (tarayıcıda canvas ile görsele dönüştürülür). */
+    protected function shareCardData($teamA, $teamB): array
+    {
+        $mvpName = null;
+        if (! $this->match->mvpOpen() && $this->match->mvpVotes()->exists()) {
+            $topId = $this->match->mvpVotes()
+                ->selectRaw('player_id, COUNT(*) as votes')
+                ->groupBy('player_id')
+                ->orderByDesc('votes')
+                ->value('player_id');
+            $mvpName = $this->match->group->players()->find($topId)?->name;
+        }
+
+        return [
+            'group' => $this->match->group->name,
+            'title' => $this->match->title,
+            'date' => $this->match->starts_at->translatedFormat('d F Y, l'),
+            'scoreA' => (int) $this->match->team_a_score,
+            'scoreB' => (int) $this->match->team_b_score,
+            'teamA' => $teamA->map(fn (Rsvp $r) => $r->player->name)->all(),
+            'teamB' => $teamB->map(fn (Rsvp $r) => $r->player->name)->all(),
+            'mvp' => $mvpName,
+            'scorers' => $this->match->goals()->with('player')->orderByDesc('count')->get()
+                ->map(fn ($g) => $g->player?->name.($g->count > 1 ? ' ×'.$g->count : ''))
+                ->filter()->take(6)->values()->all(),
+        ];
     }
 
     /** PitchLayout için oyuncu verisi. */

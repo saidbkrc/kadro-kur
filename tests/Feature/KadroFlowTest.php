@@ -1140,6 +1140,53 @@ class KadroFlowTest extends TestCase
             ->assertStatus(400);
     }
 
+    public function test_mac_karti_ve_gelisim_grafigi(): void
+    {
+        $owner = User::factory()->create();
+        $group = $this->makeGroup($owner);
+        $p1 = $group->playerFor($owner);
+        $friend = $this->addMember($group);
+
+        // İki tamamlanmış maç, performans puanlarıyla (grafik için en az 2 nokta gerekli)
+        foreach ([[3, 1, 7], [2, 2, 9]] as $i => [$a, $b, $puan]) {
+            $match = $group->matches()->create([
+                'created_by' => $owner->id, 'title' => "Maç {$i}", 'starts_at' => now()->subDays(5 - $i),
+                'capacity' => 14, 'status' => 'completed', 'team_a_score' => $a, 'team_b_score' => $b,
+                'mvp_closes_at' => now()->subHour(),
+            ]);
+            $match->rsvps()->create(['player_id' => $p1->id, 'status' => 'going', 'team' => 'A']);
+            $match->rsvps()->create(['player_id' => $friend->id, 'status' => 'going', 'team' => 'B']);
+            $match->performanceRatings()->create(['rater_id' => $friend->user_id, 'player_id' => $p1->id, 'score' => $puan]);
+        }
+
+        // Gelişim grafiği: 2 nokta, eskiden yeniye sıralı
+        $history = $p1->performanceHistory();
+        $this->assertCount(2, $history);
+        $this->assertSame(7.0, $history[0]['score']);
+        $this->assertSame(9.0, $history[1]['score']);
+        $this->assertTrue($history[0]['date']->lt($history[1]['date']), 'Grafik eskiden yeniye sıralı olmalı');
+
+        $this->actingAs($owner)->get(route('groups.player', [$group, $p1]))
+            ->assertOk()
+            ->assertSee('FORM GRAFİĞİ', false);
+
+        // Maç kartı: tamamlanmış maçta veri hazırlanır ve sayfada görünür
+        $last = $group->matches()->where('status', 'completed')->latest('starts_at')->first();
+        $last->goals()->create(['player_id' => $friend->id, 'count' => 2]);
+
+        $this->actingAs($owner)->get(route('matches.show', $last))
+            ->assertOk()
+            ->assertSee('Maç Kartı')
+            ->assertSee('macKarti', false)
+            ->assertSee($group->name);
+
+        // Planlı maçta kart yok
+        $upcoming = $this->makeMatch($group);
+        $this->actingAs($owner)->get(route('matches.show', $upcoming))
+            ->assertOk()
+            ->assertDontSee('Maç Kartı');
+    }
+
     public function test_oyuncu_profili_izolasyon_korunur(): void
     {
         $ownerA = User::factory()->create();
