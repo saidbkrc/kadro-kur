@@ -384,7 +384,10 @@ class Show extends Component
             ->orderByDesc('c')
             ->get()
             ->groupBy('player_id')
-            ->map(fn ($rows) => $rows->take(2)
+            ->map(fn ($rows) => $rows
+                // Havuz listesinde sadece olumlu nitelikler — takılmalar profilde kalır
+                ->reject(fn ($r) => \App\Support\PlayerTraits::isNegative($r->trait_key))
+                ->take(2)
                 ->map(fn ($r) => ['key' => $r->trait_key, 'c' => $r->c] + (\App\Support\PlayerTraits::ALL[$r->trait_key] ?? []))
                 ->filter(fn ($t) => isset($t['name']))
                 ->values());

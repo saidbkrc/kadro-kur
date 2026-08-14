@@ -211,13 +211,41 @@
                 </div>
             @endif
 
+            {{-- Takılmalar: ancak eşiği geçenler görünür --}}
+            @if ($negativeCounts->isNotEmpty())
+                <div x-data="{ info: null }" class="pt-3 border-t border-pitch-line">
+                    <div class="text-[11px] tracking-[.14em] text-pitch-muted mb-2">😅 TAKILMALAR</div>
+                    <div class="flex flex-wrap gap-2">
+                        @foreach ($negativeCounts as $key => $count)
+                            @php $trait = \App\Support\PlayerTraits::ALL[$key] ?? null; @endphp
+                            @if ($trait)
+                                <button type="button"
+                                        @click="info = info === @js($trait['icon'].' '.$trait['name'].': '.$trait['desc']) ? null : @js($trait['icon'].' '.$trait['name'].': '.$trait['desc'])"
+                                        class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full border border-[#6c3030] bg-red-900/15 text-[#ffb3b3] text-sm font-semibold transition active:scale-95">
+                                    {{ $trait['icon'] }} {{ $trait['name'] }}
+                                    <span class="text-[#ffb3b3]/70 font-normal">×{{ $count }}</span>
+                                    @if ($myTraits->contains($key))<span class="text-bibB">✓</span>@endif
+                                </button>
+                            @endif
+                        @endforeach
+                    </div>
+                    <p x-show="info" x-cloak x-text="info" @click.outside="info = null"
+                       class="mt-2 text-xs text-pitch-muted bg-pitch-bg border border-pitch-line rounded-md px-3 py-2"></p>
+                </div>
+            @endif
+
             @if ($showTraitPicker && $player->user_id !== auth()->id())
                 <div class="border-t border-pitch-line pt-3 space-y-4">
+                    @php
+                        $secPozitif = collect($selectedTraits)->reject(fn ($k) => \App\Support\PlayerTraits::isNegative($k))->count();
+                        $secNegatif = collect($selectedTraits)->filter(fn ($k) => \App\Support\PlayerTraits::isNegative($k))->count();
+                    @endphp
+
                     <p class="text-xs text-pitch-muted">
-                        En iyi bildiği {{ \App\Support\PlayerTraits::MAX_PER_ENDORSER }} şeyi seç ({{ count($selectedTraits) }}/{{ \App\Support\PlayerTraits::MAX_PER_ENDORSER }}), sonra <strong class="text-pitch-ink">Kaydet</strong>'e bas. Onaylar anonimdir, sadece sayı görünür.
+                        En iyi bildiği {{ \App\Support\PlayerTraits::MAX_PER_ENDORSER }} şeyi seç ({{ $secPozitif }}/{{ \App\Support\PlayerTraits::MAX_PER_ENDORSER }}), sonra <strong class="text-pitch-ink">Kaydet</strong>'e bas. Onaylar anonimdir, sadece sayı görünür.
                     </p>
 
-                    @foreach (\App\Support\PlayerTraits::grouped() as $cat => $traits)
+                    @foreach (\App\Support\PlayerTraits::grouped('positive') as $cat => $traits)
                         <div>
                             <div class="text-[11px] tracking-[.14em] text-pitch-muted mb-2">{{ mb_strtoupper($cat, 'UTF-8') }}</div>
                             <div class="grid grid-cols-2 gap-2">
@@ -236,6 +264,30 @@
                             </div>
                         </div>
                     @endforeach
+
+                    {{-- Şakacı takılmalar: ayrı ve daha kısıtlı --}}
+                    <div class="pt-3 border-t border-dashed border-pitch-line">
+                        <div class="text-[11px] tracking-[.14em] text-[#ffb3b3] mb-1">😅 TAKILMALAR ({{ $secNegatif }}/{{ \App\Support\PlayerTraits::MAX_NEGATIVE_PER_ENDORSER }})</div>
+                        <p class="text-xs text-pitch-muted mb-2">
+                            Dostça takılmalar — en fazla {{ \App\Support\PlayerTraits::MAX_NEGATIVE_PER_ENDORSER }} tane. Bir takılma ancak <strong class="text-pitch-ink">{{ \App\Support\PlayerTraits::MIN_NEGATIVE_VISIBLE }} kişi</strong> aynı şeyi seçerse profilde görünür, bildirim gitmez.
+                        </p>
+                        <div class="grid grid-cols-2 gap-2">
+                            @foreach (\App\Support\PlayerTraits::grouped('negative') as $traits)
+                                @foreach ($traits as $key => $trait)
+                                    @php
+                                        $secili = in_array($key, $selectedTraits, true);
+                                        $full = ! $secili && $secNegatif >= \App\Support\PlayerTraits::MAX_NEGATIVE_PER_ENDORSER;
+                                    @endphp
+                                    <button type="button" wire:click="toggleTraitSelection('{{ $key }}')"
+                                            class="text-start px-3 py-2 rounded-md border transition
+                                                   {{ $secili ? 'border-[#6c3030] bg-red-900/15' : ($full ? 'border-pitch-line opacity-40' : 'border-pitch-line hover:bg-pitch-surface2') }}">
+                                        <span class="block text-xs {{ $secili ? 'text-[#ffb3b3] font-semibold' : 'text-pitch-ink font-medium' }}">{{ $trait['icon'] }} {{ $trait['name'] }}{{ $secili ? ' ✓' : '' }}</span>
+                                        <span class="block text-[10px] leading-snug text-pitch-muted mt-0.5">{{ $trait['desc'] }}</span>
+                                    </button>
+                                @endforeach
+                            @endforeach
+                        </div>
+                    </div>
 
                     <div class="flex flex-col sm:flex-row sm:items-center gap-3 pt-1">
                         <x-primary-button type="button" wire:click="saveTraits" class="w-full sm:w-auto">Kaydet</x-primary-button>

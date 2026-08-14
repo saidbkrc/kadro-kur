@@ -1240,6 +1240,63 @@ class KadroFlowTest extends TestCase
             ->assertDontSee('Maç Kartı');
     }
 
+    public function test_olumsuz_nitelikler_ayri_limit_esik_ve_bildirimsiz(): void
+    {
+        Notification::fake();
+
+        $owner = User::factory()->create();
+        $group = $this->makeGroup($owner);
+        $target = $group->playerFor($owner);
+        $m1 = $this->addMember($group);
+        $m2 = $this->addMember($group);
+        $m3 = $this->addMember($group);
+
+        // Olumsuzlarda ayrı ve daha düşük limit (2): 3.'de uyarı verir, seçilmez
+        Livewire::actingAs($m1->user)
+            ->test(Groups\PlayerProfile::class, ['group' => $group, 'player' => $target])
+            ->call('toggleTraitSelection', 'kazma')
+            ->call('toggleTraitSelection', 'agir_abi')
+            ->call('toggleTraitSelection', 'cam_adam')
+            ->assertSet('traitNotice', fn ($v) => str_contains((string) $v, 'takılma'))
+            // Olumlu limiti ayrı işler: 3 olumlu hâlâ seçilebilir
+            ->call('toggleTraitSelection', 'maestro')
+            ->call('toggleTraitSelection', 'joker')
+            ->call('toggleTraitSelection', 'beton')
+            ->call('saveTraits');
+
+        $kayitlar = $target->traitEndorsements()->where('endorser_id', $m1->user_id)->pluck('trait_key');
+        $this->assertCount(5, $kayitlar, '3 olumlu + 2 olumsuz kaydedilmeli');
+        $this->assertContains('kazma', $kayitlar);
+        $this->assertNotContains('cam_adam', $kayitlar);
+
+        // Eşiğin altındaki takılma profilde GÖRÜNMEZ (tek kişi yapıştıramaz)
+        $this->actingAs($owner)->get(route('groups.player', [$group, $target]))
+            ->assertOk()
+            ->assertSee('Maestro')
+            ->assertDontSee('Kazma');
+
+        // 3. onayla eşik dolar → görünür olur, ama bildirim GİTMEZ
+        foreach ([$m2, $m3] as $uye) {
+            Livewire::actingAs($uye->user)
+                ->test(Groups\PlayerProfile::class, ['group' => $group, 'player' => $target])
+                ->call('toggleTraitSelection', 'kazma')
+                ->call('saveTraits');
+        }
+
+        $this->actingAs($owner)->get(route('groups.player', [$group, $target]))
+            ->assertOk()
+            ->assertSee('Kazma')
+            ->assertSee('TAKILMALAR');
+
+        Notification::assertNotSentTo($owner, MatchPushNotification::class,
+            fn ($n) => str_contains($n->body, 'Kazma'));
+
+        // Havuz listesine takılmalar sızmaz (olumlu etiket gösterimi ayrı testte)
+        $this->actingAs($owner)->get(route('groups.show', $group))
+            ->assertOk()
+            ->assertDontSee('Kazma');
+    }
+
     public function test_oyuncu_profili_izolasyon_korunur(): void
     {
         $ownerA = User::factory()->create();

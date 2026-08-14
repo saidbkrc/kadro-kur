@@ -84,7 +84,7 @@ class PlayerProfile extends Component
         }
     }
 
-    /** Seçimi yerel olarak değiştirir (kaydetmez). Kişi başı en fazla 3. */
+    /** Seçimi yerel olarak değiştirir (kaydetmez). Olumlu ve olumsuz için ayrı limitler. */
     public function toggleTraitSelection(string $key): void
     {
         abort_unless(array_key_exists($key, \App\Support\PlayerTraits::ALL), 400);
@@ -97,8 +97,14 @@ class PlayerProfile extends Component
             return;
         }
 
-        if (count($this->selectedTraits) >= \App\Support\PlayerTraits::MAX_PER_ENDORSER) {
-            $this->traitNotice = 'Bir oyuncuya en fazla '.\App\Support\PlayerTraits::MAX_PER_ENDORSER.' nitelik onaylayabilirsin — önce birini kaldır.';
+        $negatifMi = \App\Support\PlayerTraits::isNegative($key);
+        $limit = \App\Support\PlayerTraits::limitFor($negatifMi ? 'negative' : 'positive');
+        $mevcut = $this->selectedCountByType($negatifMi ? 'negative' : 'positive');
+
+        if ($mevcut >= $limit) {
+            $this->traitNotice = $negatifMi
+                ? "Bir oyuncuya en fazla {$limit} takılma seçebilirsin — önce birini kaldır."
+                : "Bir oyuncuya en fazla {$limit} nitelik onaylayabilirsin — önce birini kaldır.";
 
             return;
         }
@@ -107,11 +113,20 @@ class PlayerProfile extends Component
         $this->traitNotice = null;
     }
 
+    /** Seçimde bu türden kaç tane var? */
+    protected function selectedCountByType(string $type): int
+    {
+        return collect($this->selectedTraits)
+            ->filter(fn ($k) => (\App\Support\PlayerTraits::isNegative($k) ? 'negative' : 'positive') === $type)
+            ->count();
+    }
+
     /** Seçimi kaydeder: eklenenler yazılır, kaldırılanlar silinir. */
     public function saveTraits(): void
     {
         abort_if($this->player->user_id === Auth::id(), 403);
-        abort_if(count($this->selectedTraits) > \App\Support\PlayerTraits::MAX_PER_ENDORSER, 400);
+        abort_if($this->selectedCountByType('positive') > \App\Support\PlayerTraits::MAX_PER_ENDORSER, 400);
+        abort_if($this->selectedCountByType('negative') > \App\Support\PlayerTraits::MAX_NEGATIVE_PER_ENDORSER, 400);
 
         $valid = collect($this->selectedTraits)
             ->filter(fn ($k) => array_key_exists($k, \App\Support\PlayerTraits::ALL))
@@ -129,8 +144,9 @@ class PlayerProfile extends Component
         foreach ($valid->diff($current) as $key) {
             $this->player->traitEndorsements()->create(['trait_key' => $key, 'endorser_id' => Auth::id()]);
 
-            // Tam 3. onayda oyuncuya tek push (her onayda değil)
-            if ($this->player->traitEndorsements()->where('trait_key', $key)->count() === 3) {
+            // Tam 3. onayda oyuncuya tek push — takılmalar için bildirim YOK
+            if (! \App\Support\PlayerTraits::isNegative($key)
+                && $this->player->traitEndorsements()->where('trait_key', $key)->count() === 3) {
                 app(\App\Services\PushNotifier::class)->traitMilestone($this->player, $key);
             }
         }
@@ -162,6 +178,12 @@ class PlayerProfile extends Component
 
         $earnedCount = fn (array $s) => collect($badges->evaluate($s))->where('earned', true)->count();
 
+        $sayilar = $this->player->traitEndorsements()
+            ->selectRaw('trait_key, count(*) as c')
+            ->groupBy('trait_key')
+            ->orderByDesc('c')
+            ->pluck('c', 'trait_key');
+
         return view('livewire.groups.player-profile', [
             'stats' => $stats,
             'badges' => $badges->evaluate($stats),
@@ -172,11 +194,12 @@ class PlayerProfile extends Component
             'compareEarned' => $compareStats !== null ? $earnedCount($compareStats) : null,
             'bestPartner' => app(\App\Services\TeamChemistry::class)->bestPartnerFor($this->player->id, $this->group),
             'formHistory' => $this->player->isGuest() ? collect() : $this->player->performanceHistory(),
-            'traitCounts' => $this->player->traitEndorsements()
-                ->selectRaw('trait_key, count(*) as c')
-                ->groupBy('trait_key')
-                ->orderByDesc('c')
-                ->pluck('c', 'trait_key'),
+            // Olumlu nitelikler her onaydan itibaren görünür
+            'traitCounts' => $sayilar->reject(fn ($c, $k) => \App\Support\PlayerTraits::isNegative($k)),
+            // Takılmalar ancak eşiği geçince görünür — tek kişi yapıştıramaz
+            'negativeCounts' => $sayilar
+                ->filter(fn ($c, $k) => \App\Support\PlayerTraits::isNegative($k)
+                    && $c >= \App\Support\PlayerTraits::MIN_NEGATIVE_VISIBLE),
             'myTraits' => $this->player->traitEndorsements()
                 ->where('endorser_id', Auth::id())
                 ->pluck('trait_key'),
