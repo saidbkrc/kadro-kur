@@ -9,6 +9,10 @@ return new class extends Migration
     /** Nitelik onayları (LinkedIn tarzı): üye, takım arkadaşının niteliğini onaylar. */
     public function up(): void
     {
+        if (Schema::hasTable('player_trait_endorsements')) {
+            return; // tekrar çalıştırılabilir
+        }
+
         Schema::create('player_trait_endorsements', function (Blueprint $table) {
             $table->id();
             $table->foreignId('player_id')->constrained()->cascadeOnDelete();

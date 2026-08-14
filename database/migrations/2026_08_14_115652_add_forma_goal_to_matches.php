@@ -12,6 +12,10 @@ return new class extends Migration
      */
     public function up(): void
     {
+        if (Schema::hasColumn('matches', 'forma_goal_player_id')) {
+            return; // tekrar çalıştırılabilir
+        }
+
         Schema::table('matches', function (Blueprint $table) {
             $table->foreignId('forma_goal_player_id')->nullable()->after('result_edited_by')
                 ->constrained('players')->nullOnDelete();
