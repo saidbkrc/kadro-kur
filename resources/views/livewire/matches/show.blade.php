@@ -139,6 +139,234 @@
             @endif
         </div>
 
+        {{-- Sonuç girme formu --}}
+        @if ($showResultForm && $canManage)
+            <div class="bg-pitch-surface border border-pitch-line rounded-xl">
+                <form wire:submit="saveResult" class="p-6 space-y-4">
+                    <h3 class="font-display uppercase tracking-wider text-lg font-semibold">{{ $match->status === 'completed' ? '✏️ Sonucu Düzenle' : 'Maç Bitti Mi?' }}</h3>
+                    <div class="flex items-center justify-center sm:justify-start gap-3">
+                        <span class="font-bold text-bibA">Turuncu</span>
+                        <x-text-input wire:model="teamAScore" type="number" min="0" max="99" class="w-20 text-center text-lg font-bold" />
+                        <span class="font-display text-2xl text-pitch-muted">:</span>
+                        <x-text-input wire:model="teamBScore" type="number" min="0" max="99" class="w-20 text-center text-lg font-bold" />
+                        <span class="font-bold text-bibB">Yeşil</span>
+                    </div>
+                    <x-input-error :messages="$errors->get('teamAScore')" />
+                    <x-input-error :messages="$errors->get('teamBScore')" />
+
+                    @if ($going->isNotEmpty())
+                        @php
+                            // Takımlar ayrı ayrı; takımı belirsizler (kadro kurulmadıysa) sonda
+                            $gruplar = [
+                                ['Turuncu', 'text-bibA', 'border-bibA/40', $going->where('team', 'A')->values()],
+                                ['Yeşil', 'text-bibB', 'border-bibB/40', $going->where('team', 'B')->values()],
+                                ['Takımı belirsiz', 'text-pitch-muted', 'border-pitch-line', $going->whereNull('team')->values()],
+                            ];
+                        @endphp
+
+                        <div>
+                            <x-input-label value="⚽ Golleri atanlar (gol atanlara sayı gir, diğerlerini boş bırak)" class="mb-2" />
+                            <div class="grid sm:grid-cols-2 gap-4">
+                                @foreach ($gruplar as [$takimAdi, $renk, $kenar, $uyeler])
+                                    @if ($uyeler->isNotEmpty())
+                                        <div class="min-w-0">
+                                            <div class="text-[11px] font-bold tracking-[.14em] {{ $renk }} mb-1.5">{{ mb_strtoupper($takimAdi, 'UTF-8') }}</div>
+                                            <div class="space-y-2">
+                                                @foreach ($uyeler as $rsvp)
+                                                    <div class="flex items-center justify-between gap-2 border {{ $kenar }} rounded-md px-3 py-2">
+                                                        <span class="text-sm min-w-0 truncate">{{ $rsvp->player->name }}</span>
+                                                        <input type="number" min="0" max="30" placeholder="0"
+                                                               wire:model="goals.{{ $rsvp->player_id }}"
+                                                               class="w-16 shrink-0 text-sm bg-pitch-bg border-pitch-line text-pitch-ink rounded-md focus:border-bibB focus:ring-bibB/40">
+                                                    </div>
+                                                @endforeach
+                                            </div>
+                                        </div>
+                                    @endif
+                                @endforeach
+                            </div>
+                        </div>
+
+                        {{-- Forma golü: tek oyuncu, skora ve gol istatistiğine etki etmez --}}
+                        <div>
+                            <x-input-label value="👕 Forma golü (maçta bir kişi — skora ve gol sayısına eklenmez)" class="mb-2" />
+                            <div class="grid grid-cols-2 sm:grid-cols-3 gap-2">
+                                <button type="button" wire:click="$set('formaGoalPlayerId', null)"
+                                        class="text-xs px-3 py-2 rounded-md border transition {{ $formaGoalPlayerId === null ? 'border-gold bg-gold/10 text-gold font-semibold' : 'border-pitch-line text-pitch-muted hover:bg-pitch-surface2' }}">
+                                    Yok
+                                </button>
+                                @foreach ($going as $rsvp)
+                                    <button type="button" wire:click="$set('formaGoalPlayerId', {{ $rsvp->player_id }})"
+                                            class="text-xs px-3 py-2 rounded-md border truncate transition {{ (int) $formaGoalPlayerId === $rsvp->player_id ? 'border-gold bg-gold/10 text-gold font-semibold' : 'border-pitch-line hover:bg-pitch-surface2' }}">
+                                        {{ (int) $formaGoalPlayerId === $rsvp->player_id ? '👕 ' : '' }}{{ $rsvp->player->name }}
+                                    </button>
+                                @endforeach
+                            </div>
+                        </div>
+                    @endif
+
+                    <x-primary-button class="w-full sm:w-auto">{{ $match->status === 'completed' ? '💾 Değişiklikleri Kaydet' : '🏁 Sonucu Kaydet ve Maçı Bitir' }}</x-primary-button>
+                    <p class="text-xs text-pitch-muted">Skor kaydedilince MVP ve performans oylaması <strong class="text-pitch-ink">1 hafta</strong> (bir sonraki maça kadar) açık kalır; haftalık otomatik maç ayarlıysa sıradaki maç açılır.</p>
+                </form>
+            </div>
+        @endif
+
+        {{-- Maç sonu: golcüler + MVP --}}
+        @if ($match->status === 'completed')
+            @if ($matchGoals->isNotEmpty() || $match->formaGoalPlayer)
+                <div class="bg-pitch-surface border border-pitch-line rounded-xl p-6 space-y-3">
+                    @if ($matchGoals->isNotEmpty())
+                        <div>
+                            <h3 class="font-display uppercase tracking-wider text-lg font-semibold mb-3">⚽ Golleri Atanlar</h3>
+                            <ul class="space-y-1.5 text-sm">
+                                @foreach ($matchGoals as $goal)
+                                    <li><strong class="text-gold">{{ $goal->count }}×</strong> {{ $goal->player?->name ?? 'Bilinmiyor' }}</li>
+                                @endforeach
+                            </ul>
+                        </div>
+                    @endif
+
+                    @if ($match->formaGoalPlayer)
+                        <div class="{{ $matchGoals->isNotEmpty() ? 'pt-3 border-t border-pitch-line' : '' }}">
+                            <span class="inline-flex items-center gap-2 text-sm px-3 py-1.5 rounded-full bg-gold/10 border border-gold/40 text-gold font-semibold">
+                                👕 Forma golü: {{ $match->formaGoalPlayer->name }}
+                            </span>
+                        </div>
+                    @endif
+                </div>
+            @endif
+
+            {{-- Paylaşılabilir maç kartı: tarayıcıda canvas ile üretilir, native paylaşımla WhatsApp'a gider --}}
+            @if ($shareCard)
+                <div class="bg-pitch-surface border border-pitch-line rounded-xl p-4 sm:p-6 space-y-3"
+                     x-data="macKarti(@js($shareCard))">
+                    <div class="flex items-center justify-between flex-wrap gap-2">
+                        <h3 class="font-display uppercase tracking-wider text-lg font-semibold">📲 Maç Kartı</h3>
+                        <span class="text-xs text-pitch-muted">Gruba atmak için hazır</span>
+                    </div>
+
+                    <canvas x-ref="tuval" class="w-full max-w-xs mx-auto rounded-xl border border-pitch-line"></canvas>
+
+                    <div class="grid grid-cols-2 gap-2 sm:flex sm:flex-wrap">
+                        <x-primary-button type="button" x-on:click="paylas()" class="w-full sm:w-auto">
+                            📲 Paylaş
+                        </x-primary-button>
+                        <x-secondary-button type="button" x-on:click="indir()" class="w-full sm:w-auto">
+                            ⬇️ İndir
+                        </x-secondary-button>
+                    </div>
+                    <p class="text-xs text-pitch-muted" x-text="durum"></p>
+                </div>
+            @endif
+
+            <div class="bg-pitch-surface border border-pitch-line rounded-xl p-6 space-y-4">
+                <div class="flex items-center justify-between flex-wrap gap-2">
+                    <h3 class="font-display uppercase tracking-wider text-lg font-semibold">🏆 Maçın Adamı (MVP)</h3>
+                    @if ($match->mvpOpen())
+                        @php $mvpHoursLeft = (int) ceil(now()->diffInHours($match->mvp_closes_at, true)); @endphp
+                        <span class="text-xs text-gold bg-gold/10 border border-gold/30 rounded-full px-3 py-1">
+                            {{ \App\Models\FootballMatch::ratingUnlimited() ? 'Oylama açık (sınırsız)' : 'Oylama açık — '.($mvpHoursLeft > 48 ? (int) ceil($mvpHoursLeft / 24).' gün kaldı' : $mvpHoursLeft.' saat kaldı') }}
+                        </span>
+                    @elseif ($match->mvp_closes_at)
+                        <span class="text-xs text-pitch-muted bg-pitch-bg border border-pitch-line rounded-full px-3 py-1">Oylama kapandı</span>
+                    @endif
+                </div>
+
+                @if ($match->mvpOpen() && $isParticipant && ! $myMvpVote)
+                    <p class="text-sm text-pitch-muted">Maçın yıldızı kimdi? <strong class="text-pitch-ink">Tek oy hakkın var ve değiştirilemez.</strong> Oylar anonim — kimse kime verdiğini görmez.</p>
+                    <div class="grid grid-cols-2 gap-2 sm:flex sm:flex-wrap">
+                        @foreach ($going as $rsvp)
+                            @if (! $myPlayer || $rsvp->player_id !== $myPlayer->id)
+                                <button type="button" wire:click="voteMvp({{ $rsvp->player_id }})"
+                                        data-confirm="{{ $rsvp->player->name }} için MVP oyu vereceksin. Bu oy değiştirilemez. Emin misin?"
+                                        class="px-4 py-2 rounded-md text-sm font-medium border border-pitch-line hover:bg-pitch-surface2 hover:border-gold transition truncate">
+                                    {{ $rsvp->player->name }}
+                                </button>
+                            @endif
+                        @endforeach
+                    </div>
+                @elseif ($mvpResults->isNotEmpty() && ($myMvpVote || ! $match->mvpOpen()))
+                    <ul class="space-y-2">
+                        @foreach ($mvpResults as $result)
+                            <li class="flex items-center gap-3">
+                                <span class="w-8 text-center">{{ $loop->first ? '👑' : $loop->iteration.'.' }}</span>
+                                <span class="font-semibold {{ $loop->first ? 'text-gold' : '' }}">{{ $result->player->name }}</span>
+                                <span class="text-sm text-pitch-muted">{{ $result->votes }} oy</span>
+                                @if ($result->player_id === $myMvpVote?->player_id)
+                                    <span class="text-xs text-bibB">(senin oyun)</span>
+                                @endif
+                            </li>
+                        @endforeach
+                    </ul>
+                @elseif ($match->mvpOpen())
+                    <p class="text-sm text-pitch-muted">Sonuçlar oylar verildikçe burada görünecek{{ $isParticipant ? '' : ' (kadroda olmadığın için oy kullanamazsın)' }}.</p>
+                @else
+                    <p class="text-sm text-pitch-muted">Hiç oy kullanılmadı.</p>
+                @endif
+            </div>
+
+            {{-- Maç sonu performans puanı --}}
+            <div class="bg-pitch-surface border border-pitch-line rounded-xl p-6 space-y-4">
+                <div class="flex items-center justify-between flex-wrap gap-2">
+                    <h3 class="font-display uppercase tracking-wider text-lg font-semibold">📈 Performans Puanı</h3>
+                    @if ($perfOpen)
+                        @php $perfHoursLeft = (int) ceil(now()->diffInHours($match->perfClosesAt(), true)); @endphp
+                        <span class="text-xs text-gold bg-gold/10 border border-gold/30 rounded-full px-3 py-1">{{ \App\Models\FootballMatch::ratingUnlimited() ? 'Açık (sınırsız)' : 'Açık — '.($perfHoursLeft > 48 ? (int) ceil($perfHoursLeft / 24).' gün kaldı' : $perfHoursLeft.' saat kaldı') }}</span>
+                    @else
+                        <span class="text-xs text-pitch-muted bg-pitch-bg border border-pitch-line rounded-full px-3 py-1">Kapandı</span>
+                    @endif
+                </div>
+
+                @if ($perfOpen && $isParticipant)
+                    <p class="text-sm text-pitch-muted">Bu maçta takım arkadaşlarının performansını 1-10 puanla (anonim). Son 5 maçın ortalaması oyuncunun puanına <strong class="text-pitch-ink">%20</strong> oranında ▲/▼ olarak yansır.</p>
+                    <div class="space-y-1.5">
+                        @foreach ($going as $rsvp)
+                            @if ((! $myPlayer || $rsvp->player_id !== $myPlayer->id) && ! $rsvp->player->isGuest())
+                                @php $cur = (int) ($perfScores[$rsvp->player_id] ?? 5); $dokunuldu = isset($perfScores[$rsvp->player_id]); @endphp
+                                <div class="flex items-center justify-between gap-2 bg-pitch-bg border border-pitch-line rounded-lg px-3 py-2">
+                                    <span class="text-sm font-medium min-w-0 truncate">{{ $rsvp->player->name }}</span>
+                                    <div class="flex items-center gap-1.5 shrink-0">
+                                        <button type="button" wire:click="adjustPerf({{ $rsvp->player_id }}, -1)"
+                                                class="w-9 h-9 rounded-md bg-pitch-surface2 border border-pitch-line text-xl font-bold leading-none hover:brightness-125 active:scale-95 transition">−</button>
+                                        <span class="w-8 text-center font-display text-xl font-bold {{ $dokunuldu ? 'text-bibB' : 'text-pitch-muted/60' }}">{{ $cur }}</span>
+                                        <button type="button" wire:click="adjustPerf({{ $rsvp->player_id }}, 1)"
+                                                class="w-9 h-9 rounded-md bg-pitch-surface2 border border-pitch-line text-xl font-bold leading-none hover:brightness-125 active:scale-95 transition">+</button>
+                                    </div>
+                                </div>
+                            @endif
+                        @endforeach
+                    </div>
+
+                    <div class="flex flex-col sm:flex-row sm:items-center gap-3">
+                        <x-primary-button type="button" wire:click="savePerformance" class="w-full sm:w-auto">
+                            Puanları Kaydet
+                        </x-primary-button>
+                        @if ($perfSaved)
+                            <span class="text-sm text-bibB text-center sm:text-start">Kaydedildi ✓</span>
+                        @elseif ($perfDirty !== [])
+                            <span class="text-sm text-gold text-center sm:text-start">Kaydedilmemiş değişiklik var</span>
+                        @endif
+                    </div>
+                @elseif (! $perfOpen && $perfAverages->isNotEmpty())
+                    <p class="text-sm text-pitch-muted">Bu maçın performans ortalamaları:</p>
+                    <ul class="space-y-1.5">
+                        @foreach ($going as $rsvp)
+                            @if ($perfAverages->has($rsvp->player_id) && ! $rsvp->player->isGuest())
+                                <li class="flex items-center justify-between gap-2 text-sm">
+                                    <span class="font-medium">{{ $rsvp->player->name }}</span>
+                                    <span class="font-display text-lg font-bold text-bibB">{{ number_format($perfAverages->get($rsvp->player_id), 1) }}</span>
+                                </li>
+                            @endif
+                        @endforeach
+                    </ul>
+                @elseif ($perfOpen)
+                    <p class="text-sm text-pitch-muted">Bu maçta oynamadığın için performans puanı veremezsin.</p>
+                @else
+                    <p class="text-sm text-pitch-muted">Performans puanı verilmedi.</p>
+                @endif
+            </div>
+        @endif
+
         {{-- Başkan: hazır hatırlatma bildirimleri --}}
         @if ($canManage && $match->status !== 'cancelled')
             @php
@@ -452,189 +680,6 @@
             </div>
         </div>
 
-        {{-- Sonuç girme formu --}}
-        @if ($showResultForm && $canManage)
-            <div class="bg-pitch-surface border border-pitch-line rounded-xl">
-                <form wire:submit="saveResult" class="p-6 space-y-4">
-                    <h3 class="font-display uppercase tracking-wider text-lg font-semibold">{{ $match->status === 'completed' ? '✏️ Sonucu Düzenle' : 'Maç Bitti Mi?' }}</h3>
-                    <div class="flex items-center justify-center sm:justify-start gap-3">
-                        <span class="font-bold text-bibA">Turuncu</span>
-                        <x-text-input wire:model="teamAScore" type="number" min="0" max="99" class="w-20 text-center text-lg font-bold" />
-                        <span class="font-display text-2xl text-pitch-muted">:</span>
-                        <x-text-input wire:model="teamBScore" type="number" min="0" max="99" class="w-20 text-center text-lg font-bold" />
-                        <span class="font-bold text-bibB">Yeşil</span>
-                    </div>
-                    <x-input-error :messages="$errors->get('teamAScore')" />
-                    <x-input-error :messages="$errors->get('teamBScore')" />
-
-                    @if ($going->isNotEmpty())
-                        <div>
-                            <x-input-label value="⚽ Golleri atanlar (gol atanlara sayı gir, diğerlerini boş bırak)" class="mb-2" />
-                            <div class="grid sm:grid-cols-2 gap-2">
-                                @foreach ($going as $rsvp)
-                                    <div class="flex items-center justify-between gap-2 border border-pitch-line rounded-md px-3 py-2">
-                                        <span class="text-sm">
-                                            {{ $rsvp->player->name }}
-                                            @if ($rsvp->team)<span class="text-xs {{ $rsvp->team === 'A' ? 'text-bibA' : 'text-bibB' }}">({{ $rsvp->team === 'A' ? 'Turuncu' : 'Yeşil' }})</span>@endif
-                                        </span>
-                                        <input type="number" min="0" max="30" placeholder="0"
-                                               wire:model="goals.{{ $rsvp->player_id }}"
-                                               class="w-16 text-sm bg-pitch-bg border-pitch-line text-pitch-ink rounded-md focus:border-bibB focus:ring-bibB/40">
-                                    </div>
-                                @endforeach
-                            </div>
-                        </div>
-                    @endif
-
-                    <x-primary-button class="w-full sm:w-auto">{{ $match->status === 'completed' ? '💾 Değişiklikleri Kaydet' : '🏁 Sonucu Kaydet ve Maçı Bitir' }}</x-primary-button>
-                    <p class="text-xs text-pitch-muted">Skor kaydedilince MVP ve performans oylaması <strong class="text-pitch-ink">1 hafta</strong> (bir sonraki maça kadar) açık kalır; haftalık otomatik maç ayarlıysa sıradaki maç açılır.</p>
-                </form>
-            </div>
-        @endif
-
-        {{-- Maç sonu: golcüler + MVP --}}
-        @if ($match->status === 'completed')
-            @if ($matchGoals->isNotEmpty())
-                <div class="bg-pitch-surface border border-pitch-line rounded-xl p-6">
-                    <h3 class="font-display uppercase tracking-wider text-lg font-semibold mb-3">⚽ Golleri Atanlar</h3>
-                    <ul class="space-y-1.5 text-sm">
-                        @foreach ($matchGoals as $goal)
-                            <li><strong class="text-gold">{{ $goal->count }}×</strong> {{ $goal->player?->name ?? 'Bilinmiyor' }}</li>
-                        @endforeach
-                    </ul>
-                </div>
-            @endif
-
-            {{-- Paylaşılabilir maç kartı: tarayıcıda canvas ile üretilir, native paylaşımla WhatsApp'a gider --}}
-            @if ($shareCard)
-                <div class="bg-pitch-surface border border-pitch-line rounded-xl p-4 sm:p-6 space-y-3"
-                     x-data="macKarti(@js($shareCard))">
-                    <div class="flex items-center justify-between flex-wrap gap-2">
-                        <h3 class="font-display uppercase tracking-wider text-lg font-semibold">📲 Maç Kartı</h3>
-                        <span class="text-xs text-pitch-muted">Gruba atmak için hazır</span>
-                    </div>
-
-                    <canvas x-ref="tuval" class="w-full max-w-xs mx-auto rounded-xl border border-pitch-line"></canvas>
-
-                    <div class="grid grid-cols-2 gap-2 sm:flex sm:flex-wrap">
-                        <x-primary-button type="button" x-on:click="paylas()" class="w-full sm:w-auto">
-                            📲 Paylaş
-                        </x-primary-button>
-                        <x-secondary-button type="button" x-on:click="indir()" class="w-full sm:w-auto">
-                            ⬇️ İndir
-                        </x-secondary-button>
-                    </div>
-                    <p class="text-xs text-pitch-muted" x-text="durum"></p>
-                </div>
-            @endif
-
-            <div class="bg-pitch-surface border border-pitch-line rounded-xl p-6 space-y-4">
-                <div class="flex items-center justify-between flex-wrap gap-2">
-                    <h3 class="font-display uppercase tracking-wider text-lg font-semibold">🏆 Maçın Adamı (MVP)</h3>
-                    @if ($match->mvpOpen())
-                        @php $mvpHoursLeft = (int) ceil(now()->diffInHours($match->mvp_closes_at, true)); @endphp
-                        <span class="text-xs text-gold bg-gold/10 border border-gold/30 rounded-full px-3 py-1">
-                            {{ \App\Models\FootballMatch::ratingUnlimited() ? 'Oylama açık (sınırsız)' : 'Oylama açık — '.($mvpHoursLeft > 48 ? (int) ceil($mvpHoursLeft / 24).' gün kaldı' : $mvpHoursLeft.' saat kaldı') }}
-                        </span>
-                    @elseif ($match->mvp_closes_at)
-                        <span class="text-xs text-pitch-muted bg-pitch-bg border border-pitch-line rounded-full px-3 py-1">Oylama kapandı</span>
-                    @endif
-                </div>
-
-                @if ($match->mvpOpen() && $isParticipant && ! $myMvpVote)
-                    <p class="text-sm text-pitch-muted">Maçın yıldızı kimdi? <strong class="text-pitch-ink">Tek oy hakkın var ve değiştirilemez.</strong> Oylar anonim — kimse kime verdiğini görmez.</p>
-                    <div class="grid grid-cols-2 gap-2 sm:flex sm:flex-wrap">
-                        @foreach ($going as $rsvp)
-                            @if (! $myPlayer || $rsvp->player_id !== $myPlayer->id)
-                                <button type="button" wire:click="voteMvp({{ $rsvp->player_id }})"
-                                        data-confirm="{{ $rsvp->player->name }} için MVP oyu vereceksin. Bu oy değiştirilemez. Emin misin?"
-                                        class="px-4 py-2 rounded-md text-sm font-medium border border-pitch-line hover:bg-pitch-surface2 hover:border-gold transition truncate">
-                                    {{ $rsvp->player->name }}
-                                </button>
-                            @endif
-                        @endforeach
-                    </div>
-                @elseif ($mvpResults->isNotEmpty() && ($myMvpVote || ! $match->mvpOpen()))
-                    <ul class="space-y-2">
-                        @foreach ($mvpResults as $result)
-                            <li class="flex items-center gap-3">
-                                <span class="w-8 text-center">{{ $loop->first ? '👑' : $loop->iteration.'.' }}</span>
-                                <span class="font-semibold {{ $loop->first ? 'text-gold' : '' }}">{{ $result->player->name }}</span>
-                                <span class="text-sm text-pitch-muted">{{ $result->votes }} oy</span>
-                                @if ($result->player_id === $myMvpVote?->player_id)
-                                    <span class="text-xs text-bibB">(senin oyun)</span>
-                                @endif
-                            </li>
-                        @endforeach
-                    </ul>
-                @elseif ($match->mvpOpen())
-                    <p class="text-sm text-pitch-muted">Sonuçlar oylar verildikçe burada görünecek{{ $isParticipant ? '' : ' (kadroda olmadığın için oy kullanamazsın)' }}.</p>
-                @else
-                    <p class="text-sm text-pitch-muted">Hiç oy kullanılmadı.</p>
-                @endif
-            </div>
-
-            {{-- Maç sonu performans puanı --}}
-            <div class="bg-pitch-surface border border-pitch-line rounded-xl p-6 space-y-4">
-                <div class="flex items-center justify-between flex-wrap gap-2">
-                    <h3 class="font-display uppercase tracking-wider text-lg font-semibold">📈 Performans Puanı</h3>
-                    @if ($perfOpen)
-                        @php $perfHoursLeft = (int) ceil(now()->diffInHours($match->perfClosesAt(), true)); @endphp
-                        <span class="text-xs text-gold bg-gold/10 border border-gold/30 rounded-full px-3 py-1">{{ \App\Models\FootballMatch::ratingUnlimited() ? 'Açık (sınırsız)' : 'Açık — '.($perfHoursLeft > 48 ? (int) ceil($perfHoursLeft / 24).' gün kaldı' : $perfHoursLeft.' saat kaldı') }}</span>
-                    @else
-                        <span class="text-xs text-pitch-muted bg-pitch-bg border border-pitch-line rounded-full px-3 py-1">Kapandı</span>
-                    @endif
-                </div>
-
-                @if ($perfOpen && $isParticipant)
-                    <p class="text-sm text-pitch-muted">Bu maçta takım arkadaşlarının performansını 1-10 puanla (anonim). Son 5 maçın ortalaması oyuncunun puanına <strong class="text-pitch-ink">%20</strong> oranında ▲/▼ olarak yansır.</p>
-                    <div class="space-y-1.5">
-                        @foreach ($going as $rsvp)
-                            @if ((! $myPlayer || $rsvp->player_id !== $myPlayer->id) && ! $rsvp->player->isGuest())
-                                @php $cur = (int) ($perfScores[$rsvp->player_id] ?? 5); $dokunuldu = isset($perfScores[$rsvp->player_id]); @endphp
-                                <div class="flex items-center justify-between gap-2 bg-pitch-bg border border-pitch-line rounded-lg px-3 py-2">
-                                    <span class="text-sm font-medium min-w-0 truncate">{{ $rsvp->player->name }}</span>
-                                    <div class="flex items-center gap-1.5 shrink-0">
-                                        <button type="button" wire:click="adjustPerf({{ $rsvp->player_id }}, -1)"
-                                                class="w-9 h-9 rounded-md bg-pitch-surface2 border border-pitch-line text-xl font-bold leading-none hover:brightness-125 active:scale-95 transition">−</button>
-                                        <span class="w-8 text-center font-display text-xl font-bold {{ $dokunuldu ? 'text-bibB' : 'text-pitch-muted/60' }}">{{ $cur }}</span>
-                                        <button type="button" wire:click="adjustPerf({{ $rsvp->player_id }}, 1)"
-                                                class="w-9 h-9 rounded-md bg-pitch-surface2 border border-pitch-line text-xl font-bold leading-none hover:brightness-125 active:scale-95 transition">+</button>
-                                    </div>
-                                </div>
-                            @endif
-                        @endforeach
-                    </div>
-
-                    <div class="flex flex-col sm:flex-row sm:items-center gap-3">
-                        <x-primary-button type="button" wire:click="savePerformance" class="w-full sm:w-auto">
-                            Puanları Kaydet
-                        </x-primary-button>
-                        @if ($perfSaved)
-                            <span class="text-sm text-bibB text-center sm:text-start">Kaydedildi ✓</span>
-                        @elseif ($perfDirty !== [])
-                            <span class="text-sm text-gold text-center sm:text-start">Kaydedilmemiş değişiklik var</span>
-                        @endif
-                    </div>
-                @elseif (! $perfOpen && $perfAverages->isNotEmpty())
-                    <p class="text-sm text-pitch-muted">Bu maçın performans ortalamaları:</p>
-                    <ul class="space-y-1.5">
-                        @foreach ($going as $rsvp)
-                            @if ($perfAverages->has($rsvp->player_id) && ! $rsvp->player->isGuest())
-                                <li class="flex items-center justify-between gap-2 text-sm">
-                                    <span class="font-medium">{{ $rsvp->player->name }}</span>
-                                    <span class="font-display text-lg font-bold text-bibB">{{ number_format($perfAverages->get($rsvp->player_id), 1) }}</span>
-                                </li>
-                            @endif
-                        @endforeach
-                    </ul>
-                @elseif ($perfOpen)
-                    <p class="text-sm text-pitch-muted">Bu maçta oynamadığın için performans puanı veremezsin.</p>
-                @else
-                    <p class="text-sm text-pitch-muted">Performans puanı verilmedi.</p>
-                @endif
-            </div>
-        @endif
     </div>
 
     @script

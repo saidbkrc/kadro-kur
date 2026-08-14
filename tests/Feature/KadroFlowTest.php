@@ -1140,6 +1140,59 @@ class KadroFlowTest extends TestCase
             ->assertStatus(400);
     }
 
+    public function test_forma_golu_skora_etki_etmez_ve_rozet_verir(): void
+    {
+        $owner = User::factory()->create();
+        $group = $this->makeGroup($owner);
+        $ownPlayer = $group->playerFor($owner);
+        $friend = $this->addMember($group);
+        $yabanci = $this->addMember($group); // kadroda değil
+
+        $match = $this->makeMatch($group);
+        $match->setRsvp($ownPlayer, 'going');
+        $match->setRsvp($friend, 'going');
+
+        Livewire::actingAs($owner)
+            ->test(Matches\Show::class, ['match' => $match])
+            ->set('teamAScore', 3)
+            ->set('teamBScore', 2)
+            ->set('goals', [$friend->id => 2])
+            ->set('formaGoalPlayerId', $friend->id)
+            ->call('saveResult')
+            ->assertHasNoErrors();
+
+        $match->refresh();
+
+        // Skor ve gol istatistiği forma golünden etkilenmez
+        $this->assertSame($friend->id, $match->forma_goal_player_id);
+        $this->assertSame(3, $match->team_a_score);
+        $this->assertSame(2, $match->team_b_score);
+        $this->assertSame(2, (int) $match->goals()->where('player_id', $friend->id)->value('count'));
+        $this->assertSame(1, $match->goals()->count(), 'Forma golü ayrı bir gol kaydı oluşturmamalı');
+
+        // Rozet: forma golü sayılır
+        $badges = app(PlayerBadges::class);
+        $stats = $badges->statsForPlayer($friend);
+        $this->assertSame(1, $stats['forma_goals']);
+        $earned = collect($badges->evaluate($stats))->where('earned', true)->pluck('key');
+        $this->assertContains('forma_golu', $earned);
+        $this->assertNotContains('forma_ustasi', $earned); // 5 eşiği geçilmedi
+
+        // Kadroda olmayan oyuncu forma golü olarak kaydedilemez
+        Livewire::actingAs($owner)
+            ->test(Matches\Show::class, ['match' => $match->refresh()])
+            ->set('formaGoalPlayerId', $yabanci->id)
+            ->call('saveResult');
+        $this->assertNull($match->refresh()->forma_goal_player_id);
+
+        // Maç sayfasında görünür
+        $match->update(['forma_goal_player_id' => $friend->id]);
+        $this->actingAs($owner)->get(route('matches.show', $match))
+            ->assertOk()
+            ->assertSee('Forma golü')
+            ->assertSee($friend->name);
+    }
+
     public function test_mac_karti_ve_gelisim_grafigi(): void
     {
         $owner = User::factory()->create();

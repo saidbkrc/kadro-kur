@@ -17,7 +17,7 @@ class FootballMatch extends Model
         'group_id', 'created_by', 'title', 'location', 'starts_at', 'capacity', 'status',
         'squad_status', 'formation_a', 'formation_b', 'pitch_layout',
         'team_a_score', 'team_b_score', 'mvp_closes_at', 'reminder_sent_at',
-        'digest_sent_at', 'result_edited_at', 'result_edited_by',
+        'digest_sent_at', 'result_edited_at', 'result_edited_by', 'forma_goal_player_id',
     ];
 
     protected function casts(): array
@@ -46,6 +46,12 @@ class FootballMatch extends Model
     public function resultEditor(): BelongsTo
     {
         return $this->belongsTo(User::class, 'result_edited_by');
+    }
+
+    /** Forma golünü atan oyuncu (maç başına en fazla bir kişi; skora etki etmez). */
+    public function formaGoalPlayer(): BelongsTo
+    {
+        return $this->belongsTo(Player::class, 'forma_goal_player_id');
     }
 
     public function rsvps(): HasMany

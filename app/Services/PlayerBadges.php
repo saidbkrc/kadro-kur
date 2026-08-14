@@ -28,6 +28,8 @@ class PlayerBadges
             ['key' => 'scorer', 'icon' => '🔥', 'name' => 'Golcü', 'desc' => 'Toplam 10 gol at', 'group' => 'Gol', 'goal' => 10, 'stat' => 'goals'],
             ['key' => 'goal_king', 'icon' => '👑', 'name' => 'Gol Kralı', 'desc' => 'Toplam 50 gol at', 'group' => 'Gol', 'goal' => 50, 'stat' => 'goals'],
             ['key' => 'hat_trick', 'icon' => '⚡', 'name' => 'Hat-trick', 'desc' => 'Tek maçta 3 gol at', 'group' => 'Gol', 'goal' => 3, 'stat' => 'best_match_goals'],
+            ['key' => 'forma_golu', 'icon' => '👕', 'name' => 'Forma Golü', 'desc' => 'Bir maçta forma golünü at', 'group' => 'Gol', 'goal' => 1, 'stat' => 'forma_goals'],
+            ['key' => 'forma_ustasi', 'icon' => '🎽', 'name' => 'Forma Ustası', 'desc' => '5 kez forma golü at', 'group' => 'Gol', 'goal' => 5, 'stat' => 'forma_goals'],
 
             // 🏆 MVP & Performans
             ['key' => 'mvp', 'icon' => '⭐', 'name' => 'Maçın Adamı', 'desc' => 'Bir maçta MVP seçil', 'group' => 'MVP', 'goal' => 1, 'stat' => 'mvp'],
@@ -71,6 +73,7 @@ class PlayerBadges
                 'played' => 0, 'win' => 0, 'draw' => 0, 'loss' => 0, 'goals' => 0, 'mvp' => 0,
                 'best_match_goals' => 0, 'streak' => 0, '_run' => 0,
                 'win_streak' => 0, '_win_run' => 0, 'clean_sheets' => 0, 'best_match_perf' => 0.0,
+                'forma_goals' => 0,
             ];
         };
 
@@ -138,6 +141,12 @@ class PlayerBadges
                 $stats[$pid]['best_match_goals'] = max($stats[$pid]['best_match_goals'], $count);
             }
 
+            // Forma golü: maç başına en fazla bir oyuncu
+            if ($match->forma_goal_player_id !== null) {
+                $touch($match->forma_goal_player_id);
+                $stats[$match->forma_goal_player_id]['forma_goals']++;
+            }
+
             // MVP: oylama kapanmışsa en çok oyu alan(lar)
             if (! $match->mvpOpen() && $match->mvpVotes->isNotEmpty()) {
                 $counts = $match->mvpVotes->countBy('player_id');
@@ -198,6 +207,7 @@ class PlayerBadges
             'played' => 0, 'win' => 0, 'draw' => 0, 'loss' => 0, 'goals' => 0,
             'mvp' => 0, 'best_match_goals' => 0, 'streak' => 0,
             'win_streak' => 0, 'clean_sheets' => 0, 'best_match_perf' => 0.0,
+            'forma_goals' => 0,
         ];
     }
 

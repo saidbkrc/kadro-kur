@@ -61,6 +61,9 @@ class Show extends Component
     /** Golcüler: [player_id => gol] */
     public array $goals = [];
 
+    /** Forma golünü atan oyuncu (tek kişi; skora ve gol istatistiğine etki etmez) */
+    public ?int $formaGoalPlayerId = null;
+
     public function mount(FootballMatch $match): void
     {
         abort_unless($match->group->isMember(Auth::user()), 403);
@@ -69,6 +72,7 @@ class Show extends Component
         $this->teamAScore = $match->team_a_score;
         $this->teamBScore = $match->team_b_score;
         $this->goals = $match->goals()->pluck('count', 'player_id')->all();
+        $this->formaGoalPlayerId = $match->forma_goal_player_id;
         $this->perfScores = $match->performanceRatings()
             ->where('rater_id', Auth::id())
             ->pluck('score', 'player_id')
@@ -388,6 +392,13 @@ class Show extends Component
                 $this->match->goals()->create(['player_id' => $playerId, 'count' => (int) $count]);
             }
         }
+
+        // Forma golü: tek oyuncu, kadroda olmalı; skora ve gol istatistiğine yansımaz
+        $formaId = $participantIds->contains((int) $this->formaGoalPlayerId)
+            ? (int) $this->formaGoalPlayerId
+            : null;
+        $this->match->update(['forma_goal_player_id' => $formaId]);
+        $this->formaGoalPlayerId = $formaId;
 
         // Yeni rozet kazananlara bildirim (skor/goller işlendiği için burada)
         app(PushNotifier::class)->syncBadgesAndNotify($this->match->group);
