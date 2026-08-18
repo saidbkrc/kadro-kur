@@ -197,6 +197,18 @@ class PushNotifier
         );
     }
 
+    /** Kehanet: kupon(lar)ı tutan kullanıcıya tek bildirim. */
+    public function kehanetWin(User $user, FootballMatch $match, int $net): void
+    {
+        $this->send(
+            collect([$user]),
+            '🎉 Kehanetin tuttu!',
+            $match->title.' — kazancın +'.number_format($net).' Çim',
+            route('groups.kehanet', $match->group_id),
+            'kehanet-'.$match->id.'-'.$user->id,
+        );
+    }
+
     /** Nitelik 3 onaya ulaşınca oyuncuya tek bildirim (her onayda değil — spam yok). */
     public function traitMilestone(Player $player, string $traitKey): void
     {

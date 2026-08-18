@@ -24,6 +24,11 @@ class Kehanet
 
     public const MAX_ODDS = 20.0;
 
+    /** Kombine kuponda en az / en çok bacak sayısı. */
+    public const MIN_LEGS = 2;
+
+    public const MAX_LEGS = 5;
+
     /** Başkanın maç sonrası işaretlediği olaylar — manuel market'lerin kaynağı. */
     public const EVENTS = [
         'gerginlik' => ['icon' => '😤', 'name' => 'Gerginlik yaşayan', 'hint' => 'Saha içinde en çok tartışan'],
@@ -41,6 +46,7 @@ class Kehanet
      */
     public const MARKETS = [
         'winner' => ['icon' => '🏆', 'name' => 'Maç sonucu', 'kind' => 'takim', 'source' => 'auto'],
+        'exact_score' => ['icon' => '🎯', 'name' => 'Skor tam tahmini', 'kind' => 'skor', 'source' => 'auto'],
         'total_goals' => ['icon' => '🎯', 'name' => 'Toplam gol', 'kind' => 'altust', 'source' => 'auto'],
         'clean_sheet' => ['icon' => '🛡️', 'name' => 'Gol yemeyen takım', 'kind' => 'takim', 'source' => 'auto'],
         'scorer' => ['icon' => '⚽', 'name' => 'Gol atacak oyuncu', 'kind' => 'oyuncu', 'source' => 'auto'],

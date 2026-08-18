@@ -17,6 +17,11 @@
                 <div class="text-end shrink-0">
                     <div class="font-display text-3xl font-bold text-bibB">{{ number_format($balance) }}</div>
                     <div class="text-[10px] tracking-[.2em] text-pitch-muted">ÇİM</div>
+                    @if ($myStreak['current'] >= 2)
+                        <div class="text-[11px] text-gold mt-0.5">🔥 {{ $myStreak['current'] }} maç serisi</div>
+                    @elseif ($myStreak['best'] >= 2)
+                        <div class="text-[11px] text-pitch-muted mt-0.5">En uzun seri: {{ $myStreak['best'] }}</div>
+                    @endif
                 </div>
             </div>
             <p class="text-xs text-pitch-muted mt-3">
@@ -26,6 +31,51 @@
                 <p class="mt-3 text-sm text-bibB bg-bibB/10 border border-bibB/30 rounded-md px-3 py-2">{{ $notice }}</p>
             @endif
         </div>
+
+        {{-- Kombine sepeti --}}
+        @if ($parlay)
+            @php $toplamOran = array_product(array_column($parlay, 'odds')); @endphp
+            <div class="bg-pitch-surface border border-bibB/50 rounded-xl p-4 sm:p-6 space-y-3">
+                <div class="flex items-baseline justify-between gap-2 flex-wrap">
+                    <h3 class="font-display uppercase tracking-wider text-lg font-semibold text-bibB">🎰 Kombine Kupon</h3>
+                    <span class="text-xs text-pitch-muted">{{ count($parlay) }} tahmin · hepsi tutmalı</span>
+                </div>
+
+                <div class="space-y-1.5">
+                    @foreach ($parlay as $bacak)
+                        <div class="flex items-center justify-between gap-2 bg-pitch-bg border border-pitch-line rounded-lg px-3 py-2 text-sm">
+                            <span class="min-w-0 truncate">{{ $bacak['label'] }}</span>
+                            <span class="flex items-center gap-2 shrink-0">
+                                <span class="font-display font-bold">{{ number_format($bacak['odds'], 2) }}×</span>
+                                <button wire:click="toggleParlay({{ $bacak['match_id'] }}, '{{ $bacak['market'] }}', '{{ $bacak['selection'] }}')"
+                                        class="text-pitch-muted hover:text-[#FF8A8A]">&times;</button>
+                            </span>
+                        </div>
+                    @endforeach
+                </div>
+
+                <div class="flex items-center justify-between gap-2 pt-2 border-t border-pitch-line flex-wrap">
+                    <span class="text-sm">Toplam oran: <strong class="font-display text-xl text-gold">{{ number_format(min(500, $toplamOran), 2) }}×</strong></span>
+                    <div class="flex items-center gap-2">
+                        <input type="number" min="{{ K::MIN_STAKE }}" max="{{ K::MAX_STAKE }}" wire:model="parlayStake"
+                               class="w-20 text-sm bg-pitch-bg border-pitch-line text-pitch-ink rounded-md focus:border-bibB focus:ring-bibB/40">
+                        <span class="text-xs text-pitch-muted">Çim → <strong class="text-gold">{{ number_format($parlayStake * min(500, $toplamOran)) }}</strong></span>
+                    </div>
+                </div>
+
+                <div class="grid grid-cols-2 gap-2 sm:flex">
+                    <x-primary-button wire:click="placeParlay" class="w-full sm:w-auto"
+                            data-confirm="{{ count($parlay) }}'li kombine oynuyorsun. Hepsi tutmalı, iptal edilemez — emin misin?"
+                            data-confirm-danger="false">
+                        Kombineyi Oyna
+                    </x-primary-button>
+                    <x-secondary-button wire:click="clearParlay" class="w-full sm:w-auto">Temizle</x-secondary-button>
+                </div>
+                @if (count($parlay) < K::MIN_LEGS)
+                    <p class="text-xs text-gold">En az {{ K::MIN_LEGS }} tahmin gerekli.</p>
+                @endif
+            </div>
+        @endif
 
         {{-- Aktif kuponların (sonucu beklenenler) --}}
         @php $aktif = $myBets->where('status', 'pending'); @endphp
@@ -46,7 +96,12 @@
                                     <span class="text-pitch-muted">{{ K::icon($bet->market_key) }} {{ K::label($bet->market_key) }}:</span>
                                     <strong class="text-bibB">{{ $this->selectionText($bet->market_key, $bet->selection) }}</strong>
                                 </div>
-                                <div class="text-xs text-pitch-muted truncate">{{ $bet->match?->title }}</div>
+                                <div class="text-xs text-pitch-muted truncate">
+                                    {{ $bet->match?->title }}
+                                    @if ($bet->match)
+                                        · 📅 {{ $bet->match->starts_at->translatedFormat('d F, l H:i') }}
+                                    @endif
+                                </div>
                             </div>
                             <div class="text-end shrink-0">
                                 <div class="font-display font-bold text-sm">{{ $bet->stake }} → <span class="text-gold">{{ $bet->potentialPayout() }}</span></div>
@@ -104,44 +159,110 @@
                                 ? K::teamOptions($key)
                                 : ($kind === 'altust'
                                     ? ['under' => $line.' Alt', 'over' => $line.' Üst']
-                                    : $squad->pluck('name', 'id')->all());
+                                    // Kendi hakkında tahmin yapılamaz
+                                    : $squad->where('user_id', '!=', auth()->id())->pluck('name', 'id')->all());
                             $anahtar = $match->id.'-'.$key;
                             $mevcut = $myBets->firstWhere(fn ($b) => $b->match_id === $match->id && $b->market_key === $key && $b->status === 'pending');
                         @endphp
 
-                        @if ($secenekler)
+                        @if ($kind === 'skor')
+                            {{-- Skor tam tahmini: iki sayı girilir, oran anlık hesaplanır --}}
+                            @php
+                                $sa = (int) ($scorePick[$match->id.'-a'] ?? 0);
+                                $sb = (int) ($scorePick[$match->id.'-b'] ?? 0);
+                                $skorOran = $odds->odds($match, 'exact_score', "{$sa}-{$sb}");
+                            @endphp
+                            <div class="border border-pitch-line rounded-lg p-3">
+                                <div class="flex items-center justify-between gap-2 mb-2 flex-wrap">
+                                    <span class="text-sm font-semibold">{{ $market['icon'] }} {{ $market['name'] }}</span>
+                                    @if ($mevcut)
+                                        <span class="text-[11px] text-gold">✓ {{ $mevcut->selection }} · {{ $mevcut->stake }} Çim @ {{ $mevcut->odds }}×</span>
+                                    @endif
+                                </div>
+                                <div class="flex items-center justify-center gap-2 flex-wrap">
+                                    <span class="text-xs font-bold text-bibA">Turuncu</span>
+                                    <input type="number" min="0" max="20" wire:model.live="scorePick.{{ $match->id }}-a"
+                                           class="w-14 text-center text-sm bg-pitch-bg border-pitch-line text-pitch-ink rounded-md focus:border-bibB focus:ring-bibB/40">
+                                    <span class="text-pitch-muted">:</span>
+                                    <input type="number" min="0" max="20" wire:model.live="scorePick.{{ $match->id }}-b"
+                                           class="w-14 text-center text-sm bg-pitch-bg border-pitch-line text-pitch-ink rounded-md focus:border-bibB focus:ring-bibB/40">
+                                    <span class="text-xs font-bold text-bibB">Yeşil</span>
+                                    <span class="font-display font-bold text-gold ms-2">{{ number_format($skorOran, 2) }}×</span>
+                                </div>
+                                <div class="flex items-center gap-2 mt-2">
+                                    <input type="number" min="{{ K::MIN_STAKE }}" max="{{ K::MAX_STAKE }}" placeholder="20"
+                                           wire:model="stake.{{ $anahtar }}"
+                                           class="w-24 text-sm bg-pitch-bg border-pitch-line text-pitch-ink rounded-md focus:border-bibB focus:ring-bibB/40">
+                                    <span class="text-xs text-pitch-muted">Çim</span>
+                                    <x-secondary-button wire:click="betScore({{ $match->id }})" class="ms-auto"
+                                            data-confirm="{{ $sa }}-{{ $sb }} skorunu tahmin ediyorsun. İptal edilemez — emin misin?"
+                                            data-confirm-danger="false">
+                                        Kuponu Yap
+                                    </x-secondary-button>
+                                </div>
+                            </div>
+                        @elseif ($secenekler)
                             <div class="border border-pitch-line rounded-lg p-3">
                                 <div class="flex items-center justify-between gap-2 mb-2 flex-wrap">
                                     <span class="text-sm font-semibold">{{ $market['icon'] }} {{ $market['name'] }}</span>
                                     @if ($mevcut)
                                         <span class="text-[11px] text-gold">
-                                            Kuponun: {{ $mevcut->stake }} Çim @ {{ $mevcut->odds }}× → {{ $mevcut->potentialPayout() }}
-                                            <button wire:click="cancelBet({{ $mevcut->id }})" class="ms-1 underline hover:text-pitch-ink">iptal</button>
+                                            ✓ {{ $this->selectionText($mevcut->market_key, $mevcut->selection) }} · {{ $mevcut->stake }} Çim @ {{ $mevcut->odds }}×
                                         </span>
                                     @endif
                                 </div>
 
+                                @php
+                                    $nabiz = $pulse[$match->id][$key] ?? [];
+                                    $nabizToplam = array_sum($nabiz);
+                                @endphp
+
                                 <div class="grid grid-cols-2 sm:grid-cols-3 gap-2">
                                     @foreach ($secenekler as $deger => $etiket)
-                                        @php $o = $odds->odds($match, $key, (string) $deger); @endphp
-                                        <button type="button" wire:click="$set('selection.{{ $anahtar }}', '{{ $deger }}')"
-                                                class="flex items-center justify-between gap-2 px-3 py-2 rounded-md border text-xs transition
-                                                       {{ (string) ($selection[$anahtar] ?? '') === (string) $deger
-                                                          ? 'border-bibB bg-bibB/10 text-bibB font-semibold'
-                                                          : 'border-pitch-line hover:bg-pitch-surface2' }}">
-                                            <span class="truncate">{{ $etiket }}</span>
-                                            <span class="font-display font-bold shrink-0">{{ number_format($o, 2) }}×</span>
-                                        </button>
+                                        @php
+                                            $o = $odds->odds($match, $key, (string) $deger);
+                                            $oran = $nabizToplam > 0 ? round(($nabiz[(string) $deger] ?? 0) / $nabizToplam * 100) : null;
+                                            $sepette = collect($parlay)->contains('key', $anahtar);
+                                        @endphp
+                                        <div class="relative">
+                                            <button type="button" wire:click="$set('selection.{{ $anahtar }}', '{{ $deger }}')"
+                                                    class="w-full flex items-center justify-between gap-2 px-3 py-2 rounded-md border text-xs transition
+                                                           {{ (string) ($selection[$anahtar] ?? '') === (string) $deger
+                                                              ? 'border-bibB bg-bibB/10 text-bibB font-semibold'
+                                                              : 'border-pitch-line hover:bg-pitch-surface2' }}">
+                                                <span class="truncate">
+                                                    {{ $etiket }}
+                                                    @if ($oran !== null && $oran > 0)
+                                                        <span class="text-[10px] text-pitch-muted">%{{ $oran }}</span>
+                                                    @endif
+                                                </span>
+                                                <span class="font-display font-bold shrink-0">{{ number_format($o, 2) }}×</span>
+                                            </button>
+                                        </div>
                                     @endforeach
                                 </div>
+
+                                @if ($nabizToplam > 0)
+                                    <p class="text-[10px] text-pitch-muted mt-1">📊 Grubun nabzı — {{ $nabizToplam }} kişi tahmin yaptı</p>
+                                @endif
 
                                 <div class="flex items-center gap-2 mt-2">
                                     <input type="number" min="{{ K::MIN_STAKE }}" max="{{ K::MAX_STAKE }}" placeholder="20"
                                            wire:model="stake.{{ $anahtar }}"
                                            class="w-24 text-sm bg-pitch-bg border-pitch-line text-pitch-ink rounded-md focus:border-bibB focus:ring-bibB/40">
                                     <span class="text-xs text-pitch-muted">Çim</span>
-                                    <x-secondary-button wire:click="bet({{ $match->id }}, '{{ $key }}')" class="ms-auto">
-                                        Kuponu Yap
+                                    @if (($selection[$anahtar] ?? '') !== '')
+                                        <button type="button"
+                                                wire:click="toggleParlay({{ $match->id }}, '{{ $key }}', '{{ $selection[$anahtar] }}')"
+                                                class="text-xs px-2 py-2 rounded-md border transition
+                                                       {{ collect($parlay)->contains('key', $anahtar)
+                                                          ? 'border-bibB bg-bibB/10 text-bibB' : 'border-pitch-line hover:bg-pitch-surface2' }}"
+                                                title="Kombineye ekle">🎰</button>
+                                    @endif
+                                    <x-secondary-button wire:click="bet({{ $match->id }}, '{{ $key }}')" class="ms-auto"
+                                            data-confirm="{{ $market['name'] }} tahminini yapıyorsun. Kupon yapıldıktan sonra {{ $mevcut ? 'değiştirilebilir ama iptal edilemez' : 'iptal edilemez' }} — emin misin?"
+                                            data-confirm-danger="false">
+                                        {{ $mevcut ? 'Kuponu Değiştir' : 'Kuponu Yap' }}
                                     </x-secondary-button>
                                 </div>
                             </div>
@@ -205,6 +326,10 @@
                         <div class="flex items-center gap-3 text-sm">
                             <span class="font-display font-bold w-6 text-center {{ $i === 0 ? 'text-gold' : 'text-pitch-muted' }}">{{ $i === 0 ? '👑' : ($i + 1).'.' }}</span>
                             <span class="font-semibold min-w-0 truncate">{{ $lider->name }}</span>
+                            @php $seri = $streaks[$lider->user_id] ?? ['current' => 0, 'best' => 0]; @endphp
+                            @if ($seri['current'] >= 2)
+                                <span class="text-[11px] text-gold shrink-0">🔥{{ $seri['current'] }}</span>
+                            @endif
                             <span class="text-xs text-pitch-muted ms-auto shrink-0">{{ $lider->tuttu }}/{{ $lider->toplam }}</span>
                             <span class="font-display font-bold w-20 text-end shrink-0 {{ $lider->net > 0 ? 'text-[#7DE39A]' : ($lider->net < 0 ? 'text-[#FF8A8A]' : 'text-pitch-muted') }}">
                                 {{ $lider->net > 0 ? '+' : '' }}{{ number_format($lider->net) }}
@@ -214,6 +339,47 @@
                 </div>
             @endif
         </div>
+
+        {{-- Kombine kuponlarım --}}
+        @if ($mySlips->isNotEmpty())
+            <div class="bg-pitch-surface border border-pitch-line rounded-xl p-4 sm:p-6">
+                <h3 class="font-display uppercase tracking-wider text-lg font-semibold mb-3">🎰 Kombine Kuponlarım</h3>
+                <div class="space-y-2">
+                    @foreach ($mySlips as $slip)
+                        @php
+                            $renk = match ($slip->status) {
+                                'won' => 'border-[#7DE39A]/40', 'lost' => 'border-[#6c3030]',
+                                'void' => 'border-pitch-line', default => 'border-gold/40',
+                            };
+                            $durum = match ($slip->status) {
+                                'won' => '✓ Kazandı', 'lost' => '✕ Kaybetti',
+                                'void' => '↩ İade', default => '⏳ Bekliyor',
+                            };
+                        @endphp
+                        <div class="border {{ $renk }} rounded-lg p-3">
+                            <div class="flex items-center justify-between gap-2 mb-1.5 flex-wrap">
+                                <span class="text-sm font-semibold">{{ $slip->legs->count() }}'li kombine · {{ $slip->total_odds }}×</span>
+                                <span class="text-xs {{ $slip->status === 'won' ? 'text-[#7DE39A]' : ($slip->status === 'lost' ? 'text-[#FF8A8A]' : 'text-gold') }}">
+                                    {{ $durum }}
+                                    @if ($slip->status === 'won') +{{ number_format($slip->payout - $slip->stake) }} @endif
+                                </span>
+                            </div>
+                            <div class="space-y-0.5">
+                                @foreach ($slip->legs as $bacak)
+                                    @php $isaret = match ($bacak->status) { 'won' => '✓', 'lost' => '✕', 'void' => '↩', default => '·' }; @endphp
+                                    <div class="text-xs text-pitch-muted truncate">
+                                        <span class="{{ $bacak->status === 'won' ? 'text-[#7DE39A]' : ($bacak->status === 'lost' ? 'text-[#FF8A8A]' : '') }}">{{ $isaret }}</span>
+                                        {{ K::label($bacak->market_key) }}: <strong class="text-pitch-ink">{{ $this->selectionText($bacak->market_key, $bacak->selection) }}</strong>
+                                        <span class="text-pitch-muted/70">{{ $bacak->odds }}×</span>
+                                    </div>
+                                @endforeach
+                            </div>
+                            <div class="text-xs text-pitch-muted mt-1.5">{{ $slip->stake }} Çim → {{ number_format($slip->potentialPayout()) }}</div>
+                        </div>
+                    @endforeach
+                </div>
+            </div>
+        @endif
 
         {{-- Kuponlarım --}}
         <div class="bg-pitch-surface border border-pitch-line rounded-xl p-4 sm:p-6">
@@ -255,6 +421,31 @@
                 </div>
             @endif
         </div>
+
+        {{-- Çim hareket geçmişi --}}
+        @if ($transactions->isNotEmpty())
+            <div class="bg-pitch-surface border border-pitch-line rounded-xl p-4 sm:p-6">
+                <h3 class="font-display uppercase tracking-wider text-lg font-semibold mb-3">💸 Çim Hareketleri</h3>
+                <div class="divide-y divide-pitch-line">
+                    @foreach ($transactions as $hareket)
+                        <div class="flex items-center justify-between gap-3 py-2 text-sm">
+                            <div class="min-w-0">
+                                <div class="truncate">{{ \App\Models\CimTransaction::LABELS[$hareket->type] ?? $hareket->type }}</div>
+                                <div class="text-xs text-pitch-muted truncate">
+                                    {{ $hareket->description }} · {{ $hareket->created_at->translatedFormat('d M H:i') }}
+                                </div>
+                            </div>
+                            <div class="text-end shrink-0">
+                                <div class="font-display font-bold {{ $hareket->amount > 0 ? 'text-[#7DE39A]' : 'text-[#FF8A8A]' }}">
+                                    {{ $hareket->amount > 0 ? '+' : '' }}{{ number_format($hareket->amount) }}
+                                </div>
+                                <div class="text-[10px] text-pitch-muted">{{ number_format($hareket->balance_after) }} Çim</div>
+                            </div>
+                        </div>
+                    @endforeach
+                </div>
+            </div>
+        @endif
 
     </div>
 </div>

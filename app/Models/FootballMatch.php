@@ -153,8 +153,13 @@ class FootballMatch extends Model
                     : $this->closeWaitlistGap($previousPosition);
             }
 
-            if ($this->squad_status !== 'none' && $mainBefore !== $this->mainListPlayerIds()) {
-                $this->resetSquad();
+            if ($mainBefore !== $this->mainListPlayerIds()) {
+                if ($this->squad_status !== 'none') {
+                    $this->resetSquad();
+                }
+
+                // Kadrodan çıkan oyuncular üzerine yapılmış kuponlar iade edilir
+                app(\App\Services\KehanetService::class)->voidBetsForMissingPlayers($this);
             }
 
             return $rsvp;

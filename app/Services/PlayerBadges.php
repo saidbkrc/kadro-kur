@@ -46,6 +46,13 @@ class PlayerBadges
             ['key' => 'regular', 'icon' => '🎖️', 'name' => 'Düzenli', 'desc' => '10 maça çık', 'group' => 'Katılım', 'goal' => 10, 'stat' => 'played'],
             ['key' => 'veteran', 'icon' => '🏅', 'name' => 'Veteran', 'desc' => '50 maça çık', 'group' => 'Katılım', 'goal' => 50, 'stat' => 'played'],
             ['key' => 'streak', 'icon' => '🧲', 'name' => 'Kaçırmayan', 'desc' => 'Üst üste 10 maça çık', 'group' => 'Katılım', 'goal' => 10, 'stat' => 'streak'],
+
+            // 🔮 Kehanet
+            ['key' => 'ilk_kupon', 'icon' => '🎫', 'name' => 'İlk Kupon', 'desc' => 'İlk Kehanet kuponunu yap', 'group' => 'Kehanet', 'goal' => 1, 'stat' => 'bets'],
+            ['key' => 'kahin', 'icon' => '🔮', 'name' => 'Kâhin', 'desc' => '10 kupon tuttur', 'group' => 'Kehanet', 'goal' => 10, 'stat' => 'bet_wins'],
+            ['key' => 'cesur', 'icon' => '🎰', 'name' => 'Cesur', 'desc' => '5.00× ve üzeri bir kupon tuttur', 'group' => 'Kehanet', 'goal' => 1, 'stat' => 'brave_wins'],
+            ['key' => 'kehanet_serisi', 'icon' => '🔥', 'name' => 'Sıcak Seri', 'desc' => 'Üst üste 4 kupon tuttur', 'group' => 'Kehanet', 'goal' => 4, 'stat' => 'bet_streak'],
+            ['key' => 'ayin_kahini', 'icon' => '👑', 'name' => 'Ayın Kâhini', 'desc' => 'Bir ayı zirvede bitir', 'group' => 'Kehanet', 'goal' => 1, 'stat' => 'monthly_titles'],
         ];
     }
 
@@ -158,10 +165,15 @@ class PlayerBadges
             }
         }
 
-        return collect($stats)->map(function (array $s) {
+        // Kehanet istatistikleri kullanıcı bazlı — grubun oyuncularına eşlenir
+        $kehanet = $this->kehanetStats($group);
+
+        return collect($stats)->map(function (array $s, int $playerId) use ($kehanet) {
             unset($s['_run'], $s['_win_run']);
 
-            return $s;
+            return $s + ($kehanet[$playerId] ?? [
+                'bets' => 0, 'bet_wins' => 0, 'brave_wins' => 0, 'bet_streak' => 0, 'monthly_titles' => 0,
+            ]);
         });
     }
 
@@ -200,6 +212,51 @@ class PlayerBadges
         return $new;
     }
 
+    /**
+     * Kehanet sayaçları: kullanıcı bazlı kupon verisi, grubun oyuncu kayıtlarına eşlenir.
+     *
+     * @return array<int, array<string, int>> [player_id => sayaçlar]
+     */
+    protected function kehanetStats(Group $group): array
+    {
+        $oyuncular = $group->players()->whereNotNull('user_id')->pluck('id', 'user_id');
+
+        if ($oyuncular->isEmpty()) {
+            return [];
+        }
+
+        $kuponlar = \App\Models\Prediction::whereIn('user_id', $oyuncular->keys())
+            ->whereIn('match_id', $group->matches()->pluck('id'))
+            ->orderBy('settled_at')
+            ->get(['user_id', 'status', 'odds', 'slip_id', 'settled_at']);
+
+        $sampiyonlar = app(\App\Services\KehanetService::class)->pastMonthlyChampions($group);
+
+        $sonuc = [];
+
+        foreach ($oyuncular as $userId => $playerId) {
+            $kendi = $kuponlar->where('user_id', $userId);
+            $sonuclanan = $kendi->whereIn('status', ['won', 'lost']);
+
+            $seri = 0;
+            $enUzun = 0;
+            foreach ($sonuclanan as $k) {
+                $seri = $k->status === 'won' ? $seri + 1 : 0;
+                $enUzun = max($enUzun, $seri);
+            }
+
+            $sonuc[$playerId] = [
+                'bets' => $kendi->count(),
+                'bet_wins' => $kendi->where('status', 'won')->count(),
+                'brave_wins' => $kendi->where('status', 'won')->filter(fn ($k) => (float) $k->odds >= 5.0)->count(),
+                'bet_streak' => $enUzun,
+                'monthly_titles' => count($sampiyonlar[$userId] ?? []),
+            ];
+        }
+
+        return $sonuc;
+    }
+
     /** Hiç maçı olmayan oyuncu için sıfır istatistik. */
     public static function emptyStats(): array
     {
@@ -208,6 +265,7 @@ class PlayerBadges
             'mvp' => 0, 'best_match_goals' => 0, 'streak' => 0,
             'win_streak' => 0, 'clean_sheets' => 0, 'best_match_perf' => 0.0,
             'forma_goals' => 0,
+            'bets' => 0, 'bet_wins' => 0, 'brave_wins' => 0, 'bet_streak' => 0, 'monthly_titles' => 0,
         ];
     }
 

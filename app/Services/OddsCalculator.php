@@ -37,6 +37,7 @@ class OddsCalculator
         return match ($kind) {
             'takim' => $this->teamProbability($match, $market, $selection),
             'altust' => $this->totalGoalsProbability($match, $selection),
+            'skor' => $this->exactScoreProbability($match, $selection),
             default => $this->playerProbability($match, $market, (int) $selection),
         };
     }
@@ -94,12 +95,13 @@ class OddsCalculator
 
     /* ---------- toplam gol ---------- */
 
-    /** Alt/üst eşiği: grubun tamamlanmış maçlarındaki ortalama, .5'e yuvarlanır. */
+    /**
+     * Alt/üst eşiği: grubun gol ortalamasından türetilir ve DAİMA .5 ile biter —
+     * böylece toplam gol eşiğe eşit olamaz, beraberlik durumu oluşmaz.
+     */
     public function totalGoalsLine(Group $group): float
     {
-        $ort = $this->groupAverageGoals($group);
-
-        return max(3.5, round($ort * 2) / 2 - 0.5 + 0.5);
+        return max(3.5, floor($this->groupAverageGoals($group)) + 0.5);
     }
 
     protected function totalGoalsProbability(FootballMatch $match, string $selection): float
@@ -114,6 +116,27 @@ class OddsCalculator
         }
 
         return $selection === 'under' ? $altOlasilik : 1 - $altOlasilik;
+    }
+
+    /** Skor tam tahmini: her takımın golü bağımsız Poisson kabul edilir. Seçim "4-2" biçiminde. */
+    protected function exactScoreProbability(FootballMatch $match, string $selection): float
+    {
+        [$a, $b] = array_pad(array_map('intval', explode('-', $selection)), 2, 0);
+
+        if ($a < 0 || $b < 0 || $a > 20 || $b > 20) {
+            return 0.001;
+        }
+
+        [$avgA, $avgB] = $this->teamStrengths($match);
+        $toplam = max(2.0, $this->groupAverageGoals($match->group));
+        $fark = ($avgA - $avgB) / 10;
+
+        $lambdaA = max(0.3, $toplam / 2 * (1 + $fark));
+        $lambdaB = max(0.3, $toplam / 2 * (1 - $fark));
+
+        $poisson = fn (float $l, int $k) => exp(-$l) * pow($l, $k) / $this->faktoriyel($k);
+
+        return $poisson($lambdaA, $a) * $poisson($lambdaB, $b);
     }
 
     protected function faktoriyel(int $n): float

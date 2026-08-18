@@ -1569,6 +1569,128 @@ class KadroFlowTest extends TestCase
         $this->actingAs($yabanci)->get(route('groups.kehanet', $group))->assertForbidden();
     }
 
+    public function test_kehanet_kendine_kupon_yasak_ve_kadro_degisince_iade(): void
+    {
+        $owner = User::factory()->create();
+        $group = $this->makeGroup($owner);
+        $ownPlayer = $group->playerFor($owner);
+        $friend = $this->addMember($group);
+        $ucuncu = $this->addMember($group);
+
+        $match = $this->makeMatch($group);
+        foreach ([$ownPlayer, $friend, $ucuncu] as $p) {
+            $match->setRsvp($p, 'going');
+        }
+
+        $c = Livewire::actingAs($owner)->test(Groups\Kehanet::class, ['group' => $group]);
+
+        // Kendi hakkında oyuncu tahmini yapılamaz
+        $c->set("selection.{$match->id}-scorer", (string) $ownPlayer->id)
+            ->set("stake.{$match->id}-scorer", 20)
+            ->call('bet', $match->id, 'scorer')
+            ->assertSet('notice', fn ($v) => str_contains((string) $v, 'Kendinle'));
+        $this->assertSame(0, \App\Models\Prediction::count());
+
+        // Kendi adı seçenek listesinde de görünmez
+        $this->actingAs($owner)->get(route('groups.kehanet', $group))
+            ->assertOk()
+            ->assertSee($friend->name);
+
+        // Başkası hakkında serbest — ve bakiye ekranda anında düşer
+        $baslangic = $owner->refresh()->cim_balance;
+        $c->set("selection.{$match->id}-scorer", (string) $friend->id)
+            ->set("stake.{$match->id}-scorer", 20)
+            ->call('bet', $match->id, 'scorer')
+            ->assertSee(number_format($baslangic - 20)); // güncel bakiye render edilir
+        $this->assertSame($baslangic - 20, $owner->refresh()->cim_balance);
+
+        // Takım market'inde kısıt yok
+        $c->set("selection.{$match->id}-winner", 'A')
+            ->set("stake.{$match->id}-winner", 10)
+            ->call('bet', $match->id, 'winner');
+        $this->assertSame(2, \App\Models\Prediction::where('status', 'pending')->count());
+
+        // Kadro değişir: friend gelmiyor → onun üzerine kupon iade edilir, takım kuponu kalır
+        $oncekiBakiye = $owner->refresh()->cim_balance;
+        $match->setRsvp($friend, 'not_going');
+
+        $oyuncuKuponu = \App\Models\Prediction::where('market_key', 'scorer')->firstOrFail();
+        $takimKuponu = \App\Models\Prediction::where('market_key', 'winner')->firstOrFail();
+
+        $this->assertSame('void', $oyuncuKuponu->refresh()->status, 'Kadrodan çıkan oyuncunun kuponu iade edilmeli');
+        $this->assertSame('pending', $takimKuponu->refresh()->status, 'Takım kuponu etkilenmemeli');
+        $this->assertSame($oncekiBakiye + 20, $owner->refresh()->cim_balance);
+    }
+
+    public function test_kehanet_kombine_skor_nabiz_ve_hareket_gecmisi(): void
+    {
+        Notification::fake();
+
+        $owner = User::factory()->create();
+        $group = $this->makeGroup($owner);
+        $ownPlayer = $group->playerFor($owner);
+        $friend = $this->addMember($group);
+
+        $match = $this->makeMatch($group);
+        $match->setRsvp($ownPlayer, 'going');
+        $match->setRsvp($friend, 'going');
+        $match->applySquad([$ownPlayer->id], [$friend->id]);
+
+        $c = Livewire::actingAs($owner)->test(Groups\Kehanet::class, ['group' => $group]);
+        $baslangic = $owner->refresh()->cim_balance;
+
+        // Skor tam tahmini: yüksek oran vermeli
+        $c->set("scorePick.{$match->id}-a", 4)
+            ->set("scorePick.{$match->id}-b", 2)
+            ->set("stake.{$match->id}-exact_score", 10)
+            ->call('betScore', $match->id);
+
+        $skorKuponu = \App\Models\Prediction::where('market_key', 'exact_score')->firstOrFail();
+        $this->assertSame('4-2', $skorKuponu->selection);
+        $this->assertGreaterThan(3.0, (float) $skorKuponu->odds, 'Tam skor oranı yüksek olmalı');
+
+        // Kombine: iki tahmin, oranlar çarpılır (5-1 = 6 gol → 8.5 altı)
+        $c->call('toggleParlay', $match->id, 'winner', 'A')
+            ->call('toggleParlay', $match->id, 'total_goals', 'under')
+            ->set('parlayStake', 15)
+            ->call('placeParlay');
+
+        $slip = \App\Models\PredictionSlip::firstOrFail();
+        $this->assertSame(2, $slip->legs()->count());
+        $this->assertSame(15, $slip->stake);
+        $beklenenOran = round($slip->legs->reduce(fn ($t, $l) => $t * (float) $l->odds, 1.0), 2);
+        $this->assertEqualsWithDelta($beklenenOran, (float) $slip->total_odds, 0.02);
+
+        // Bakiye: skor kuponu + kombine düşmüş, hareket kaydı tutulmuş
+        $this->assertSame($baslangic - 10 - 15, $owner->refresh()->cim_balance);
+        $this->assertGreaterThanOrEqual(3, \App\Models\CimTransaction::where('user_id', $owner->id)->count());
+
+        // Nabız: grubun tahmin dağılımı görünür
+        $this->actingAs($owner)->get(route('groups.kehanet', $group))
+            ->assertOk()
+            ->assertSee('Grubun nabzı')
+            ->assertSee('Kombine');
+
+        // Maç sonucu: Turuncu 5-1 kazanır → kombinenin iki bacağı da tutar
+        Livewire::actingAs($owner)
+            ->test(Matches\Show::class, ['match' => $match])
+            ->set('teamAScore', 5)->set('teamBScore', 1)
+            ->call('saveResult');
+
+        $slip->refresh();
+        $this->assertSame('won', $slip->status);
+        $this->assertSame($slip->potentialPayout(), $slip->payout);
+        $this->assertSame('lost', $skorKuponu->refresh()->status, '4-2 tahmini 5-1 sonucunda kaybeder');
+
+        // Kazanç bildirimi gider
+        Notification::assertSentTo($owner, MatchPushNotification::class,
+            fn ($n) => str_contains($n->title, 'Kehanetin tuttu'));
+
+        // Seri sayacı çalışır
+        $seri = app(\App\Services\KehanetService::class)->streak($owner->id, $group);
+        $this->assertIsInt($seri['current']);
+    }
+
     public function test_kehanet_mac_iptalinde_cim_iade_edilir(): void
     {
         $owner = User::factory()->create();

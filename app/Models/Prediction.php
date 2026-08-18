@@ -9,7 +9,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 class Prediction extends Model
 {
     protected $fillable = [
-        'user_id', 'match_id', 'market_key', 'selection',
+        'user_id', 'match_id', 'slip_id', 'market_key', 'selection',
         'odds', 'stake', 'status', 'payout', 'settled_at',
     ];
 
@@ -29,6 +29,12 @@ class Prediction extends Model
     public function match(): BelongsTo
     {
         return $this->belongsTo(FootballMatch::class, 'match_id');
+    }
+
+    /** Kombine kuponun parçasıysa bağlı olduğu kupon. */
+    public function slip(): BelongsTo
+    {
+        return $this->belongsTo(PredictionSlip::class, 'slip_id');
     }
 
     /** Kupon tutarsa ödenecek toplam (yatırılan dahil). */

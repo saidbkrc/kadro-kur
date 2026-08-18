@@ -33,6 +33,14 @@ class Kehanet extends Component
 
     public ?int $eventMatchId = null;
 
+    /** Kombine kupon sepeti: [['match_id'=>, 'market'=>, 'selection'=>, 'label'=>, 'odds'=>], ...] */
+    public array $parlay = [];
+
+    public int $parlayStake = 20;
+
+    /** Skor tahmini girişleri: ["{matchId}-a" => 3, ...] */
+    public array $scorePick = [];
+
     public function mount(Group $group): void
     {
         abort_unless($group->isMember(Auth::user()), 403);
@@ -61,12 +69,81 @@ class Kehanet extends Component
 
         $sonuc = app(KehanetService::class)->placeBet(Auth::user(), $match, $market, $secim, $tutar);
         $this->notice = $sonuc['message'];
+
+        // Bakiye anında güncellensin (Auth::user() örneği bellekte eskiyor)
+        Auth::user()->refresh();
     }
 
-    public function cancelBet(int $predictionId): void
+    /** Skor tam tahmini: iki sayıdan "A-B" seçimi kurar. */
+    public function betScore(int $matchId): void
     {
-        $kupon = Prediction::where('user_id', Auth::id())->findOrFail($predictionId);
-        $this->notice = app(KehanetService::class)->cancelBet(Auth::user(), $kupon)['message'];
+        $a = (int) ($this->scorePick["{$matchId}-a"] ?? -1);
+        $b = (int) ($this->scorePick["{$matchId}-b"] ?? -1);
+
+        if ($a < 0 || $b < 0 || $a > 20 || $b > 20) {
+            $this->notice = 'Geçerli bir skor gir (0-20).';
+
+            return;
+        }
+
+        $this->selection["{$matchId}-exact_score"] = "{$a}-{$b}";
+        $this->bet($matchId, 'exact_score');
+    }
+
+    /** Kombine sepetine tahmin ekler/çıkarır. */
+    public function toggleParlay(int $matchId, string $market, string $selection): void
+    {
+        $anahtar = "{$matchId}-{$market}";
+
+        foreach ($this->parlay as $i => $bacak) {
+            if ($bacak['key'] === $anahtar) {
+                unset($this->parlay[$i]);
+                $this->parlay = array_values($this->parlay);
+                $this->notice = null;
+
+                return;
+            }
+        }
+
+        if (count($this->parlay) >= K::MAX_LEGS) {
+            $this->notice = 'Kombineye en fazla '.K::MAX_LEGS.' tahmin eklenebilir.';
+
+            return;
+        }
+
+        $match = $this->group->matches()->findOrFail($matchId);
+
+        $this->parlay[] = [
+            'key' => $anahtar,
+            'match_id' => $matchId,
+            'market' => $market,
+            'selection' => $selection,
+            'label' => K::icon($market).' '.$this->selectionText($market, $selection),
+            'odds' => app(OddsCalculator::class)->odds($match, $market, $selection),
+        ];
+        $this->notice = null;
+    }
+
+    public function clearParlay(): void
+    {
+        $this->parlay = [];
+    }
+
+    /** Kombine kuponu oynar. */
+    public function placeParlay(): void
+    {
+        $bacaklar = array_map(fn ($b) => [
+            'match_id' => $b['match_id'], 'market' => $b['market'], 'selection' => $b['selection'],
+        ], $this->parlay);
+
+        $sonuc = app(KehanetService::class)->placeParlay(Auth::user(), $this->group, $bacaklar, $this->parlayStake);
+        $this->notice = $sonuc['message'];
+
+        if ($sonuc['ok']) {
+            $this->parlay = [];
+        }
+
+        Auth::user()->refresh();
     }
 
     /** Başkan: maç olaylarını kaydeder ve bekleyen kuponları sonuçlandırır. */
@@ -122,9 +199,22 @@ class Kehanet extends Component
 
         $kuponlarim = Prediction::where('user_id', $user->id)
             ->whereIn('match_id', $this->group->matches()->pluck('id'))
+            ->whereNull('slip_id')
             ->with('match')
             ->orderByDesc('id')
             ->limit(25)
+            ->get();
+
+        $kombineler = \App\Models\PredictionSlip::where('user_id', $user->id)
+            ->where('group_id', $this->group->id)
+            ->with('legs.match')
+            ->orderByDesc('id')
+            ->limit(10)
+            ->get();
+
+        $hareketler = \App\Models\CimTransaction::where('user_id', $user->id)
+            ->orderByDesc('id')
+            ->limit(15)
             ->get();
 
         // Ayın Kâhini: bu ay sonuçlanan kuponların net kazancı
@@ -133,7 +223,8 @@ class Kehanet extends Component
             ->whereIn('predictions.match_id', $this->group->matches()->pluck('id'))
             ->whereIn('predictions.status', ['won', 'lost'])
             ->where('predictions.settled_at', '>=', now()->startOfMonth())
-            ->selectRaw('users.name, SUM(predictions.payout) - SUM(predictions.stake) as net,
+            ->whereNull('predictions.slip_id')
+            ->selectRaw('users.id as user_id, users.name, SUM(predictions.payout) - SUM(predictions.stake) as net,
                          SUM(CASE WHEN predictions.status = "won" THEN 1 ELSE 0 END) as tuttu,
                          COUNT(*) as toplam')
             ->groupBy('users.id', 'users.name')
@@ -141,12 +232,22 @@ class Kehanet extends Component
             ->limit(10)
             ->get();
 
+        $servis = app(KehanetService::class);
+
+        // Seri bilgisi lider tablosuna eklenir
+        $seriler = $liderler->mapWithKeys(fn ($l) => [$l->user_id => $servis->streak($l->user_id, $this->group)]);
+
         return view('livewire.groups.kehanet', [
             'balance' => $user->cim_balance,
             'openMatches' => $acikMaclar,
             'pendingMatches' => $bekleyenMaclar,
             'myBets' => $kuponlarim,
+            'mySlips' => $kombineler,
+            'transactions' => $hareketler,
             'leaders' => $liderler,
+            'streaks' => $seriler,
+            'myStreak' => $servis->streak($user->id, $this->group),
+            'pulse' => $acikMaclar->mapWithKeys(fn ($m) => [$m->id => $servis->pulse($m)]),
             'odds' => $odds,
             'roster' => $this->group->players()->orderBy('name')->get(),
             'isAdmin' => $this->group->isAdmin($user),
