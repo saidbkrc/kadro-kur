@@ -1516,16 +1516,34 @@ class KadroFlowTest extends TestCase
         $kupon = \App\Models\Prediction::where('user_id', $owner->id)->firstOrFail();
         $this->assertSame(30, $kupon->stake);
 
-        // Kupon ne seçtiğini gösterir + kadro listesi "SEN" ile işaretli
+        // Kupon sekmesi: kadro listesi + kendini ayırt etme + kilit durumu
         $this->actingAs($owner)->get(route('groups.kehanet', $group))
             ->assertOk()
+            ->assertSee('Turuncu')
+            ->assertSee($friend->name)
+            ->assertSee('SEN')
+            ->assertSee('Kuponun kesinleşti');
+
+        // Bekleyen tahminler "Kuponlarım" sekmesinde, seçim etiketiyle
+        Livewire::actingAs($owner)
+            ->test(Groups\Kehanet::class, ['group' => $group])
+            ->call('setTab', 'kuponlarim')
             ->assertSee('Bekleyen Tahminlerin')
-            ->assertSee('Turuncu')          // seçim etiketi okunabilir
-            ->assertSee($friend->name)      // kadro listesi
-            ->assertSee('SEN');             // kendini ayırt etme
+            ->assertSee('Turuncu');
 
         $this->assertGreaterThan(1.0, (float) $kupon->odds);
         $this->assertSame(\App\Support\Kehanet::STARTING_BALANCE - 30, $owner->refresh()->cim_balance);
+
+        // Kupon kesindir: aynı market'e ikinci kupon yapılamaz, bakiye değişmez
+        $bakiyeOnce = $owner->refresh()->cim_balance;
+        $c->set("selection.{$match->id}-winner", 'B')
+            ->set("stake.{$match->id}-winner", 5)
+            ->call('bet', $match->id, 'winner')
+            ->assertSet('notice', fn ($v) => str_contains((string) $v, 'değiştirilemez'));
+
+        $this->assertSame($bakiyeOnce, $owner->refresh()->cim_balance, 'Reddedilen kupon bakiyeye dokunmamalı');
+        $this->assertSame(1, \App\Models\Prediction::where('market_key', 'winner')->count());
+        $this->assertSame('A', \App\Models\Prediction::where('market_key', 'winner')->value('selection'));
 
         // Manuel olay kuponu: gerginliği friend yaşayacak
         $c->set("selection.{$match->id}-gerginlik", (string) $friend->id)
@@ -1665,11 +1683,22 @@ class KadroFlowTest extends TestCase
         $this->assertSame($baslangic - 10 - 15, $owner->refresh()->cim_balance);
         $this->assertGreaterThanOrEqual(3, \App\Models\CimTransaction::where('user_id', $owner->id)->count());
 
-        // Nabız: grubun tahmin dağılımı görünür
+        // Nabız: kupon sekmesinde grubun tahmin dağılımı görünür
         $this->actingAs($owner)->get(route('groups.kehanet', $group))
             ->assertOk()
-            ->assertSee('Grubun nabzı')
-            ->assertSee('Kombine');
+            ->assertSee('Grubun nabzı');
+
+        // Kombine kuponu "Kuponlarım" sekmesinde listelenir
+        Livewire::actingAs($owner)
+            ->test(Groups\Kehanet::class, ['group' => $group])
+            ->call('setTab', 'kuponlarim')
+            ->assertSee('Kombine Kuponlarım');
+
+        // Çim hareketleri kendi sekmesinde
+        Livewire::actingAs($owner)
+            ->test(Groups\Kehanet::class, ['group' => $group])
+            ->call('setTab', 'cim')
+            ->assertSee('Çim Hareketleri');
 
         // Maç sonucu: Turuncu 5-1 kazanır → kombinenin iki bacağı da tutar
         Livewire::actingAs($owner)
@@ -1689,6 +1718,64 @@ class KadroFlowTest extends TestCase
         // Seri sayacı çalışır
         $seri = app(\App\Services\KehanetService::class)->streak($owner->id, $group);
         $this->assertIsInt($seri['current']);
+    }
+
+    public function test_kehanet_mac_odulleri_dagitilir_misafire_verilmez(): void
+    {
+        Notification::fake();
+
+        $owner = User::factory()->create();
+        $group = $this->makeGroup($owner);
+        $ownPlayer = $group->playerFor($owner);
+        $golcu = $this->addMember($group);
+        $misafir = $group->players()->create(['name' => 'Misafir Ali', 'positions' => []]);
+
+        $match = $group->matches()->create([
+            'created_by' => $owner->id, 'title' => 'Ödül maçı', 'starts_at' => now()->subDays(2),
+            'capacity' => 14, 'status' => 'completed', 'team_a_score' => 5, 'team_b_score' => 2,
+            'mvp_closes_at' => now()->subHour(),   // oylama kapandı
+            'forma_goal_player_id' => $ownPlayer->id,
+        ]);
+        foreach ([$ownPlayer, $golcu, $misafir] as $p) {
+            $match->rsvps()->create(['player_id' => $p->id, 'status' => 'going', 'team' => 'A']);
+        }
+
+        // golcü 3 gol (en çok), misafir 1 gol; MVP = golcü
+        $match->goals()->create(['player_id' => $golcu->id, 'count' => 3]);
+        $match->goals()->create(['player_id' => $misafir->id, 'count' => 1]);
+        $match->mvpVotes()->create(['voter_id' => $owner->id, 'player_id' => $golcu->id]);
+
+        $golcuOnce = $golcu->user->cim_balance;
+        $ownerOnce = $owner->cim_balance;
+
+        $adet = app(\App\Services\KehanetService::class)->awardMatchBonuses($match);
+
+        // golcü: en çok gol (100) + MVP (50) = 150 · owner: forma golü (25)
+        $this->assertSame(2, $adet);
+        $this->assertSame($golcuOnce + 150, $golcu->user->refresh()->cim_balance);
+        $this->assertSame($ownerOnce + 25, $owner->refresh()->cim_balance);
+
+        // Misafirin hesabı yok — ödül kaydı da oluşmaz
+        $this->assertSame(0, \App\Models\CimTransaction::where('type', 'bonus')
+            ->where('description', 'like', '%'.$misafir->name.'%')->count());
+
+        // Bildirim gider
+        Notification::assertSentTo($golcu->user, MatchPushNotification::class,
+            fn ($n) => str_contains($n->title, 'Maç ödülün'));
+
+        // İkinci çalıştırma tekrar ödül vermez
+        $bakiye = $golcu->user->refresh()->cim_balance;
+        $this->assertSame(0, app(\App\Services\KehanetService::class)->awardMatchBonuses($match->refresh()));
+        $this->assertSame($bakiye, $golcu->user->refresh()->cim_balance);
+
+        // Oylama açıkken ödül dağıtılmaz
+        $acikMac = $group->matches()->create([
+            'created_by' => $owner->id, 'title' => 'Yeni biten', 'starts_at' => now()->subHours(2),
+            'capacity' => 14, 'status' => 'completed', 'team_a_score' => 1, 'team_b_score' => 0,
+            'mvp_closes_at' => now()->addDays(5),
+        ]);
+        $acikMac->goals()->create(['player_id' => $golcu->id, 'count' => 1]);
+        $this->assertSame(0, app(\App\Services\KehanetService::class)->awardMatchBonuses($acikMac));
     }
 
     public function test_kehanet_mac_iptalinde_cim_iade_edilir(): void

@@ -25,15 +25,59 @@
                 </div>
             </div>
             <p class="text-xs text-pitch-muted mt-3">
-                Her hafta <strong class="text-pitch-ink">{{ K::WEEKLY_GRANT }} Çim</strong> hesabına yüklenir. Çim tamamen sanaldır — eğlence amaçlıdır, gerçek parayla ilişkisi yoktur.
+                Her hafta <strong class="text-pitch-ink">{{ K::WEEKLY_GRANT }} Çim</strong> hesabına yüklenir. Kuponlar <strong class="text-pitch-ink">kesindir</strong> — yapıldıktan sonra değiştirilemez veya iptal edilemez. Çim tamamen sanaldır; eğlence amaçlıdır, gerçek parayla ilişkisi yoktur.
             </p>
+
+            {{-- Maç başarı ödülleri: kupon oynamadan da Çim kazanma yolu --}}
+            <div class="mt-3 flex flex-wrap gap-2">
+                @foreach (K::BONUS as $odul)
+                    <span class="inline-flex items-center gap-1.5 text-[11px] px-2.5 py-1 rounded-full bg-pitch-bg border border-pitch-line">
+                        {{ $odul['icon'] }} {{ $odul['name'] }}
+                        <strong class="text-gold">+{{ $odul['amount'] }}</strong>
+                    </span>
+                @endforeach
+                <span class="text-[11px] text-pitch-muted self-center">— maç sonrası sahadaki başarına göre otomatik</span>
+            </div>
             @if ($notice)
                 <p class="mt-3 text-sm text-bibB bg-bibB/10 border border-bibB/30 rounded-md px-3 py-2">{{ $notice }}</p>
             @endif
         </div>
 
+        {{-- Sekmeler --}}
+        @php
+            $sekmeler = [
+                'kupon' => ['🎯', 'Kupon Yap', null],
+                'kuponlarim' => ['🎫', 'Kuponlarım', $pendingCount ?: null],
+                'kahin' => ['👑', 'Ayın Kâhini', null],
+                'cim' => ['💸', 'Çim', null],
+            ];
+            if ($isAdmin) {
+                $sekmeler['olaylar'] = ['🎬', 'Olaylar', null];
+            }
+        @endphp
+
+        <div class="bg-pitch-surface border border-pitch-line rounded-xl p-2">
+            <div class="grid grid-cols-4 {{ $isAdmin ? 'sm:grid-cols-5' : '' }} gap-2">
+                @foreach ($sekmeler as $anahtar => [$ikon, $etiket, $rozet])
+                    <button type="button" wire:click="setTab('{{ $anahtar }}')"
+                            class="relative flex flex-col items-center justify-center gap-0.5 px-2 py-2.5 rounded-lg border text-center transition min-w-0
+                                   {{ $tab === $anahtar
+                                      ? 'bg-bibB/10 border-bibB text-bibB font-semibold'
+                                      : 'bg-pitch-bg border-pitch-line text-pitch-ink hover:bg-pitch-surface2' }}
+                                   {{ $anahtar === 'olaylar' && ! $isAdmin ? 'hidden' : '' }}
+                                   {{ $anahtar === 'olaylar' ? 'col-span-4 sm:col-span-1' : '' }}">
+                        <span class="text-lg leading-none">{{ $ikon }}</span>
+                        <span class="text-[11px] leading-tight truncate w-full">{{ $etiket }}</span>
+                        @if ($rozet)
+                            <span class="absolute -top-1 -end-1 bg-gold text-pitch-bg text-[10px] font-bold rounded-full w-4 h-4 flex items-center justify-center">{{ $rozet }}</span>
+                        @endif
+                    </button>
+                @endforeach
+            </div>
+        </div>
+
         {{-- Kombine sepeti --}}
-        @if ($parlay)
+        @if ($tab === 'kupon' && $parlay)
             @php $toplamOran = array_product(array_column($parlay, 'odds')); @endphp
             <div class="bg-pitch-surface border border-bibB/50 rounded-xl p-4 sm:p-6 space-y-3">
                 <div class="flex items-baseline justify-between gap-2 flex-wrap">
@@ -79,7 +123,7 @@
 
         {{-- Aktif kuponların (sonucu beklenenler) --}}
         @php $aktif = $myBets->where('status', 'pending'); @endphp
-        @if ($aktif->isNotEmpty())
+        @if ($tab === 'kuponlarim' && $aktif->isNotEmpty())
             <div class="bg-pitch-surface border border-gold/40 rounded-xl p-4 sm:p-6">
                 <div class="flex items-baseline justify-between gap-2 mb-3 flex-wrap">
                     <h3 class="font-display uppercase tracking-wider text-lg font-semibold text-gold">⏳ Bekleyen Tahminlerin</h3>
@@ -114,6 +158,7 @@
         @endif
 
         {{-- Açık maçlar: kupon yapma --}}
+        @if ($tab === 'kupon')
         @forelse ($openMatches as $match)
             @php $squad = $this->squadFor($match); @endphp
 
@@ -190,15 +235,19 @@
                                     <span class="font-display font-bold text-gold ms-2">{{ number_format($skorOran, 2) }}×</span>
                                 </div>
                                 <div class="flex items-center gap-2 mt-2">
-                                    <input type="number" min="{{ K::MIN_STAKE }}" max="{{ K::MAX_STAKE }}" placeholder="20"
-                                           wire:model="stake.{{ $anahtar }}"
-                                           class="w-24 text-sm bg-pitch-bg border-pitch-line text-pitch-ink rounded-md focus:border-bibB focus:ring-bibB/40">
-                                    <span class="text-xs text-pitch-muted">Çim</span>
-                                    <x-secondary-button wire:click="betScore({{ $match->id }})" class="ms-auto"
-                                            data-confirm="{{ $sa }}-{{ $sb }} skorunu tahmin ediyorsun. İptal edilemez — emin misin?"
-                                            data-confirm-danger="false">
-                                        Kuponu Yap
-                                    </x-secondary-button>
+                                    @if ($mevcut)
+                                        <span class="text-xs text-gold">🔒 Kuponun kesinleşti — değiştirilemez.</span>
+                                    @else
+                                        <input type="number" min="{{ K::MIN_STAKE }}" max="{{ K::MAX_STAKE }}" placeholder="20"
+                                               wire:model="stake.{{ $anahtar }}"
+                                               class="w-24 text-sm bg-pitch-bg border-pitch-line text-pitch-ink rounded-md focus:border-bibB focus:ring-bibB/40">
+                                        <span class="text-xs text-pitch-muted">Çim</span>
+                                        <x-secondary-button wire:click="betScore({{ $match->id }})" class="ms-auto"
+                                                data-confirm="{{ $sa }}-{{ $sb }} skorunu tahmin ediyorsun. Kupon kesindir — değiştirilemez veya iptal edilemez. Emin misin?"
+                                                data-confirm-danger="false">
+                                            Kuponu Yap
+                                        </x-secondary-button>
+                                    @endif
                                 </div>
                             </div>
                         @elseif ($secenekler)
@@ -247,23 +296,35 @@
                                 @endif
 
                                 <div class="flex items-center gap-2 mt-2">
-                                    <input type="number" min="{{ K::MIN_STAKE }}" max="{{ K::MAX_STAKE }}" placeholder="20"
-                                           wire:model="stake.{{ $anahtar }}"
-                                           class="w-24 text-sm bg-pitch-bg border-pitch-line text-pitch-ink rounded-md focus:border-bibB focus:ring-bibB/40">
-                                    <span class="text-xs text-pitch-muted">Çim</span>
-                                    @if (($selection[$anahtar] ?? '') !== '')
-                                        <button type="button"
-                                                wire:click="toggleParlay({{ $match->id }}, '{{ $key }}', '{{ $selection[$anahtar] }}')"
-                                                class="text-xs px-2 py-2 rounded-md border transition
-                                                       {{ collect($parlay)->contains('key', $anahtar)
-                                                          ? 'border-bibB bg-bibB/10 text-bibB' : 'border-pitch-line hover:bg-pitch-surface2' }}"
-                                                title="Kombineye ekle">🎰</button>
+                                    @if ($mevcut)
+                                        <span class="text-xs text-gold">🔒 Kuponun kesinleşti — değiştirilemez.</span>
+                                        @if (($selection[$anahtar] ?? '') !== '')
+                                            <button type="button"
+                                                    wire:click="toggleParlay({{ $match->id }}, '{{ $key }}', '{{ $selection[$anahtar] }}')"
+                                                    class="ms-auto text-xs px-2 py-2 rounded-md border transition
+                                                           {{ collect($parlay)->contains('key', $anahtar)
+                                                              ? 'border-bibB bg-bibB/10 text-bibB' : 'border-pitch-line hover:bg-pitch-surface2' }}"
+                                                    title="Kombineye ekle">🎰</button>
+                                        @endif
+                                    @else
+                                        <input type="number" min="{{ K::MIN_STAKE }}" max="{{ K::MAX_STAKE }}" placeholder="20"
+                                               wire:model="stake.{{ $anahtar }}"
+                                               class="w-24 text-sm bg-pitch-bg border-pitch-line text-pitch-ink rounded-md focus:border-bibB focus:ring-bibB/40">
+                                        <span class="text-xs text-pitch-muted">Çim</span>
+                                        @if (($selection[$anahtar] ?? '') !== '')
+                                            <button type="button"
+                                                    wire:click="toggleParlay({{ $match->id }}, '{{ $key }}', '{{ $selection[$anahtar] }}')"
+                                                    class="text-xs px-2 py-2 rounded-md border transition
+                                                           {{ collect($parlay)->contains('key', $anahtar)
+                                                              ? 'border-bibB bg-bibB/10 text-bibB' : 'border-pitch-line hover:bg-pitch-surface2' }}"
+                                                    title="Kombineye ekle">🎰</button>
+                                        @endif
+                                        <x-secondary-button wire:click="bet({{ $match->id }}, '{{ $key }}')" class="ms-auto"
+                                                data-confirm="{{ $market['name'] }} tahminini yapıyorsun. Kupon kesindir — sonradan değiştirilemez veya iptal edilemez. Emin misin?"
+                                                data-confirm-danger="false">
+                                            Kuponu Yap
+                                        </x-secondary-button>
                                     @endif
-                                    <x-secondary-button wire:click="bet({{ $match->id }}, '{{ $key }}')" class="ms-auto"
-                                            data-confirm="{{ $market['name'] }} tahminini yapıyorsun. Kupon yapıldıktan sonra {{ $mevcut ? 'değiştirilebilir ama iptal edilemez' : 'iptal edilemez' }} — emin misin?"
-                                            data-confirm-danger="false">
-                                        {{ $mevcut ? 'Kuponu Değiştir' : 'Kuponu Yap' }}
-                                    </x-secondary-button>
                                 </div>
                             </div>
                         @endif
@@ -276,9 +337,10 @@
                 Kupon yapılabilecek maç yok — yaklaşan maç açılınca burada belirir.
             </div>
         @endforelse
+        @endif
 
         {{-- Başkan: maç olayları girişi --}}
-        @if ($isAdmin && $pendingMatches->isNotEmpty())
+        @if ($tab === 'olaylar' && $isAdmin && $pendingMatches->isNotEmpty())
             <div class="bg-pitch-surface border border-gold/40 rounded-xl p-4 sm:p-6 space-y-4">
                 <h3 class="font-display uppercase tracking-wider text-lg font-semibold text-gold">🎬 Maç Olayları <span class="text-xs text-pitch-muted font-normal tracking-normal">(başkan)</span></h3>
                 <p class="text-xs text-pitch-muted">Bu olayları işaretleyince ilgili kuponlar otomatik sonuçlanır. Dokunmadığın olay beklemede kalır.</p>
@@ -314,6 +376,7 @@
         @endif
 
         {{-- Ayın Kâhini --}}
+        @if ($tab === 'kahin')
         <div class="bg-pitch-surface border border-pitch-line rounded-xl p-4 sm:p-6">
             <h3 class="font-display uppercase tracking-wider text-lg font-semibold mb-1">👑 Ayın Kâhini</h3>
             <p class="text-xs text-pitch-muted mb-3">{{ now()->translatedFormat('F Y') }} — net kazanç sıralaması</p>
@@ -340,8 +403,10 @@
             @endif
         </div>
 
+        @endif
+
         {{-- Kombine kuponlarım --}}
-        @if ($mySlips->isNotEmpty())
+        @if ($tab === 'kuponlarim' && $mySlips->isNotEmpty())
             <div class="bg-pitch-surface border border-pitch-line rounded-xl p-4 sm:p-6">
                 <h3 class="font-display uppercase tracking-wider text-lg font-semibold mb-3">🎰 Kombine Kuponlarım</h3>
                 <div class="space-y-2">
@@ -382,6 +447,7 @@
         @endif
 
         {{-- Kuponlarım --}}
+        @if ($tab === 'kuponlarim')
         <div class="bg-pitch-surface border border-pitch-line rounded-xl p-4 sm:p-6">
             <h3 class="font-display uppercase tracking-wider text-lg font-semibold mb-3">🎫 Kuponlarım</h3>
 
@@ -422,8 +488,10 @@
             @endif
         </div>
 
+        @endif
+
         {{-- Çim hareket geçmişi --}}
-        @if ($transactions->isNotEmpty())
+        @if ($tab === 'cim' && $transactions->isNotEmpty())
             <div class="bg-pitch-surface border border-pitch-line rounded-xl p-4 sm:p-6">
                 <h3 class="font-display uppercase tracking-wider text-lg font-semibold mb-3">💸 Çim Hareketleri</h3>
                 <div class="divide-y divide-pitch-line">

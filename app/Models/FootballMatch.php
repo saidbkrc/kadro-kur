@@ -17,7 +17,7 @@ class FootballMatch extends Model
         'group_id', 'created_by', 'title', 'location', 'starts_at', 'capacity', 'status',
         'squad_status', 'formation_a', 'formation_b', 'pitch_layout',
         'team_a_score', 'team_b_score', 'mvp_closes_at', 'reminder_sent_at',
-        'digest_sent_at', 'result_edited_at', 'result_edited_by', 'forma_goal_player_id',
+        'digest_sent_at', 'result_edited_at', 'result_edited_by', 'forma_goal_player_id', 'bonus_awarded_at',
     ];
 
     protected function casts(): array
@@ -28,6 +28,7 @@ class FootballMatch extends Model
             'reminder_sent_at' => 'datetime',
             'digest_sent_at' => 'datetime',
             'result_edited_at' => 'datetime',
+            'bonus_awarded_at' => 'datetime',
             'pitch_layout' => 'array',
         ];
     }

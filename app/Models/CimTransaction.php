@@ -15,6 +15,7 @@ class CimTransaction extends Model
         'bet' => '🎫 Kupon',
         'win' => '🎉 Kazanç',
         'refund' => '↩ İade',
+        'bonus' => '🎁 Maç ödülü',
     ];
 
     public function user(): BelongsTo

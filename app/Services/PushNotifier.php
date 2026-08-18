@@ -209,6 +209,22 @@ class PushNotifier
         );
     }
 
+    /** Maç başarı ödülü: MVP / en çok gol / forma golü karşılığı Çim. */
+    public function kehanetBonus(?User $user, FootballMatch $match, int $total, array $reasons): void
+    {
+        if ($user === null) {
+            return;
+        }
+
+        $this->send(
+            collect([$user]),
+            '🎁 Maç ödülün: +'.number_format($total).' Çim',
+            implode(' · ', $reasons).' — '.$match->title,
+            route('groups.kehanet', $match->group_id),
+            'odul-'.$match->id.'-'.$user->id,
+        );
+    }
+
     /** Nitelik 3 onaya ulaşınca oyuncuya tek bildirim (her onayda değil — spam yok). */
     public function traitMilestone(Player $player, string $traitKey): void
     {

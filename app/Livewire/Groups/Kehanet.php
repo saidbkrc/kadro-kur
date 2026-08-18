@@ -13,6 +13,7 @@ use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 use Illuminate\View\View;
 use Livewire\Attributes\Layout;
+use Livewire\Attributes\Url;
 use Livewire\Component;
 
 /** Kehanet: eğlence amaçlı tahmin oyunu (sanal "Çim" ile — gerçek para yok). */
@@ -40,6 +41,16 @@ class Kehanet extends Component
 
     /** Skor tahmini girişleri: ["{matchId}-a" => 3, ...] */
     public array $scorePick = [];
+
+    /** Aktif sekme: kupon | kuponlarim | kahin | cim | olaylar */
+    #[Url(as: 'sekme')]
+    public string $tab = 'kupon';
+
+    public function setTab(string $tab): void
+    {
+        $this->tab = $tab;
+        $this->notice = null;
+    }
 
     public function mount(Group $group): void
     {
@@ -177,19 +188,87 @@ class Kehanet extends Component
     public function render(OddsCalculator $odds): View
     {
         $user = Auth::user();
+        $servis = app(KehanetService::class);
+        $macIdler = $this->group->matches()->pluck('id');
+        $isAdmin = $this->group->isAdmin($user);
 
-        // Kupon yapılabilecek maçlar
-        $acikMaclar = $this->group->matches()
-            ->where('status', 'scheduled')
-            ->where('starts_at', '>=', now())
-            ->orderBy('starts_at')
-            ->limit(3)
-            ->get();
+        // Bekleyen kupon sayısı (sekme rozeti) — her sekmede lazım, ucuz
+        $bekleyenSayisi = Prediction::where('user_id', $user->id)
+            ->whereIn('match_id', $macIdler)
+            ->where('status', 'pending')
+            ->count();
 
-        // Başkanın olay girmesi gereken tamamlanmış maçlar
-        $bekleyenMaclar = collect();
-        if ($this->group->isAdmin($user)) {
-            $bekleyenMaclar = $this->group->matches()
+        // Sekme bazlı veri: sadece görünen sekmenin sorguları çalışır
+        $veri = [
+            'openMatches' => collect(), 'pendingMatches' => collect(), 'myBets' => collect(),
+            'mySlips' => collect(), 'transactions' => collect(), 'leaders' => collect(),
+            'streaks' => collect(), 'pulse' => collect(), 'line' => 8.5,
+        ];
+
+        if ($this->tab === 'kupon') {
+            $veri['openMatches'] = $this->group->matches()
+                ->where('status', 'scheduled')
+                ->where('starts_at', '>=', now())
+                ->orderBy('starts_at')
+                ->limit(3)
+                ->get();
+
+            $veri['pulse'] = $veri['openMatches']->mapWithKeys(fn ($m) => [$m->id => $servis->pulse($m)]);
+            $veri['line'] = $odds->totalGoalsLine($this->group);
+
+            // Kilit durumunu göstermek için mevcut kuponlar
+            $veri['myBets'] = Prediction::where('user_id', $user->id)
+                ->whereIn('match_id', $veri['openMatches']->pluck('id'))
+                ->whereNull('slip_id')
+                ->where('status', 'pending')
+                ->get();
+        }
+
+        if ($this->tab === 'kuponlarim') {
+            $veri['myBets'] = Prediction::where('user_id', $user->id)
+                ->whereIn('match_id', $macIdler)
+                ->whereNull('slip_id')
+                ->with('match')
+                ->orderByDesc('id')
+                ->limit(25)
+                ->get();
+
+            $veri['mySlips'] = \App\Models\PredictionSlip::where('user_id', $user->id)
+                ->where('group_id', $this->group->id)
+                ->with('legs.match')
+                ->orderByDesc('id')
+                ->limit(10)
+                ->get();
+        }
+
+        if ($this->tab === 'kahin') {
+            // Ayın Kâhini: bu ay sonuçlanan kuponların net kazancı
+            $veri['leaders'] = DB::table('predictions')
+                ->join('users', 'users.id', '=', 'predictions.user_id')
+                ->whereIn('predictions.match_id', $macIdler)
+                ->whereIn('predictions.status', ['won', 'lost'])
+                ->where('predictions.settled_at', '>=', now()->startOfMonth())
+                ->whereNull('predictions.slip_id')
+                ->selectRaw('users.id as user_id, users.name, SUM(predictions.payout) - SUM(predictions.stake) as net,
+                             SUM(CASE WHEN predictions.status = "won" THEN 1 ELSE 0 END) as tuttu,
+                             COUNT(*) as toplam')
+                ->groupBy('users.id', 'users.name')
+                ->orderByDesc('net')
+                ->limit(10)
+                ->get();
+
+            $veri['streaks'] = $veri['leaders']->mapWithKeys(fn ($l) => [$l->user_id => $servis->streak($l->user_id, $this->group)]);
+        }
+
+        if ($this->tab === 'cim') {
+            $veri['transactions'] = \App\Models\CimTransaction::where('user_id', $user->id)
+                ->orderByDesc('id')
+                ->limit(30)
+                ->get();
+        }
+
+        if ($this->tab === 'olaylar' && $isAdmin) {
+            $veri['pendingMatches'] = $this->group->matches()
                 ->where('status', 'completed')
                 ->orderByDesc('starts_at')
                 ->limit(3)
@@ -197,61 +276,12 @@ class Kehanet extends Component
                 ->get();
         }
 
-        $kuponlarim = Prediction::where('user_id', $user->id)
-            ->whereIn('match_id', $this->group->matches()->pluck('id'))
-            ->whereNull('slip_id')
-            ->with('match')
-            ->orderByDesc('id')
-            ->limit(25)
-            ->get();
-
-        $kombineler = \App\Models\PredictionSlip::where('user_id', $user->id)
-            ->where('group_id', $this->group->id)
-            ->with('legs.match')
-            ->orderByDesc('id')
-            ->limit(10)
-            ->get();
-
-        $hareketler = \App\Models\CimTransaction::where('user_id', $user->id)
-            ->orderByDesc('id')
-            ->limit(15)
-            ->get();
-
-        // Ayın Kâhini: bu ay sonuçlanan kuponların net kazancı
-        $liderler = DB::table('predictions')
-            ->join('users', 'users.id', '=', 'predictions.user_id')
-            ->whereIn('predictions.match_id', $this->group->matches()->pluck('id'))
-            ->whereIn('predictions.status', ['won', 'lost'])
-            ->where('predictions.settled_at', '>=', now()->startOfMonth())
-            ->whereNull('predictions.slip_id')
-            ->selectRaw('users.id as user_id, users.name, SUM(predictions.payout) - SUM(predictions.stake) as net,
-                         SUM(CASE WHEN predictions.status = "won" THEN 1 ELSE 0 END) as tuttu,
-                         COUNT(*) as toplam')
-            ->groupBy('users.id', 'users.name')
-            ->orderByDesc('net')
-            ->limit(10)
-            ->get();
-
-        $servis = app(KehanetService::class);
-
-        // Seri bilgisi lider tablosuna eklenir
-        $seriler = $liderler->mapWithKeys(fn ($l) => [$l->user_id => $servis->streak($l->user_id, $this->group)]);
-
-        return view('livewire.groups.kehanet', [
+        return view('livewire.groups.kehanet', $veri + [
             'balance' => $user->cim_balance,
-            'openMatches' => $acikMaclar,
-            'pendingMatches' => $bekleyenMaclar,
-            'myBets' => $kuponlarim,
-            'mySlips' => $kombineler,
-            'transactions' => $hareketler,
-            'leaders' => $liderler,
-            'streaks' => $seriler,
             'myStreak' => $servis->streak($user->id, $this->group),
-            'pulse' => $acikMaclar->mapWithKeys(fn ($m) => [$m->id => $servis->pulse($m)]),
+            'pendingCount' => $bekleyenSayisi,
             'odds' => $odds,
-            'roster' => $this->group->players()->orderBy('name')->get(),
-            'isAdmin' => $this->group->isAdmin($user),
-            'line' => $odds->totalGoalsLine($this->group),
+            'isAdmin' => $isAdmin,
         ]);
     }
 

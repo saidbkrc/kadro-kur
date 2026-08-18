@@ -22,3 +22,9 @@ Schedule::call(fn () => app(PushNotifier::class)->sendDueDigests())
     ->hourly()
     ->name('match-digests')
     ->withoutOverlapping();
+
+// Maç başarı ödülleri (Çim): MVP oylaması kapanan maçlarda bir kez dağıtılır.
+Schedule::call(fn () => app(App\Services\KehanetService::class)->awardDueBonuses())
+    ->hourly()
+    ->name('kehanet-bonuses')
+    ->withoutOverlapping();

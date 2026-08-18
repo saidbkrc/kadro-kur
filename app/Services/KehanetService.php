@@ -90,25 +90,23 @@ class KehanetService
             return ['ok' => false, 'message' => $hata];
         }
 
-        $eski = Prediction::where('user_id', $user->id)
+        // Kupon kesindir: aynı maç + market'te ikinci kupon yapılamaz, değiştirilemez
+        $zatenVar = Prediction::where('user_id', $user->id)
             ->where('match_id', $match->id)
             ->where('market_key', $market)
             ->whereNull('slip_id')
             ->where('status', 'pending')
-            ->first();
+            ->exists();
 
-        $iade = $eski?->stake ?? 0;
+        if ($zatenVar) {
+            return ['ok' => false, 'message' => 'Bu tahmin için kuponun zaten var — kuponlar değiştirilemez.'];
+        }
 
-        if ($user->cim_balance + $iade < $stake) {
+        if ($user->cim_balance < $stake) {
             return ['ok' => false, 'message' => 'Yeterli Çim yok.'];
         }
 
         $odds = app(OddsCalculator::class)->odds($match, $market, $selection);
-
-        if ($eski) {
-            $this->adjustBalance($user->id, $iade, 'refund', 'Kupon değiştirildi');
-            $eski->delete();
-        }
 
         Prediction::create([
             'user_id' => $user->id,
@@ -298,6 +296,9 @@ class KehanetService
             }
         }
 
+        // Oylama zaten kapandıysa maç ödüllerini de dağıt
+        $this->awardMatchBonuses($match->refresh());
+
         return $sayac;
     }
 
@@ -364,6 +365,103 @@ class KehanetService
 
         $slip->update(['status' => 'void', 'payout' => $slip->stake, 'settled_at' => now()]);
         $this->adjustBalance($slip->user_id, $slip->stake, 'refund', $sebep.' (kombine)');
+    }
+
+    /* ---------- maç başarı ödülleri ---------- */
+
+    /**
+     * Maç ödüllerini dağıtır: en çok gol atan, MVP ve forma golü.
+     * MVP oylaması kapanmadan çalışmaz (MVP kesinleşmemiş olur) ve maç başına
+     * yalnızca bir kez dağıtılır. Misafir oyuncular hesapsız olduğu için alamaz.
+     *
+     * @return int Ödül alan kişi sayısı
+     */
+    public function awardMatchBonuses(FootballMatch $match): int
+    {
+        if ($match->status !== 'completed' || $match->bonus_awarded_at !== null || $match->mvpOpen()) {
+            return 0;
+        }
+
+        // Önce işaretle: yarım kalsa bile ikinci kez dağıtılmasın
+        $match->update(['bonus_awarded_at' => now()]);
+
+        $oduller = []; // [player_id => [sebep etiketleri]]
+
+        // En çok gol atan (beraberlikte hepsi alır)
+        $goller = $match->goals()->get();
+        if ($goller->isNotEmpty()) {
+            $enFazla = $goller->max('count');
+            foreach ($goller->where('count', $enFazla) as $gol) {
+                $oduller[$gol->player_id][] = 'top_scorer';
+            }
+        }
+
+        // MVP: en çok oyu alan
+        $mvpOylari = $match->mvpVotes()->selectRaw('player_id, count(*) as oy')->groupBy('player_id')->get();
+        if ($mvpOylari->isNotEmpty()) {
+            $enCok = $mvpOylari->max('oy');
+            foreach ($mvpOylari->where('oy', $enCok) as $oy) {
+                $oduller[$oy->player_id][] = 'mvp';
+            }
+        }
+
+        // Forma golü
+        if ($match->forma_goal_player_id) {
+            $oduller[$match->forma_goal_player_id][] = 'forma';
+        }
+
+        if ($oduller === []) {
+            return 0;
+        }
+
+        // Misafirler elenir (hesabı olmayan Çim alamaz)
+        $oyuncular = \App\Models\Player::whereIn('id', array_keys($oduller))
+            ->whereNotNull('user_id')
+            ->get()
+            ->keyBy('id');
+
+        $sayac = 0;
+
+        foreach ($oduller as $playerId => $sebepler) {
+            $oyuncu = $oyuncular->get($playerId);
+
+            if ($oyuncu === null) {
+                continue; // misafir
+            }
+
+            $toplam = 0;
+            $etiketler = [];
+
+            foreach (array_unique($sebepler) as $sebep) {
+                $odul = Kehanet::BONUS[$sebep];
+                $toplam += $odul['amount'];
+                $etiketler[] = $odul['icon'].' '.$odul['name'];
+
+                $this->adjustBalance($oyuncu->user_id, $odul['amount'], 'bonus', $odul['name'].' — '.$match->title);
+            }
+
+            app(PushNotifier::class)->kehanetBonus($oyuncu->user, $match, $toplam, $etiketler);
+            $sayac++;
+        }
+
+        return $sayac;
+    }
+
+    /** Oylaması kapanmış ve ödülü dağıtılmamış maçlar (scheduler saatlik çağırır). */
+    public function awardDueBonuses(): int
+    {
+        $toplam = 0;
+
+        $adaylar = FootballMatch::where('status', 'completed')
+            ->whereNull('bonus_awarded_at')
+            ->where('starts_at', '>=', now()->subMonths(2)) // çok eski maçlara geriye dönük dağıtma
+            ->get();
+
+        foreach ($adaylar as $match) {
+            $toplam += $this->awardMatchBonuses($match);
+        }
+
+        return $toplam;
     }
 
     /* ---------- istatistikler ---------- */
