@@ -159,4 +159,45 @@ class Kehanet extends Component
     {
         return $match->mainListRsvps()->map(fn ($r) => $r->player)->filter()->values();
     }
+
+    /** Kadro kurulduysa takım listeleri: ['A' => [...], 'B' => [...]]; kurulmadıysa boş. */
+    public function teamsFor(FootballMatch $match): array
+    {
+        if ($match->squad_status === 'none') {
+            return [];
+        }
+
+        $rsvps = $match->mainListRsvps();
+
+        $takim = fn ($harf) => $rsvps->where('team', $harf)
+            ->map(fn ($r) => $r->player)->filter()->values();
+
+        $a = $takim('A');
+        $b = $takim('B');
+
+        return ($a->isEmpty() && $b->isEmpty()) ? [] : ['A' => $a, 'B' => $b];
+    }
+
+    /** Oyuncu adları önbelleği (kupon etiketlerinde tekrar tekrar sorgu atmamak için). */
+    protected ?array $playerNameCache = null;
+
+    /** Kupon seçiminin okunabilir karşılığı: "Turuncu", "8.5 Üst", "Ahmet". */
+    public function selectionText(string $market, string $selection): string
+    {
+        $kind = K::MARKETS[$market]['kind'] ?? 'oyuncu';
+
+        if ($kind === 'takim') {
+            return K::teamOptions($market)[$selection] ?? $selection;
+        }
+
+        if ($kind === 'altust') {
+            $line = app(OddsCalculator::class)->totalGoalsLine($this->group);
+
+            return $line.($selection === 'over' ? ' Üst' : ' Alt');
+        }
+
+        $this->playerNameCache ??= $this->group->players()->pluck('name', 'id')->all();
+
+        return $this->playerNameCache[(int) $selection] ?? 'Bilinmiyor';
+    }
 }

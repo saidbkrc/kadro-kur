@@ -1515,6 +1515,15 @@ class KadroFlowTest extends TestCase
 
         $kupon = \App\Models\Prediction::where('user_id', $owner->id)->firstOrFail();
         $this->assertSame(30, $kupon->stake);
+
+        // Kupon ne seçtiğini gösterir + kadro listesi "SEN" ile işaretli
+        $this->actingAs($owner)->get(route('groups.kehanet', $group))
+            ->assertOk()
+            ->assertSee('Bekleyen Tahminlerin')
+            ->assertSee('Turuncu')          // seçim etiketi okunabilir
+            ->assertSee($friend->name)      // kadro listesi
+            ->assertSee('SEN');             // kendini ayırt etme
+
         $this->assertGreaterThan(1.0, (float) $kupon->odds);
         $this->assertSame(\App\Support\Kehanet::STARTING_BALANCE - 30, $owner->refresh()->cim_balance);
 

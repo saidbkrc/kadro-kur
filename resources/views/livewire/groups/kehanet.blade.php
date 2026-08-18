@@ -27,6 +27,37 @@
             @endif
         </div>
 
+        {{-- Aktif kuponların (sonucu beklenenler) --}}
+        @php $aktif = $myBets->where('status', 'pending'); @endphp
+        @if ($aktif->isNotEmpty())
+            <div class="bg-pitch-surface border border-gold/40 rounded-xl p-4 sm:p-6">
+                <div class="flex items-baseline justify-between gap-2 mb-3 flex-wrap">
+                    <h3 class="font-display uppercase tracking-wider text-lg font-semibold text-gold">⏳ Bekleyen Tahminlerin</h3>
+                    <span class="text-xs text-pitch-muted">
+                        {{ $aktif->count() }} kupon · {{ number_format($aktif->sum('stake')) }} Çim riskte
+                    </span>
+                </div>
+
+                <div class="space-y-2">
+                    @foreach ($aktif as $bet)
+                        <div class="flex items-center justify-between gap-3 bg-pitch-bg border border-pitch-line rounded-lg px-3 py-2">
+                            <div class="min-w-0">
+                                <div class="text-sm min-w-0">
+                                    <span class="text-pitch-muted">{{ K::icon($bet->market_key) }} {{ K::label($bet->market_key) }}:</span>
+                                    <strong class="text-bibB">{{ $this->selectionText($bet->market_key, $bet->selection) }}</strong>
+                                </div>
+                                <div class="text-xs text-pitch-muted truncate">{{ $bet->match?->title }}</div>
+                            </div>
+                            <div class="text-end shrink-0">
+                                <div class="font-display font-bold text-sm">{{ $bet->stake }} → <span class="text-gold">{{ $bet->potentialPayout() }}</span></div>
+                                <div class="text-[11px] text-pitch-muted">{{ $bet->odds }}×</div>
+                            </div>
+                        </div>
+                    @endforeach
+                </div>
+            </div>
+        @endif
+
         {{-- Açık maçlar: kupon yapma --}}
         @forelse ($openMatches as $match)
             @php $squad = $this->squadFor($match); @endphp
@@ -37,8 +68,32 @@
                     <span class="text-xs text-pitch-muted">{{ $match->starts_at->translatedFormat('d F, l H:i') }}</span>
                 </div>
 
-                @if ($squad->isEmpty())
+                @php $takimlar = $this->teamsFor($match); @endphp
+
+                @if ($takimlar)
+                    {{-- Kadro belli: kim hangi takımda --}}
+                    <div class="grid grid-cols-2 gap-3">
+                        @foreach ([['A', 'Turuncu', 'text-bibA', 'border-bibA/40'], ['B', 'Yeşil', 'text-bibB', 'border-bibB/40']] as [$harf, $ad, $renk, $kenar])
+                            <div class="border {{ $kenar }} rounded-lg p-3 min-w-0">
+                                <div class="text-[11px] font-bold tracking-[.14em] {{ $renk }} mb-1.5">{{ mb_strtoupper($ad, 'UTF-8') }}</div>
+                                <ul class="space-y-1">
+                                    @foreach ($takimlar[$harf] as $p)
+                                        @php $benMiyim = $p->user_id === auth()->id(); @endphp
+                                        <li class="text-xs truncate {{ $benMiyim ? 'text-bibB font-bold' : 'text-pitch-ink' }}">
+                                            {{ $p->name }}@if ($benMiyim) <span class="text-[10px] bg-bibB/15 text-bibB rounded px-1">SEN</span>@endif
+                                        </li>
+                                    @endforeach
+                                    @if ($takimlar[$harf]->isEmpty())
+                                        <li class="text-xs text-pitch-muted">—</li>
+                                    @endif
+                                </ul>
+                            </div>
+                        @endforeach
+                    </div>
+                @elseif ($squad->isEmpty())
                     <p class="text-sm text-pitch-muted">Kadro henüz belli değil — oyuncu tahminleri kadro kurulunca açılır.</p>
+                @else
+                    <p class="text-sm text-pitch-muted">Takımlar henüz kurulmadı — gelenler arasından tahmin yapabilirsin.</p>
                 @endif
 
                 <div class="space-y-3">
@@ -181,7 +236,10 @@
                         @endphp
                         <div class="flex items-center justify-between gap-3 py-2 text-sm">
                             <div class="min-w-0">
-                                <div class="truncate">{{ K::icon($bet->market_key) }} {{ K::label($bet->market_key) }}</div>
+                                <div class="truncate">
+                                    <span class="text-pitch-muted">{{ K::icon($bet->market_key) }} {{ K::label($bet->market_key) }}:</span>
+                                    <strong>{{ $this->selectionText($bet->market_key, $bet->selection) }}</strong>
+                                </div>
                                 <div class="text-xs text-pitch-muted truncate">{{ $bet->match?->title }} · {{ $bet->stake }} Çim @ {{ $bet->odds }}×</div>
                             </div>
                             <div class="text-end shrink-0">
