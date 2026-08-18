@@ -403,6 +403,9 @@ class Show extends Component
         // Yeni rozet kazananlara bildirim (skor/goller işlendiği için burada)
         app(PushNotifier::class)->syncBadgesAndNotify($this->match->group);
 
+        // Kehanet kuponlarını sonuçlandır (manuel olay bekleyenler beklemede kalır)
+        app(\App\Services\KehanetService::class)->settleMatch($this->match->refresh());
+
         // Haftalık otomatik maç: sıradaki maçı hemen aç
         app(MatchScheduler::class)->ensureUpcomingMatch($this->match->group);
 
@@ -486,6 +489,9 @@ class Show extends Component
         abort_unless($this->match->canManage(Auth::user()), 403);
 
         $this->match->update(['status' => 'cancelled']);
+
+        // Kuponlar geçersiz sayılır, Çim iade edilir
+        app(\App\Services\KehanetService::class)->voidMatch($this->match);
 
         app(PushNotifier::class)->matchCancelled($this->match, Auth::id());
 

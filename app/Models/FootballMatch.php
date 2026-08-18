@@ -79,6 +79,18 @@ class FootballMatch extends Model
         return $this->hasMany(MatchPerformanceRating::class, 'match_id');
     }
 
+    /** Başkanın işaretlediği maç olayları (gerginlik, günün çalımı vb.). */
+    public function events(): HasMany
+    {
+        return $this->hasMany(MatchEvent::class, 'match_id');
+    }
+
+    /** Kehanet kuponları. */
+    public function predictions(): HasMany
+    {
+        return $this->hasMany(Prediction::class, 'match_id');
+    }
+
     /** Asıl listedeki (yedek olmayan) "geliyorum" sayısı. */
     public function confirmedCount(): int
     {

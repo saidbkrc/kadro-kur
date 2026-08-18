@@ -1,6 +1,8 @@
 <div class="py-10">
     <div class="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 space-y-6">
 
+        <x-group-nav :group="$group" :active="$player->user_id === auth()->id() ? 'profile' : null" />
+
         <div>
             <a href="{{ route('groups.stats', $group) }}" wire:navigate class="text-sm text-bibB hover:underline">← İstatistikler</a>
         </div>

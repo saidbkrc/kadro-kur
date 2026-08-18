@@ -1460,6 +1460,132 @@ class KadroFlowTest extends TestCase
         $this->assertTrue($seenAt->equalTo($owner->refresh()->tutorial_seen_at));
     }
 
+    public function test_grup_hizli_erisim_cubugu_her_sayfada(): void
+    {
+        $owner = User::factory()->create();
+        $group = $this->makeGroup($owner);
+        $myPlayer = $group->playerFor($owner);
+        $match = $this->makeMatch($group); // gelecek tarihli, scheduled
+
+        $statsUrl = route('groups.stats', $group);
+        $profilUrl = route('groups.player', [$group, $myPlayer]);
+        $macUrl = route('matches.show', $match);
+
+        $kehanetUrl = route('groups.kehanet', $group);
+
+        // Grup bağlamındaki her sayfada dört bağlantı da var
+        foreach ([route('groups.show', $group), $statsUrl, route('groups.rate', $group), $profilUrl, $macUrl, $kehanetUrl] as $url) {
+            $this->actingAs($owner)->get($url)
+                ->assertOk()
+                ->assertSee($statsUrl)
+                ->assertSee($profilUrl)
+                ->assertSee($macUrl)
+                ->assertSee($kehanetUrl);
+        }
+
+        // Yaklaşan maç yoksa buton "Maç yok" olarak pasifleşir
+        $match->update(['status' => 'cancelled']);
+        $this->actingAs($owner)->get($statsUrl)
+            ->assertOk()
+            ->assertSee('Maç yok')
+            ->assertDontSee($macUrl);
+    }
+
+    public function test_kehanet_kupon_bakiye_ve_sonuclanma(): void
+    {
+        $owner = User::factory()->create();
+        $group = $this->makeGroup($owner);
+        $ownPlayer = $group->playerFor($owner);
+        $friend = $this->addMember($group);
+
+        $match = $this->makeMatch($group);
+        $match->setRsvp($ownPlayer, 'going');
+        $match->setRsvp($friend, 'going');
+        $match->applySquad([$ownPlayer->id], [$friend->id]);
+
+        // Sayfaya girince başlangıç Çim'i yüklenir
+        $c = Livewire::actingAs($owner)->test(Groups\Kehanet::class, ['group' => $group]);
+        $owner->refresh();
+        $this->assertSame(\App\Support\Kehanet::STARTING_BALANCE, $owner->cim_balance);
+
+        // Kupon: Turuncu kazanır
+        $c->set("selection.{$match->id}-winner", 'A')
+            ->set("stake.{$match->id}-winner", 30)
+            ->call('bet', $match->id, 'winner');
+
+        $kupon = \App\Models\Prediction::where('user_id', $owner->id)->firstOrFail();
+        $this->assertSame(30, $kupon->stake);
+        $this->assertGreaterThan(1.0, (float) $kupon->odds);
+        $this->assertSame(\App\Support\Kehanet::STARTING_BALANCE - 30, $owner->refresh()->cim_balance);
+
+        // Manuel olay kuponu: gerginliği friend yaşayacak
+        $c->set("selection.{$match->id}-gerginlik", (string) $friend->id)
+            ->set("stake.{$match->id}-gerginlik", 10)
+            ->call('bet', $match->id, 'gerginlik');
+
+        // Skor girilir → otomatik market sonuçlanır, manuel olan beklemede kalır
+        Livewire::actingAs($owner)
+            ->test(Matches\Show::class, ['match' => $match])
+            ->set('teamAScore', 4)->set('teamBScore', 1)
+            ->call('saveResult');
+
+        $kupon->refresh();
+        $this->assertSame('won', $kupon->status);
+        $this->assertSame((int) round(30 * (float) $kupon->odds), $kupon->payout);
+
+        $gerginlikKuponu = \App\Models\Prediction::where('market_key', 'gerginlik')->firstOrFail();
+        $this->assertSame('pending', $gerginlikKuponu->status, 'Başkan işaretlemeden sonuçlanmamalı');
+
+        // Başkan olayı işaretler → kupon sonuçlanır
+        Livewire::actingAs($owner)
+            ->test(Groups\Kehanet::class, ['group' => $group])
+            ->set("eventPick.{$match->id}-gerginlik", (string) $friend->id)
+            ->call('saveEvents', $match->id);
+
+        $this->assertSame('won', $gerginlikKuponu->refresh()->status);
+
+        // Yetersiz bakiyeyle kupon yapılamaz
+        $owner->forceFill(['cim_balance' => 3])->save();
+        $ikinciMac = $this->makeMatch($group);
+        Livewire::actingAs($owner)
+            ->test(Groups\Kehanet::class, ['group' => $group])
+            ->set("selection.{$ikinciMac->id}-winner", 'A')
+            ->set("stake.{$ikinciMac->id}-winner", 100)
+            ->call('bet', $ikinciMac->id, 'winner')
+            ->assertSet('notice', fn ($v) => str_contains((string) $v, 'Yeterli Çim yok'));
+
+        // Başka grubun üyesi kehanet sayfasına giremez
+        $yabanci = User::factory()->create();
+        $this->makeGroup($yabanci);
+        $this->actingAs($yabanci)->get(route('groups.kehanet', $group))->assertForbidden();
+    }
+
+    public function test_kehanet_mac_iptalinde_cim_iade_edilir(): void
+    {
+        $owner = User::factory()->create();
+        $group = $this->makeGroup($owner);
+        $ownPlayer = $group->playerFor($owner);
+        $friend = $this->addMember($group);
+
+        $match = $this->makeMatch($group);
+        $match->setRsvp($ownPlayer, 'going');
+        $match->setRsvp($friend, 'going');
+
+        $c = Livewire::actingAs($owner)->test(Groups\Kehanet::class, ['group' => $group]);
+        $c->set("selection.{$match->id}-winner", 'A')
+            ->set("stake.{$match->id}-winner", 50)
+            ->call('bet', $match->id, 'winner');
+
+        $sonra = $owner->refresh()->cim_balance;
+
+        Livewire::actingAs($owner)
+            ->test(Matches\Show::class, ['match' => $match])
+            ->call('cancelMatch');
+
+        $this->assertSame('void', \App\Models\Prediction::first()->status);
+        $this->assertSame($sonra + 50, $owner->refresh()->cim_balance, 'İptalde Çim iade edilmeli');
+    }
+
     public function test_sayfalar_acilir(): void
     {
         $owner = User::factory()->create();

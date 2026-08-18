@@ -50,6 +50,7 @@ class User extends Authenticatable implements FilamentUser
             'password' => 'hashed',
             'is_admin' => 'boolean',
             'tutorial_seen_at' => 'datetime',
+            'cim_granted_at' => 'datetime',
         ];
     }
 
@@ -74,5 +75,11 @@ class User extends Authenticatable implements FilamentUser
     public function players(): HasMany
     {
         return $this->hasMany(Player::class);
+    }
+
+    /** Kehanet kuponları (sanal Çim ile). */
+    public function predictions(): HasMany
+    {
+        return $this->hasMany(Prediction::class);
     }
 }

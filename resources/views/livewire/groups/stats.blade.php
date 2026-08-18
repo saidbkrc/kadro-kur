@@ -1,5 +1,7 @@
 <div class="py-10">
     <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 space-y-6">
+        <x-group-nav :group="$group" active="stats" />
+
         <div>
             <a href="{{ route('groups.show', $group) }}" wire:navigate class="text-sm text-bibB hover:underline">← {{ $group->name }}</a>
             <h2 class="font-display uppercase tracking-wider text-2xl font-bold mt-1">İstatistikler</h2>
