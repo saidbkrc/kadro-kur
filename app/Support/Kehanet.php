@@ -37,6 +37,7 @@ class Kehanet
         'top_scorer' => ['amount' => 100, 'icon' => '⚽', 'name' => 'En çok gol atan'],
         'mvp' => ['amount' => 50, 'icon' => '🏆', 'name' => 'Maçın adamı'],
         'forma' => ['amount' => 25, 'icon' => '👕', 'name' => 'Forma golü'],
+        'attendance' => ['amount' => 10, 'icon' => '🏟️', 'name' => 'Maça katılım'],
     ];
 
     /** Başkanın maç sonrası işaretlediği olaylar — manuel market'lerin kaynağı. */

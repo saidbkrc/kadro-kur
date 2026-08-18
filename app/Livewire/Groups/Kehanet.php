@@ -202,7 +202,7 @@ class Kehanet extends Component
         $veri = [
             'openMatches' => collect(), 'pendingMatches' => collect(), 'myBets' => collect(),
             'mySlips' => collect(), 'transactions' => collect(), 'leaders' => collect(),
-            'streaks' => collect(), 'pulse' => collect(), 'line' => 8.5,
+            'streaks' => collect(), 'pulse' => collect(), 'line' => 8.5, 'awardStatus' => [],
         ];
 
         if ($this->tab === 'kupon') {
@@ -265,6 +265,13 @@ class Kehanet extends Component
                 ->orderByDesc('id')
                 ->limit(30)
                 ->get();
+        }
+
+        if ($this->tab === 'oduller') {
+            // Maçtan bağımsız ödülleri tembel dağıt (profil, puanlama, rozet)
+            app(\App\Services\CimRewards::class)->syncStandingAwards($user, $this->group);
+            $user->refresh();
+            $veri['awardStatus'] = app(\App\Services\CimRewards::class)->statusFor($user, $this->group);
         }
 
         if ($this->tab === 'olaylar' && $isAdmin) {

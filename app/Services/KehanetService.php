@@ -370,91 +370,31 @@ class KehanetService
     /* ---------- maç başarı ödülleri ---------- */
 
     /**
-     * Maç ödüllerini dağıtır: en çok gol atan, MVP ve forma golü.
-     * MVP oylaması kapanmadan çalışmaz (MVP kesinleşmemiş olur) ve maç başına
-     * yalnızca bir kez dağıtılır. Misafir oyuncular hesapsız olduğu için alamaz.
-     *
-     * @return int Ödül alan kişi sayısı
+     * Maç ödüllerini dağıtır (CimRewards'a devreder) ve kazananlara bildirim gönderir.
+     * Sadece katılım ödülü alanlara push gitmez — herkese bildirim spam olurdu.
      */
     public function awardMatchBonuses(FootballMatch $match): int
     {
-        if ($match->status !== 'completed' || $match->bonus_awarded_at !== null || $match->mvpOpen()) {
-            return 0;
-        }
+        $ozet = app(CimRewards::class)->awardForMatch($match);
 
-        // Önce işaretle: yarım kalsa bile ikinci kez dağıtılmasın
-        $match->update(['bonus_awarded_at' => now()]);
+        $esik = CimRewards::AWARDS['attendance']['amount'];
 
-        $oduller = []; // [player_id => [sebep etiketleri]]
-
-        // En çok gol atan (beraberlikte hepsi alır)
-        $goller = $match->goals()->get();
-        if ($goller->isNotEmpty()) {
-            $enFazla = $goller->max('count');
-            foreach ($goller->where('count', $enFazla) as $gol) {
-                $oduller[$gol->player_id][] = 'top_scorer';
+        foreach ($ozet as $userId => $bilgi) {
+            if ($bilgi['total'] > $esik && ($u = User::find($userId))) {
+                app(PushNotifier::class)->kehanetBonus($u, $match, $bilgi['total'], $bilgi['reasons']);
             }
         }
 
-        // MVP: en çok oyu alan
-        $mvpOylari = $match->mvpVotes()->selectRaw('player_id, count(*) as oy')->groupBy('player_id')->get();
-        if ($mvpOylari->isNotEmpty()) {
-            $enCok = $mvpOylari->max('oy');
-            foreach ($mvpOylari->where('oy', $enCok) as $oy) {
-                $oduller[$oy->player_id][] = 'mvp';
-            }
-        }
-
-        // Forma golü
-        if ($match->forma_goal_player_id) {
-            $oduller[$match->forma_goal_player_id][] = 'forma';
-        }
-
-        if ($oduller === []) {
-            return 0;
-        }
-
-        // Misafirler elenir (hesabı olmayan Çim alamaz)
-        $oyuncular = \App\Models\Player::whereIn('id', array_keys($oduller))
-            ->whereNotNull('user_id')
-            ->get()
-            ->keyBy('id');
-
-        $sayac = 0;
-
-        foreach ($oduller as $playerId => $sebepler) {
-            $oyuncu = $oyuncular->get($playerId);
-
-            if ($oyuncu === null) {
-                continue; // misafir
-            }
-
-            $toplam = 0;
-            $etiketler = [];
-
-            foreach (array_unique($sebepler) as $sebep) {
-                $odul = Kehanet::BONUS[$sebep];
-                $toplam += $odul['amount'];
-                $etiketler[] = $odul['icon'].' '.$odul['name'];
-
-                $this->adjustBalance($oyuncu->user_id, $odul['amount'], 'bonus', $odul['name'].' — '.$match->title);
-            }
-
-            app(PushNotifier::class)->kehanetBonus($oyuncu->user, $match, $toplam, $etiketler);
-            $sayac++;
-        }
-
-        return $sayac;
+        return count($ozet);
     }
 
-    /** Oylaması kapanmış ve ödülü dağıtılmamış maçlar (scheduler saatlik çağırır). */
+    /** Oylaması kapanmış maçların ödüllerini dağıtır (scheduler saatlik çağırır). */
     public function awardDueBonuses(): int
     {
         $toplam = 0;
 
         $adaylar = FootballMatch::where('status', 'completed')
-            ->whereNull('bonus_awarded_at')
-            ->where('starts_at', '>=', now()->subMonths(2)) // çok eski maçlara geriye dönük dağıtma
+            ->where('starts_at', '>=', now()->subMonths(2)) // çok eskiye geriye dönük dağıtma
             ->get();
 
         foreach ($adaylar as $match) {

@@ -1750,10 +1750,12 @@ class KadroFlowTest extends TestCase
 
         $adet = app(\App\Services\KehanetService::class)->awardMatchBonuses($match);
 
-        // golcü: en çok gol (100) + MVP (50) = 150 · owner: forma golü (25)
+        // golcü: en çok gol 100 + MVP 50 + hat-trick 50 + galibiyet 15 + katılım 10 = 225
+        // owner: forma 25 + galibiyet 15 + oylamaya katıldı 10 + katılım 10 = 60
+        // misafir: hesapsız → hiç ödül yok
         $this->assertSame(2, $adet);
-        $this->assertSame($golcuOnce + 150, $golcu->user->refresh()->cim_balance);
-        $this->assertSame($ownerOnce + 25, $owner->refresh()->cim_balance);
+        $this->assertSame($golcuOnce + 225, $golcu->user->refresh()->cim_balance);
+        $this->assertSame($ownerOnce + 60, $owner->refresh()->cim_balance);
 
         // Misafirin hesabı yok — ödül kaydı da oluşmaz
         $this->assertSame(0, \App\Models\CimTransaction::where('type', 'bonus')
@@ -1776,6 +1778,31 @@ class KadroFlowTest extends TestCase
         ]);
         $acikMac->goals()->create(['player_id' => $golcu->id, 'count' => 1]);
         $this->assertSame(0, app(\App\Services\KehanetService::class)->awardMatchBonuses($acikMac));
+
+        // Ödüller sekmesi: alındı/alınmadı durumu görünür
+        Livewire::actingAs($golcu->user)
+            ->test(Groups\Kehanet::class, ['group' => $group])
+            ->call('setTab', 'oduller')
+            ->assertSee('Ödüller')
+            ->assertSee('En çok gol atan')
+            ->assertSee('Alındı')
+            ->assertSee('Alınmadı');   // henüz kazanılmamış ödüller de listelenir
+
+        // Sadece katılım ödülü alana bildirim gitmez (spam olmasın)
+        $sadeceKatilan = $this->addMember($group);
+        $katilimMaci = $group->matches()->create([
+            'created_by' => $owner->id, 'title' => 'Katılım maçı', 'starts_at' => now()->subDays(3),
+            'capacity' => 14, 'status' => 'completed', 'team_a_score' => 1, 'team_b_score' => 1,
+            'mvp_closes_at' => now()->subHour(),
+        ]);
+        $katilimMaci->rsvps()->create(['player_id' => $sadeceKatilan->id, 'status' => 'going', 'team' => 'A']);
+
+        $oncekiBakiye = $sadeceKatilan->user->cim_balance;
+        Notification::fake();
+        app(\App\Services\KehanetService::class)->awardMatchBonuses($katilimMaci);
+
+        $this->assertSame($oncekiBakiye + 10, $sadeceKatilan->user->refresh()->cim_balance);
+        Notification::assertNothingSent();
     }
 
     public function test_kehanet_mac_iptalinde_cim_iade_edilir(): void

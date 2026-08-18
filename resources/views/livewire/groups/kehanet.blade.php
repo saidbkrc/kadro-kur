@@ -48,6 +48,7 @@
             $sekmeler = [
                 'kupon' => ['🎯', 'Kupon Yap', null],
                 'kuponlarim' => ['🎫', 'Kuponlarım', $pendingCount ?: null],
+                'oduller' => ['🎁', 'Ödüller', null],
                 'kahin' => ['👑', 'Ayın Kâhini', null],
                 'cim' => ['💸', 'Çim', null],
             ];
@@ -57,15 +58,14 @@
         @endphp
 
         <div class="bg-pitch-surface border border-pitch-line rounded-xl p-2">
-            <div class="grid grid-cols-4 {{ $isAdmin ? 'sm:grid-cols-5' : '' }} gap-2">
+            <div class="grid grid-cols-3 sm:grid-cols-{{ $isAdmin ? '6' : '5' }} gap-2">
                 @foreach ($sekmeler as $anahtar => [$ikon, $etiket, $rozet])
                     <button type="button" wire:click="setTab('{{ $anahtar }}')"
                             class="relative flex flex-col items-center justify-center gap-0.5 px-2 py-2.5 rounded-lg border text-center transition min-w-0
                                    {{ $tab === $anahtar
                                       ? 'bg-bibB/10 border-bibB text-bibB font-semibold'
                                       : 'bg-pitch-bg border-pitch-line text-pitch-ink hover:bg-pitch-surface2' }}
-                                   {{ $anahtar === 'olaylar' && ! $isAdmin ? 'hidden' : '' }}
-                                   {{ $anahtar === 'olaylar' ? 'col-span-4 sm:col-span-1' : '' }}">
+                                   {{ $anahtar === 'olaylar' && ! $isAdmin ? 'hidden' : '' }}">
                         <span class="text-lg leading-none">{{ $ikon }}</span>
                         <span class="text-[11px] leading-tight truncate w-full">{{ $etiket }}</span>
                         @if ($rozet)
@@ -373,6 +373,69 @@
                     </div>
                 @endforeach
             </div>
+        @endif
+
+        {{-- Ödüller: hangisini aldın, hangisini almadın --}}
+        @if ($tab === 'oduller')
+            @php
+                $kazanilanToplam = collect($awardStatus)->sum('total');
+                $gruplar = [
+                    'match' => ['⚽ MAÇ BAŞINA', 'Her maç sonrası oylamalar kapanınca verilir'],
+                    'period' => ['📆 SÜREKLİLİK', 'Düzenli gelenlere'],
+                    'repeat' => ['🔁 TEKRARLI', 'Her yeni nesne için bir kez'],
+                    'once' => ['⭐ TEK SEFERLİK', 'Bir kez alınır'],
+                ];
+            @endphp
+
+            <div class="bg-pitch-surface border border-pitch-line rounded-xl p-4 sm:p-6">
+                <div class="flex items-baseline justify-between gap-2 flex-wrap mb-1">
+                    <h3 class="font-display uppercase tracking-wider text-lg font-semibold">🎁 Ödüller</h3>
+                    <span class="text-sm">Toplam kazandığın: <strong class="font-display text-xl text-gold">{{ number_format($kazanilanToplam) }}</strong> Çim</span>
+                </div>
+                <p class="text-xs text-pitch-muted">Kupon oynamadan da Çim kazanırsın — sahadaki ve uygulamadaki katkının karşılığı. Misafir oyuncular hesapsız olduğu için ödül alamaz.</p>
+            </div>
+
+            @foreach ($gruplar as $scope => [$baslik, $altBaslik])
+                @php $liste = collect(\App\Services\CimRewards::AWARDS)->where('scope', $scope); @endphp
+                @if ($liste->isNotEmpty())
+                    <div class="bg-pitch-surface border border-pitch-line rounded-xl p-4 sm:p-6">
+                        <div class="text-[11px] tracking-[.14em] text-pitch-muted mb-0.5">{{ $baslik }}</div>
+                        <p class="text-[11px] text-pitch-muted/70 mb-3">{{ $altBaslik }}</p>
+
+                        <div class="space-y-2">
+                            @foreach ($liste as $key => $odul)
+                                @php
+                                    $durum = $awardStatus[$key] ?? ['count' => 0, 'total' => 0];
+                                    $alindi = $durum['count'] > 0;
+                                @endphp
+                                <div class="flex items-center gap-3 rounded-lg border px-3 py-2.5 transition
+                                            {{ $alindi ? 'border-bibB/40 bg-bibB/5' : 'border-pitch-line' }}">
+                                    <span class="text-2xl shrink-0 {{ $alindi ? '' : 'opacity-30 grayscale' }}">{{ $odul['icon'] }}</span>
+
+                                    <div class="min-w-0 flex-1">
+                                        <div class="text-sm font-semibold {{ $alindi ? 'text-pitch-ink' : 'text-pitch-muted' }}">
+                                            {{ $odul['name'] }}
+                                            <span class="text-gold font-display">+{{ $odul['amount'] }}</span>
+                                        </div>
+                                        <div class="text-[11px] text-pitch-muted leading-snug">{{ $odul['desc'] }}</div>
+                                    </div>
+
+                                    <div class="text-end shrink-0">
+                                        @if ($alindi)
+                                            <div class="text-xs text-bibB font-semibold">✓ Alındı</div>
+                                            <div class="text-[11px] text-pitch-muted">
+                                                {{ $durum['count'] > 1 ? $durum['count'].' kez · ' : '' }}{{ number_format($durum['total']) }} Çim
+                                            </div>
+                                        @else
+                                            <div class="text-xs text-pitch-muted">Alınmadı</div>
+                                        @endif
+                                    </div>
+                                </div>
+                            @endforeach
+                        </div>
+                    </div>
+                @endif
+            @endforeach
         @endif
 
         {{-- Ayın Kâhini --}}
