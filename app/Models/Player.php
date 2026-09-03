@@ -101,6 +101,12 @@ class Player extends Model
         return \App\Support\CimShop::value($this->user?->equipped_color, 'class');
     }
 
+    /** Kuşanılan isim renginin hex karşılığı — SVG gibi CSS sınıfı kullanılamayan yerler için. */
+    public function nameColorHex(string $default = '#ffffff'): string
+    {
+        return \App\Support\CimShop::value($this->user?->equipped_color, 'hex', $default);
+    }
+
     /** Saha dizilişinde diskin köşesinde gösterilen kozmetik rozet (yoksa null). */
     public function pitchIcon(): ?string
     {

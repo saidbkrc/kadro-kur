@@ -547,7 +547,7 @@
                                                {{ $canManage && $match->status === 'scheduled' ? 'cursor-pointer hover:bg-pitch-surface2' : '' }}
                                                {{ $swapArmed === $rsvp->player_id ? 'bg-gold/10 shadow-[inset_3px_0_0_#FFC83D]' : '' }}">
                                         <x-ovr-badge :player="$rsvp->player" num-class="text-lg w-9" />
-                                        <span class="font-semibold">{{ $rsvp->player->name }}
+                                        <span class="font-semibold {{ $rsvp->player->nameColorClass() }}">{{ $rsvp->player->name }}
                                             @if ($rsvp->player->shirt_number)<span class="text-pitch-muted text-xs font-normal">#{{ $rsvp->player->shirt_number }}</span>@endif
                                             @if ($myPlayer && $rsvp->player_id === $myPlayer->id)<span class="text-xs text-pitch-muted font-normal">(sen)</span>@endif
                                         </span>
@@ -630,7 +630,7 @@
                                     {{-- Mağazadan kuşanılan rozet: diskin sağ üst köşesinde, sürüklemeyi engellemez --}}
                                     <text x="14" y="-9" text-anchor="middle" font-size="15" pointer-events="none">{{ $node['icon'] }}</text>
                                 @endif
-                                <text y="33" text-anchor="middle" font-family="Arial, sans-serif" font-size="11" font-weight="700" fill="#ffffff" paint-order="stroke" stroke="rgba(0,0,0,.65)" stroke-width="3">{{ $node['name'] }}</text>
+                                <text y="33" text-anchor="middle" font-family="Arial, sans-serif" font-size="11" font-weight="700" fill="{{ $node['name_color'] ?? '#ffffff' }}" paint-order="stroke" stroke="rgba(0,0,0,.65)" stroke-width="3">{{ $node['name'] }}</text>
                             </g>
                         @endforeach
                     @endforeach
@@ -647,7 +647,7 @@
                 <h3 class="font-semibold mb-3">✅ Kadro ({{ $going->count() }}/{{ $match->capacity }})</h3>
                 <ol class="space-y-1.5 text-sm list-decimal list-inside">
                     @forelse ($going as $rsvp)
-                        <li>{{ $rsvp->player->name }}
+                        <li><span class="{{ $rsvp->player->nameColorClass() }}">{{ $rsvp->player->name }}</span>
                             @if ($rsvp->player->isGuest())<span class="text-xs text-gold">(misafir)</span>@endif
                             @if ($myPlayer && $rsvp->player_id === $myPlayer->id)<span class="text-xs text-pitch-muted">(sen)</span>@endif
                         </li>

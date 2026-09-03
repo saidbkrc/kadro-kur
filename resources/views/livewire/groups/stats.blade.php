@@ -41,7 +41,7 @@
                                     <tr>
                                         <td class="py-2 px-2 border-b border-pitch-line font-display font-bold {{ $i === 0 ? 'text-gold' : 'text-pitch-muted' }} w-9">{{ $i === 0 ? '👑' : ($i + 1).'.' }}</td>
                                         <td class="py-2 px-2 border-b border-pitch-line font-semibold">
-                                            <a href="{{ route('groups.player', [$group, $s['player']]) }}" wire:navigate class="hover:text-bibB hover:underline">{{ $s['player']->name }}</a>
+                                            <a href="{{ route('groups.player', [$group, $s['player']]) }}" wire:navigate class="hover:underline {{ $s['player']->nameColorClass() ?: 'hover:text-bibB' }}">{{ $s['player']->name }}</a>
                                         </td>
                                         <td class="py-2 px-2 border-b border-pitch-line text-center font-extrabold text-gold">{{ $s['goals'] }}</td>
                                         <td class="py-2 px-2 border-b border-pitch-line text-center">{{ $s['played'] }}</td>
@@ -99,7 +99,7 @@
                                 @foreach ($playerStats as $s)
                                     <tr>
                                         <td class="py-2 px-2 border-b border-pitch-line font-semibold">
-                                            <a href="{{ route('groups.player', [$group, $s['player']]) }}" wire:navigate class="hover:text-bibB hover:underline">{{ $s['player']->name }}</a>
+                                            <a href="{{ route('groups.player', [$group, $s['player']]) }}" wire:navigate class="hover:underline {{ $s['player']->nameColorClass() ?: 'hover:text-bibB' }}">{{ $s['player']->name }}</a>
                                             @foreach (array_slice($earnedIcons[$s['player']->id] ?? [], 0, 5) as $icon)<span class="ms-0.5">{{ $icon }}</span>@endforeach
                                         </td>
                                         <td class="py-2 px-2 border-b border-pitch-line text-center">{{ $s['played'] }}</td>

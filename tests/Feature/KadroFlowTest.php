@@ -1920,6 +1920,44 @@ class KadroFlowTest extends TestCase
         $this->assertNull($owner->refresh()->equipped_frame);
     }
 
+    public function test_isim_rengi_tum_listelerde_gorunur(): void
+    {
+        $owner = User::factory()->create();
+        $group = $this->makeGroup($owner);
+        $ownPlayer = $group->playerFor($owner);
+        $friend = $this->addMember($group);
+
+        $match = $this->makeMatch($group);
+        $match->setRsvp($ownPlayer, 'going');
+        $match->setRsvp($friend, 'going');
+        $match->applySquad([$ownPlayer->id], [$friend->id]);
+
+        // Altın isim alınır (300 Çim)
+        $owner->forceFill(['cim_balance' => 500, 'cim_granted_at' => now()])->save();
+        Livewire::actingAs($owner)
+            ->test(Groups\Kehanet::class, ['group' => $group])
+            ->call('buyItem', 'color_gold');
+
+        $this->assertSame('color_gold', $owner->refresh()->equipped_color);
+        $this->assertSame('text-gold', $ownPlayer->fresh()->nameColorClass());
+        $this->assertSame('#FFC83D', $ownPlayer->fresh()->nameColorHex());
+
+        // Renk, adın göründüğü her yerde uygulanır
+        $this->actingAs($owner)->get(route('groups.show', $group))
+            ->assertOk()->assertSee('text-gold', false);          // oyuncu havuzu
+
+        $this->actingAs($owner)->get(route('groups.player', [$group, $ownPlayer]))
+            ->assertOk()->assertSee('text-gold', false);          // profil + FIFA kartı
+
+        $this->actingAs($owner)->get(route('matches.show', $match))
+            ->assertOk()
+            ->assertSee('text-gold', false)                        // takım/katılım listeleri
+            ->assertSee('fill="#FFC83D"', false);                  // saha dizilişindeki isim
+
+        // Rengi olmayan oyuncu varsayılan beyaz kalır
+        $this->assertSame('#ffffff', $friend->fresh()->nameColorHex());
+    }
+
     public function test_saha_rozeti_dizilis_gorseline_yansir(): void
     {
         $owner = User::factory()->create();

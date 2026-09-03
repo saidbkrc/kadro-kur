@@ -211,7 +211,7 @@
                                 <x-ovr-badge :player="$player" num-class="text-2xl w-11" />
                                 <div class="min-w-0">
                                     <div class="flex items-center gap-1.5 flex-wrap">
-                                        <a href="{{ route('groups.player', [$group, $player]) }}" wire:navigate class="font-semibold hover:text-bibB hover:underline">{{ $player->name }}</a>
+                                        <a href="{{ route('groups.player', [$group, $player]) }}" wire:navigate class="font-semibold hover:underline {{ $player->nameColorClass() ?: 'hover:text-bibB' }}">{{ $player->name }}</a>
                                         @if ($player->shirt_number)
                                             <span class="text-pitch-muted text-sm">#{{ $player->shirt_number }}</span>
                                         @endif
