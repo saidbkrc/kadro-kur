@@ -388,6 +388,53 @@ class KehanetService
         return count($ozet);
     }
 
+    /**
+     * Başkanın hiç işaretlemediği olay market'lerinin kuponlarını iade eder.
+     * Aksi halde o kuponlar sonsuza kadar beklemede kalır ve Çim kilitli olurdu.
+     */
+    public function voidStaleEventBets(): int
+    {
+        $sinir = now()->subDays(Kehanet::EVENT_VOID_AFTER_DAYS);
+
+        $olayMarketleri = collect(Kehanet::MARKETS)
+            ->filter(fn ($m) => ($m['source'] ?? 'auto') === 'event')
+            ->keys();
+
+        $eskiMaclar = FootballMatch::where('status', 'completed')
+            ->where('starts_at', '<', $sinir)
+            ->pluck('id');
+
+        $bekleyenler = Prediction::whereIn('match_id', $eskiMaclar)
+            ->whereIn('market_key', $olayMarketleri)
+            ->where('status', 'pending')
+            ->get();
+
+        $sayac = 0;
+
+        foreach ($bekleyenler as $kupon) {
+            // Olay gerçekten işaretlenmemişse iade et (işaretliyse settleMatch zaten çözer)
+            $isaretli = MatchEvent::where('match_id', $kupon->match_id)
+                ->where('event_key', $kupon->market_key)
+                ->exists();
+
+            if ($isaretli) {
+                continue;
+            }
+
+            $kupon->update(['status' => 'void', 'payout' => $kupon->stake, 'settled_at' => now()]);
+
+            if ($kupon->slip_id === null) {
+                $this->adjustBalance($kupon->user_id, $kupon->stake, 'refund', 'Sonuç girilmedi');
+            } else {
+                $this->voidSlip($kupon->slip, 'Sonuç girilmedi');
+            }
+
+            $sayac++;
+        }
+
+        return $sayac;
+    }
+
     /** Oylaması kapanmış maçların ödüllerini dağıtır (scheduler saatlik çağırır). */
     public function awardDueBonuses(): int
     {

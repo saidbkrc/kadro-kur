@@ -22,7 +22,19 @@ class Kehanet
     /** Oran sınırları (aşırı uçları kırpar). */
     public const MIN_ODDS = 1.05;
 
+    /** Genel tavan — skor tam tahmini gibi doğası gereği uzak ihtimaller için. */
     public const MAX_ODDS = 20.0;
+
+    /** Oyuncu bazlı market'lerde tavan daha düşük (kadro büyüdükçe oran şişmesin). */
+    public const MAX_ODDS_PLAYER = 10.0;
+
+    /** Market'in oran tavanı. */
+    public static function maxOdds(string $market): float
+    {
+        return (self::MARKETS[$market]['kind'] ?? '') === 'oyuncu'
+            ? self::MAX_ODDS_PLAYER
+            : self::MAX_ODDS;
+    }
 
     /** Kombine kuponda en az / en çok bacak sayısı. */
     public const MIN_LEGS = 2;
@@ -42,12 +54,18 @@ class Kehanet
 
     /** Başkanın maç sonrası işaretlediği olaylar — manuel market'lerin kaynağı. */
     public const EVENTS = [
+        'macin_golu' => ['icon' => '🌟', 'name' => 'Maçın golü', 'hint' => 'Maçın en güzel golünü atan'],
+        'absurt_gol' => ['icon' => '🤪', 'name' => 'En absürt gol', 'hint' => 'Nasıl girdiği belli olmayan golü atan'],
+        'asist' => ['icon' => '🎁', 'name' => 'Günün asisti', 'hint' => 'En güzel gol pasını veren'],
         'gerginlik' => ['icon' => '😤', 'name' => 'Gerginlik yaşayan', 'hint' => 'Saha içinde en çok tartışan'],
         'calim' => ['icon' => '🪄', 'name' => 'Günün çalımı', 'hint' => 'En güzel çalımı atan'],
         'iska' => ['icon' => '🤦', 'name' => 'Günün ıskası', 'hint' => 'Kaçırılmaz pozisyonu kaçıran'],
         'kurtaris' => ['icon' => '🧤', 'name' => 'Günün kurtarışı', 'hint' => 'En iyi kurtarışı yapan'],
         'gec_gelen' => ['icon' => '⏰', 'name' => 'En geç gelen', 'hint' => 'Maça en son yetişen'],
     ];
+
+    /** İşaretlenmemiş olay kuponları bu kadar gün sonra iade edilir (sonsuza kadar beklemesin). */
+    public const EVENT_VOID_AFTER_DAYS = 14;
 
     /**
      * Tahmin market'leri. 'auto' olanlar maç verisinden kendiliğinden sonuçlanır;
@@ -65,6 +83,9 @@ class Kehanet
         'mvp' => ['icon' => '🌟', 'name' => 'Maçın adamı', 'kind' => 'oyuncu', 'source' => 'auto'],
         'forma' => ['icon' => '👕', 'name' => 'Forma golünü atacak', 'kind' => 'oyuncu', 'source' => 'auto'],
         'top_perf' => ['icon' => '📈', 'name' => 'En yüksek performans', 'kind' => 'oyuncu', 'source' => 'auto'],
+        'macin_golu' => ['icon' => '🌟', 'name' => 'Maçın golünü atacak', 'kind' => 'oyuncu', 'source' => 'event'],
+        'absurt_gol' => ['icon' => '🤪', 'name' => 'En absürt golü atacak', 'kind' => 'oyuncu', 'source' => 'event'],
+        'asist' => ['icon' => '🎁', 'name' => 'Günün asistini yapacak', 'kind' => 'oyuncu', 'source' => 'event'],
         'gerginlik' => ['icon' => '😤', 'name' => 'Gerginlik yaşayacak', 'kind' => 'oyuncu', 'source' => 'event'],
         'calim' => ['icon' => '🪄', 'name' => 'Günün çalımı', 'kind' => 'oyuncu', 'source' => 'event'],
         'iska' => ['icon' => '🤦', 'name' => 'Günün ıskası', 'kind' => 'oyuncu', 'source' => 'event'],

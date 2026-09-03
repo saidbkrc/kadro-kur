@@ -26,7 +26,7 @@ class OddsCalculator
     {
         $p = max(0.001, min(0.99, $this->probability($match, $market, $selection)));
 
-        return round(max(Kehanet::MIN_ODDS, min(Kehanet::MAX_ODDS, 1 / $p)), 2);
+        return round(max(Kehanet::MIN_ODDS, min(Kehanet::maxOdds($market), 1 / $p)), 2);
     }
 
     /** Seçimin gerçekleşme olasılığı (0-1). */

@@ -52,6 +52,20 @@ class Kehanet extends Component
         $this->notice = null;
     }
 
+    /** Mağazadan kozmetik satın al. */
+    public function buyItem(string $itemKey): void
+    {
+        $this->notice = app(\App\Services\CimShopService::class)->buy(Auth::user(), $itemKey)['message'];
+        Auth::user()->refresh();
+    }
+
+    /** Sahip olunan ürünü kuşan / çıkar. */
+    public function equipItem(?string $itemKey, ?string $type = null): void
+    {
+        $this->notice = app(\App\Services\CimShopService::class)->equip(Auth::user(), $itemKey, $type)['message'];
+        Auth::user()->refresh();
+    }
+
     public function mount(Group $group): void
     {
         abort_unless($group->isMember(Auth::user()), 403);
@@ -203,6 +217,7 @@ class Kehanet extends Component
             'openMatches' => collect(), 'pendingMatches' => collect(), 'myBets' => collect(),
             'mySlips' => collect(), 'transactions' => collect(), 'leaders' => collect(),
             'streaks' => collect(), 'pulse' => collect(), 'line' => 8.5, 'awardStatus' => [],
+            'owned' => [],
         ];
 
         if ($this->tab === 'kupon') {
@@ -225,13 +240,15 @@ class Kehanet extends Component
         }
 
         if ($this->tab === 'kuponlarim') {
+            // Maça göre grupla, maç tarihine göre yeniden eskiye sırala
             $veri['myBets'] = Prediction::where('user_id', $user->id)
                 ->whereIn('match_id', $macIdler)
                 ->whereNull('slip_id')
                 ->with('match')
-                ->orderByDesc('id')
-                ->limit(25)
-                ->get();
+                ->get()
+                ->sortByDesc(fn ($b) => $b->match?->starts_at)
+                ->groupBy('match_id')
+                ->take(10);
 
             $veri['mySlips'] = \App\Models\PredictionSlip::where('user_id', $user->id)
                 ->where('group_id', $this->group->id)
@@ -265,6 +282,10 @@ class Kehanet extends Component
                 ->orderByDesc('id')
                 ->limit(30)
                 ->get();
+        }
+
+        if ($this->tab === 'magaza') {
+            $veri['owned'] = app(\App\Services\CimShopService::class)->owned($user);
         }
 
         if ($this->tab === 'oduller') {

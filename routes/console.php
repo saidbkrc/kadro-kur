@@ -28,3 +28,9 @@ Schedule::call(fn () => app(App\Services\KehanetService::class)->awardDueBonuses
     ->hourly()
     ->name('kehanet-bonuses')
     ->withoutOverlapping();
+
+// Başkanın işaretlemediği olay kuponları iade edilir (Çim kilitli kalmasın).
+Schedule::call(fn () => app(App\Services\KehanetService::class)->voidStaleEventBets())
+    ->daily()
+    ->name('kehanet-stale-events')
+    ->withoutOverlapping();
