@@ -1483,6 +1483,18 @@ class KadroFlowTest extends TestCase
                 ->assertSee($kehanetUrl);
         }
 
+        // "Son Maç" butonu: oynanmış maç yokken pasif, oynanınca o maça gider
+        $this->actingAs($owner)->get($statsUrl)->assertOk()->assertSee('Son Maç');
+
+        $gecmis = $group->matches()->create([
+            'created_by' => $owner->id, 'title' => 'Geçen hafta', 'starts_at' => now()->subWeek(),
+            'capacity' => 14, 'status' => 'completed', 'team_a_score' => 3, 'team_b_score' => 2,
+        ]);
+
+        $this->actingAs($owner)->get($statsUrl)
+            ->assertOk()
+            ->assertSee(route('matches.show', $gecmis));
+
         // Yaklaşan maç yoksa buton "Maç yok" olarak pasifleşir
         $match->update(['status' => 'cancelled']);
         $this->actingAs($owner)->get($statsUrl)
@@ -1667,6 +1679,16 @@ class KadroFlowTest extends TestCase
         $this->assertSame('4-2', $skorKuponu->selection);
         $this->assertGreaterThan(3.0, (float) $skorKuponu->odds, 'Tam skor oranı yüksek olmalı');
 
+        // Oyuncu bazlı market'lerde oran tavanı 10× (skor tahmininde 20× kalır)
+        $oranMotoru = app(\App\Services\OddsCalculator::class);
+        foreach (['scorer', 'mvp', 'gerginlik', 'macin_golu'] as $market) {
+            $this->assertLessThanOrEqual(
+                \App\Support\Kehanet::MAX_ODDS_PLAYER,
+                $oranMotoru->odds($match, $market, (string) $friend->id),
+                "{$market} oranı 10×'i aşmamalı",
+            );
+        }
+
         // Kombine: iki tahmin, oranlar çarpılır (5-1 = 6 gol → 8.5 altı)
         $c->call('toggleParlay', $match->id, 'winner', 'A')
             ->call('toggleParlay', $match->id, 'total_goals', 'under')
@@ -1779,6 +1801,24 @@ class KadroFlowTest extends TestCase
         $acikMac->goals()->create(['player_id' => $golcu->id, 'count' => 1]);
         $this->assertSame(0, app(\App\Services\KehanetService::class)->awardMatchBonuses($acikMac));
 
+        // İşaretlenmemiş olay kuponu 14 gün sonra iade edilir (sonsuza kadar beklemesin)
+        $eskiMac = $group->matches()->create([
+            'created_by' => $owner->id, 'title' => 'Çok eski maç', 'starts_at' => now()->subDays(20),
+            'capacity' => 14, 'status' => 'completed', 'team_a_score' => 2, 'team_b_score' => 1,
+            'mvp_closes_at' => now()->subDays(13),
+        ]);
+        $unutulan = \App\Models\Prediction::create([
+            'user_id' => $owner->id, 'match_id' => $eskiMac->id, 'market_key' => 'macin_golu',
+            'selection' => (string) $golcu->id, 'odds' => 3.0, 'stake' => 40,
+        ]);
+        $bakiyeOnce = $owner->refresh()->cim_balance;
+
+        $iade = app(\App\Services\KehanetService::class)->voidStaleEventBets();
+
+        $this->assertSame(1, $iade);
+        $this->assertSame('void', $unutulan->refresh()->status);
+        $this->assertSame($bakiyeOnce + 40, $owner->refresh()->cim_balance);
+
         // Ödüller sekmesi: alındı/alınmadı durumu görünür
         Livewire::actingAs($golcu->user)
             ->test(Groups\Kehanet::class, ['group' => $group])
@@ -1829,6 +1869,103 @@ class KadroFlowTest extends TestCase
 
         $this->assertSame('void', \App\Models\Prediction::first()->status);
         $this->assertSame($sonra + 50, $owner->refresh()->cim_balance, 'İptalde Çim iade edilmeli');
+    }
+
+    public function test_cim_magazasi_satin_alma_ve_kusanma(): void
+    {
+        $owner = User::factory()->create();
+        $group = $this->makeGroup($owner);
+        $player = $group->playerFor($owner);
+
+        // Yetersiz bakiyeyle alınamaz
+        $owner->forceFill(['cim_balance' => 100, 'cim_granted_at' => now()])->save();
+        Livewire::actingAs($owner)
+            ->test(Groups\Kehanet::class, ['group' => $group])
+            ->call('buyItem', 'frame_efsane')   // 2500 Çim
+            ->assertSet('notice', fn ($v) => str_contains((string) $v, 'Yeterli Çim yok'));
+        $this->assertSame(0, \App\Models\CimPurchase::count());
+
+        // Yeterli bakiyeyle alınır, Çim düşer ve otomatik kuşanılır
+        $owner->forceFill(['cim_balance' => 1000])->save();
+        Livewire::actingAs($owner)
+            ->test(Groups\Kehanet::class, ['group' => $group])
+            ->call('buyItem', 'frame_ates');    // 400 Çim
+
+        $owner->refresh();
+        $this->assertSame(600, $owner->cim_balance);
+        $this->assertSame('frame_ates', $owner->equipped_frame);
+        $this->assertSame(1, \App\Models\CimTransaction::where('type', 'shop')->count());
+
+        // Aynı ürün ikinci kez alınamaz (bakiye değişmez)
+        Livewire::actingAs($owner)
+            ->test(Groups\Kehanet::class, ['group' => $group])
+            ->call('buyItem', 'frame_ates')
+            ->assertSet('notice', fn ($v) => str_contains((string) $v, 'zaten senin'));
+        $this->assertSame(600, $owner->refresh()->cim_balance);
+
+        // Sahip olunmayan ürün kuşanılamaz
+        Livewire::actingAs($owner)
+            ->test(Groups\Kehanet::class, ['group' => $group])
+            ->call('equipItem', 'frame_elmas')
+            ->assertSet('notice', fn ($v) => str_contains((string) $v, 'sahip değilsin'));
+        $this->assertSame('frame_ates', $owner->refresh()->equipped_frame);
+
+        // Kozmetik oyuncu kartına yansır
+        $this->assertStringContainsString('#FF7A1A', $player->fresh()->frameClass());
+
+        // Çıkarılabilir
+        Livewire::actingAs($owner)
+            ->test(Groups\Kehanet::class, ['group' => $group])
+            ->call('equipItem', null, 'frame');
+        $this->assertNull($owner->refresh()->equipped_frame);
+    }
+
+    public function test_istatistik_arama_ve_mac_sayfalama(): void
+    {
+        $owner = User::factory()->create();
+        $group = $this->makeGroup($owner);
+        $ali = $group->players()->create(['name' => 'Ali Veli', 'positions' => []]);
+        $mehmet = $group->players()->create(['name' => 'Mehmet Can', 'positions' => []]);
+
+        // 12 tamamlanmış maç → ilk açılışta 10 gösterilir
+        foreach (range(1, 12) as $i) {
+            $m = $group->matches()->create([
+                'created_by' => $owner->id, 'title' => "Maç {$i}", 'starts_at' => now()->subDays(20 - $i),
+                'capacity' => 14, 'status' => 'completed', 'team_a_score' => 2, 'team_b_score' => 1,
+            ]);
+            $m->rsvps()->create(['player_id' => $ali->id, 'status' => 'going', 'team' => 'A']);
+            $m->rsvps()->create(['player_id' => $mehmet->id, 'status' => 'going', 'team' => 'B']);
+        }
+
+        $c = Livewire::actingAs($owner)->test(Groups\Stats::class, ['group' => $group]);
+        $c->assertSee('12 MAÇ')->assertSee('Daha fazla göster');
+
+        $c->call('loadMoreMatches')->assertDontSee('Daha fazla göster');
+
+        // Arama: oyuncu tablosunda sadece eşleşen kalır (maç geçmişi filtrelenmez)
+        $adlar = fn ($comp) => collect($comp->viewData('playerStats'))->map(fn ($s) => $s['player']->name)->all();
+
+        $c->set('search', 'Ali');
+        $this->assertSame(['Ali Veli'], $adlar($c));
+
+        $c->set('search', 'mehmet');   // büyük/küçük harf duyarsız
+        $this->assertSame(['Mehmet Can'], $adlar($c));
+
+        $c->set('search', '');
+        $this->assertCount(2, $adlar($c));
+    }
+
+    public function test_gizlilik_metni_girissiz_acilir(): void
+    {
+        $this->get(route('gizlilik'))
+            ->assertOk()
+            ->assertSee('Aydınlatma Metni')
+            ->assertSee('KVKK');
+
+        // Kayıt ekranından linklenir
+        $this->get(route('register'))
+            ->assertOk()
+            ->assertSee(route('gizlilik'));
     }
 
     public function test_sayfalar_acilir(): void

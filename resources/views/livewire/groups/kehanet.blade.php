@@ -1,5 +1,6 @@
 @php
     use App\Support\Kehanet as K;
+    use App\Support\CimShop;
 @endphp
 
 <div class="py-10">
@@ -49,6 +50,7 @@
                 'kupon' => ['🎯', 'Kupon Yap', null],
                 'kuponlarim' => ['🎫', 'Kuponlarım', $pendingCount ?: null],
                 'oduller' => ['🎁', 'Ödüller', null],
+                'magaza' => ['🛒', 'Mağaza', null],
                 'kahin' => ['👑', 'Ayın Kâhini', null],
                 'cim' => ['💸', 'Çim', null],
             ];
@@ -58,7 +60,7 @@
         @endphp
 
         <div class="bg-pitch-surface border border-pitch-line rounded-xl p-2">
-            <div class="grid grid-cols-3 sm:grid-cols-{{ $isAdmin ? '6' : '5' }} gap-2">
+            <div class="grid grid-cols-3 sm:grid-cols-{{ $isAdmin ? '7' : '6' }} gap-2">
                 @foreach ($sekmeler as $anahtar => [$ikon, $etiket, $rozet])
                     <button type="button" wire:click="setTab('{{ $anahtar }}')"
                             class="relative flex flex-col items-center justify-center gap-0.5 px-2 py-2.5 rounded-lg border text-center transition min-w-0
@@ -121,39 +123,47 @@
             </div>
         @endif
 
-        {{-- Aktif kuponların (sonucu beklenenler) --}}
-        @php $aktif = $myBets->where('status', 'pending'); @endphp
-        @if ($tab === 'kuponlarim' && $aktif->isNotEmpty())
-            <div class="bg-pitch-surface border border-gold/40 rounded-xl p-4 sm:p-6">
-                <div class="flex items-baseline justify-between gap-2 mb-3 flex-wrap">
+        {{-- Bekleyen tahminler — maça göre gruplu, en yeni maç üstte --}}
+        @php
+            // $myBets sekmeye göre farklı gelir: 'kuponlarim'da maça göre gruplu
+            $bekleyenGruplar = $tab === 'kuponlarim'
+                ? $myBets->map(fn ($g) => $g->where('status', 'pending'))->filter(fn ($g) => $g->isNotEmpty())
+                : collect();
+            $bekleyenAdet = $bekleyenGruplar->flatten()->count();
+        @endphp
+        @if ($bekleyenAdet > 0)
+            <div class="bg-pitch-surface border border-gold/40 rounded-xl p-4 sm:p-6 space-y-3">
+                <div class="flex items-baseline justify-between gap-2 flex-wrap">
                     <h3 class="font-display uppercase tracking-wider text-lg font-semibold text-gold">⏳ Bekleyen Tahminlerin</h3>
                     <span class="text-xs text-pitch-muted">
-                        {{ $aktif->count() }} kupon · {{ number_format($aktif->sum('stake')) }} Çim riskte
+                        {{ $bekleyenAdet }} kupon · {{ number_format($bekleyenGruplar->flatten()->sum('stake')) }} Çim riskte
                     </span>
                 </div>
 
-                <div class="space-y-2">
-                    @foreach ($aktif as $bet)
-                        <div class="flex items-center justify-between gap-3 bg-pitch-bg border border-pitch-line rounded-lg px-3 py-2">
-                            <div class="min-w-0">
-                                <div class="text-sm min-w-0">
-                                    <span class="text-pitch-muted">{{ K::icon($bet->market_key) }} {{ K::label($bet->market_key) }}:</span>
-                                    <strong class="text-bibB">{{ $this->selectionText($bet->market_key, $bet->selection) }}</strong>
-                                </div>
-                                <div class="text-xs text-pitch-muted truncate">
-                                    {{ $bet->match?->title }}
-                                    @if ($bet->match)
-                                        · 📅 {{ $bet->match->starts_at->translatedFormat('d F, l H:i') }}
-                                    @endif
-                                </div>
-                            </div>
-                            <div class="text-end shrink-0">
-                                <div class="font-display font-bold text-sm">{{ $bet->stake }} → <span class="text-gold">{{ $bet->potentialPayout() }}</span></div>
-                                <div class="text-[11px] text-pitch-muted">{{ $bet->odds }}×</div>
-                            </div>
+                @foreach ($bekleyenGruplar as $kuponlar)
+                    @php $mac = $kuponlar->first()->match; @endphp
+                    <div class="border border-pitch-line rounded-lg p-3">
+                        <div class="flex items-baseline justify-between gap-2 mb-2 flex-wrap pb-2 border-b border-pitch-line">
+                            <span class="text-sm font-semibold min-w-0 truncate">{{ $mac?->title }}</span>
+                            <span class="text-[11px] text-pitch-muted shrink-0">📅 {{ $mac?->starts_at->translatedFormat('d F, l H:i') }}</span>
                         </div>
-                    @endforeach
-                </div>
+
+                        <div class="space-y-1.5">
+                            @foreach ($kuponlar as $bet)
+                                <div class="flex items-center justify-between gap-3 text-sm">
+                                    <span class="min-w-0">
+                                        <span class="text-pitch-muted">{{ K::icon($bet->market_key) }} {{ K::label($bet->market_key) }}:</span>
+                                        <strong class="text-bibB">{{ $this->selectionText($bet->market_key, $bet->selection) }}</strong>
+                                    </span>
+                                    <span class="text-end shrink-0">
+                                        <span class="font-display font-bold">{{ $bet->stake }} → <span class="text-gold">{{ $bet->potentialPayout() }}</span></span>
+                                        <span class="text-[11px] text-pitch-muted ms-1">{{ $bet->odds }}×</span>
+                                    </span>
+                                </div>
+                            @endforeach
+                        </div>
+                    </div>
+                @endforeach
             </div>
         @endif
 
@@ -375,6 +385,69 @@
             </div>
         @endif
 
+        {{-- Mağaza: biriken Çim'i harcama yeri (yalnızca görünüm, oyun avantajı yok) --}}
+        @if ($tab === 'magaza')
+            <div class="bg-pitch-surface border border-pitch-line rounded-xl p-4 sm:p-6">
+                <h3 class="font-display uppercase tracking-wider text-lg font-semibold">🛒 Çim Mağazası</h3>
+                <p class="text-xs text-pitch-muted mt-1">
+                    Biriken Çim'ini kart görünümüne harca. Satın aldıkların kalıcıdır ve istediğin zaman değiştirebilirsin —
+                    <strong class="text-pitch-ink">hiçbiri oyun içi avantaj sağlamaz</strong>, sadece görünüm.
+                </p>
+            </div>
+
+            @foreach (CimShop::grouped() as $tur => $urunler)
+                @php $turBilgi = CimShop::TYPES[$tur]; @endphp
+                <div class="bg-pitch-surface border border-pitch-line rounded-xl p-4 sm:p-6">
+                    <div class="flex items-baseline justify-between gap-2 mb-3 flex-wrap">
+                        <div>
+                            <div class="text-[11px] tracking-[.14em] text-pitch-muted">{{ $turBilgi['icon'] }} {{ mb_strtoupper($turBilgi['name'], 'UTF-8') }}</div>
+                            <p class="text-[11px] text-pitch-muted/70">{{ $turBilgi['hint'] }}</p>
+                        </div>
+                        @if (auth()->user()->{'equipped_'.$tur})
+                            <button wire:click="equipItem(null, '{{ $tur }}')" class="text-[11px] text-pitch-muted hover:text-pitch-ink underline">Çıkar</button>
+                        @endif
+                    </div>
+
+                    <div class="grid sm:grid-cols-2 gap-2">
+                        @foreach ($urunler as $key => $urun)
+                            @php
+                                $sahip = in_array($key, $owned, true);
+                                $kusanili = auth()->user()->{'equipped_'.$tur} === $key;
+                            @endphp
+                            <div class="flex items-center gap-3 rounded-lg border px-3 py-2.5 transition
+                                        {{ $kusanili ? 'border-bibB bg-bibB/5' : ($sahip ? 'border-pitch-line' : 'border-pitch-line/60') }}">
+                                <span class="text-2xl shrink-0 {{ $sahip ? '' : 'opacity-40' }}">{{ $urun['icon'] }}</span>
+
+                                <div class="min-w-0 flex-1">
+                                    <div class="text-sm font-semibold {{ $tur === 'color' && $sahip ? $urun['class'] : '' }}">{{ $urun['name'] }}</div>
+                                    <div class="text-[11px] text-pitch-muted leading-snug">{{ $urun['desc'] }}</div>
+                                </div>
+
+                                <div class="shrink-0">
+                                    @if ($kusanili)
+                                        <span class="text-xs text-bibB font-semibold">✓ Kuşanılı</span>
+                                    @elseif ($sahip)
+                                        <button wire:click="equipItem('{{ $key }}')"
+                                                class="text-xs px-3 py-1.5 rounded-md border border-pitch-line hover:bg-pitch-surface2">Kuşan</button>
+                                    @else
+                                        <button wire:click="buyItem('{{ $key }}')"
+                                                data-confirm="{{ $urun['name'] }} — {{ number_format($urun['price']) }} Çim. Satın alınsın mı?"
+                                                data-confirm-danger="false"
+                                                class="text-xs px-3 py-1.5 rounded-md border transition whitespace-nowrap
+                                                       {{ $balance >= $urun['price']
+                                                          ? 'border-gold/50 bg-gold/10 text-gold hover:brightness-125'
+                                                          : 'border-pitch-line text-pitch-muted opacity-60' }}">
+                                            {{ number_format($urun['price']) }} Çim
+                                        </button>
+                                    @endif
+                                </div>
+                            </div>
+                        @endforeach
+                    </div>
+                </div>
+            @endforeach
+        @endif
+
         {{-- Ödüller: hangisini aldın, hangisini almadın --}}
         @if ($tab === 'oduller')
             @php
@@ -517,33 +590,53 @@
             @if ($myBets->isEmpty())
                 <p class="text-sm text-pitch-muted">Henüz kupon yapmadın.</p>
             @else
-                <div class="divide-y divide-pitch-line">
-                    @foreach ($myBets as $bet)
+                {{-- Maça göre gruplu: hangi kuponun hangi maça ait olduğu net --}}
+                <div class="space-y-3">
+                    @foreach ($myBets as $kuponlar)
                         @php
-                            $renk = match ($bet->status) {
-                                'won' => 'text-[#7DE39A]', 'lost' => 'text-[#FF8A8A]',
-                                'void' => 'text-pitch-muted', default => 'text-gold',
-                            };
-                            $durum = match ($bet->status) {
-                                'won' => '✓ Kazandı', 'lost' => '✕ Kaybetti',
-                                'void' => '↩ İade', default => '⏳ Bekliyor',
-                            };
+                            $mac = $kuponlar->first()->match;
+                            $net = $kuponlar->sum(fn ($b) => $b->status === 'won' ? $b->payout - $b->stake : ($b->status === 'lost' ? -$b->stake : 0));
                         @endphp
-                        <div class="flex items-center justify-between gap-3 py-2 text-sm">
-                            <div class="min-w-0">
-                                <div class="truncate">
-                                    <span class="text-pitch-muted">{{ K::icon($bet->market_key) }} {{ K::label($bet->market_key) }}:</span>
-                                    <strong>{{ $this->selectionText($bet->market_key, $bet->selection) }}</strong>
-                                </div>
-                                <div class="text-xs text-pitch-muted truncate">{{ $bet->match?->title }} · {{ $bet->stake }} Çim @ {{ $bet->odds }}×</div>
+                        <div class="border border-pitch-line rounded-lg p-3">
+                            <div class="flex items-baseline justify-between gap-2 pb-2 mb-2 border-b border-pitch-line flex-wrap">
+                                <span class="text-sm font-semibold min-w-0 truncate">
+                                    {{ $mac?->title }}
+                                    @if ($mac?->status === 'completed')
+                                        <span class="text-xs text-pitch-muted">({{ $mac->team_a_score }}-{{ $mac->team_b_score }})</span>
+                                    @endif
+                                </span>
+                                <span class="flex items-center gap-2 shrink-0">
+                                    <span class="text-[11px] text-pitch-muted">📅 {{ $mac?->starts_at->translatedFormat('d F, l') }}</span>
+                                    @if ($net !== 0)
+                                        <span class="font-display font-bold text-xs {{ $net > 0 ? 'text-[#7DE39A]' : 'text-[#FF8A8A]' }}">
+                                            {{ $net > 0 ? '+' : '' }}{{ number_format($net) }}
+                                        </span>
+                                    @endif
+                                </span>
                             </div>
-                            <div class="text-end shrink-0">
-                                <div class="text-xs {{ $renk }}">{{ $durum }}</div>
-                                @if ($bet->status === 'won')
-                                    <div class="font-display font-bold text-[#7DE39A]">+{{ $bet->payout - $bet->stake }}</div>
-                                @elseif ($bet->status === 'lost')
-                                    <div class="font-display font-bold text-[#FF8A8A]">−{{ $bet->stake }}</div>
-                                @endif
+
+                            <div class="space-y-1.5">
+                                @foreach ($kuponlar as $bet)
+                                    @php
+                                        $renk = match ($bet->status) {
+                                            'won' => 'text-[#7DE39A]', 'lost' => 'text-[#FF8A8A]',
+                                            'void' => 'text-pitch-muted', default => 'text-gold',
+                                        };
+                                        $durum = match ($bet->status) {
+                                            'won' => '✓', 'lost' => '✕', 'void' => '↩', default => '⏳',
+                                        };
+                                    @endphp
+                                    <div class="flex items-center justify-between gap-3 text-sm">
+                                        <span class="min-w-0 truncate">
+                                            <span class="{{ $renk }}">{{ $durum }}</span>
+                                            <span class="text-pitch-muted">{{ K::icon($bet->market_key) }} {{ K::label($bet->market_key) }}:</span>
+                                            <strong>{{ $this->selectionText($bet->market_key, $bet->selection) }}</strong>
+                                        </span>
+                                        <span class="text-end shrink-0 text-[11px] text-pitch-muted">
+                                            {{ $bet->stake }} Çim @ {{ $bet->odds }}×
+                                        </span>
+                                    </div>
+                                @endforeach
                             </div>
                         </div>
                     @endforeach

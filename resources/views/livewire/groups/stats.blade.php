@@ -7,6 +7,18 @@
             <h2 class="font-display uppercase tracking-wider text-2xl font-bold mt-1">İstatistikler</h2>
         </div>
 
+        {{-- Oyuncu arama --}}
+        <div class="bg-pitch-surface border border-pitch-line rounded-xl p-3">
+            <div class="flex items-center gap-2">
+                <span class="text-pitch-muted text-sm shrink-0">🔍</span>
+                <input type="search" wire:model.live.debounce.300ms="search" placeholder="Oyuncu ara…"
+                       class="w-full bg-pitch-bg border-pitch-line text-pitch-ink placeholder-pitch-muted/60 rounded-md text-sm focus:border-bibB focus:ring-bibB/40">
+                @if ($search !== '')
+                    <button wire:click="$set('search', '')" class="shrink-0 text-xs text-pitch-muted hover:text-pitch-ink px-2">Temizle</button>
+                @endif
+            </div>
+        </div>
+
         <div class="grid lg:grid-cols-2 gap-6 items-start">
             <div class="space-y-6 min-w-0">
                 
@@ -107,7 +119,7 @@
 
             {{-- Maç geçmişi --}}
             <div class="min-w-0 bg-pitch-surface border border-pitch-line rounded-xl p-4 sm:p-6">
-                <h3 class="font-display uppercase tracking-wider text-lg font-semibold mb-3">Maç Geçmişi <span class="text-xs text-pitch-muted font-normal tracking-widest">{{ $matches->count() }} MAÇ</span></h3>
+                <h3 class="font-display uppercase tracking-wider text-lg font-semibold mb-3">Maç Geçmişi <span class="text-xs text-pitch-muted font-normal tracking-widest">{{ $totalMatches }} MAÇ</span></h3>
                 @if ($matches->isEmpty())
                     <p class="text-pitch-muted text-sm">Kayıtlı maç yok. Maç sayfasında takımları kurup maç sonrası skoru kaydet.</p>
                 @endif
@@ -156,6 +168,14 @@
                         </a>
                     @endforeach
                 </div>
+
+                @if ($matches->count() < $totalMatches)
+                    <div class="pt-3 text-center">
+                        <x-secondary-button wire:click="loadMoreMatches" class="w-full sm:w-auto">
+                            Daha fazla göster ({{ $matches->count() }}/{{ $totalMatches }})
+                        </x-secondary-button>
+                    </div>
+                @endif
             </div>
         </div>
     </div>

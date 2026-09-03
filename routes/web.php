@@ -9,6 +9,9 @@ Route::get('/', function () {
     return redirect()->route(auth()->check() ? 'dashboard' : 'login');
 });
 
+// KVKK aydınlatma metni — girişsiz erişilebilir (kayıt ekranından link verilir)
+Route::view('gizlilik', 'gizlilik')->name('gizlilik');
+
 // Davet linki girişsiz açılabilir: grup görülür, katılmak için kayıt/giriş istenir.
 Route::get('davet/{code}', Groups\Join::class)->name('groups.join');
 

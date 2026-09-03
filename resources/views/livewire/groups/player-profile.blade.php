@@ -11,7 +11,7 @@
         <div class="bg-pitch-surface border border-pitch-line rounded-xl p-4 sm:p-6 flex items-center gap-4">
             <x-ovr-badge :player="$player" numClass="text-4xl w-16" />
             <div class="min-w-0">
-                <h2 class="font-display uppercase tracking-wider text-2xl font-bold truncate">{{ $player->name }}</h2>
+                <h2 class="font-display uppercase tracking-wider text-2xl font-bold truncate {{ $player->nameColorClass() }}">{{ $player->name }}</h2>
                 <div class="text-sm text-pitch-muted mt-0.5 flex flex-wrap items-center gap-x-2 gap-y-1">
                     @if (!empty($player->positions))
                         <span class="font-semibold text-pitch-ink">{{ implode(' · ', $player->positions) }}</span>
@@ -124,7 +124,7 @@
             $ovrTier = $ovr === null ? 'text-pitch-muted' : ($ovr >= 8 ? 'text-gold' : ($ovr >= 6.5 ? 'text-[#7DE39A]' : 'text-pitch-ink'));
         @endphp
         <div>
-            <div class="relative w-64 mx-auto rounded-2xl border border-gold/50 bg-gradient-to-b from-pitch-surface2 to-pitch-surface p-5 shadow-[0_0_35px_rgba(255,200,61,.10)]">
+            <div class="relative w-64 mx-auto rounded-2xl border bg-gradient-to-b from-pitch-surface2 to-pitch-surface p-5 {{ $player->frameClass() }}">
                 <div class="flex items-start justify-between gap-3">
                     <div class="text-center shrink-0">
                         <div class="font-display text-4xl font-extrabold leading-none {{ $ovrTier }}">{{ $ovr !== null ? number_format($ovr, 1) : '?' }}</div>
@@ -142,8 +142,13 @@
                     </div>
                 </div>
 
-                <div class="mt-3 pt-2 border-t border-gold/30 text-center font-display uppercase tracking-wider text-lg font-bold truncate">
-                    {{ $player->name }}@if ($player->shirt_number) <span class="text-pitch-muted">#{{ $player->shirt_number }}</span>@endif
+                <div class="mt-3 pt-2 border-t border-gold/30 text-center">
+                    <div class="font-display uppercase tracking-wider text-lg font-bold truncate {{ $player->nameColorClass() }}">
+                        {{ $player->name }}@if ($player->shirt_number) <span class="text-pitch-muted">#{{ $player->shirt_number }}</span>@endif
+                    </div>
+                    @if ($player->titleText())
+                        <div class="text-[10px] tracking-[.18em] text-gold mt-0.5">{{ mb_strtoupper($player->titleText(), 'UTF-8') }}</div>
+                    @endif
                 </div>
 
                 <div class="mt-2 grid grid-cols-2 gap-x-8 gap-y-1.5 px-3">

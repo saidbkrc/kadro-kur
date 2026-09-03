@@ -17,6 +17,17 @@ class Stats extends Component
 {
     public Group $group;
 
+    /** Oyuncu arama kutusu */
+    public string $search = '';
+
+    /** Maç geçmişinde gösterilen maç sayısı ("daha fazla" ile artar) */
+    public int $matchLimit = 10;
+
+    public function loadMoreMatches(): void
+    {
+        $this->matchLimit += 10;
+    }
+
     public function mount(Group $group): void
     {
         abort_unless($group->isMember(Auth::user()), 403);
@@ -106,10 +117,17 @@ class Stats extends Component
             ->sortBy([['goals', 'desc'], ['played', 'asc']])
             ->values();
 
+        // Oyuncu arama: ada göre filtrele (Türkçe karakter duyarsız değil ama küçük/büyük duyarsız)
+        $ara = trim($this->search);
+        $filtrele = fn ($liste) => $ara === ''
+            ? $liste
+            : $liste->filter(fn (array $s) => mb_stripos($s['player']->name, $ara) !== false)->values();
+
         return view('livewire.groups.stats', [
-            'matches' => $matches,
-            'playerStats' => $playerStats,
-            'topScorers' => $topScorers,
+            'matches' => $matches->take($this->matchLimit),
+            'totalMatches' => $matches->count(),
+            'playerStats' => $filtrele($playerStats),
+            'topScorers' => $filtrele($topScorers),
             'earnedIcons' => $earnedIcons,
             'chemistry' => app(TeamChemistry::class)->pairsForGroup($this->group)->take(5),
         ]);

@@ -43,6 +43,8 @@ class Dashboard extends Component
             ->keyBy('match_id');
 
         return view('livewire.dashboard', [
+            'cimBalance' => $user->cim_balance,
+            'kehanetGroup' => $user->groups()->orderBy('name')->first(),
             'upcoming' => $upcoming,
             'myRsvps' => $myRsvps,
             'groups' => $user->groups()->withCount('members')->orderBy('name')->get(),

@@ -76,6 +76,12 @@ new #[Layout('layouts.guest')] class extends Component
             <x-input-error :messages="$errors->get('password_confirmation')" class="mt-2" />
         </div>
 
+        <p class="text-xs text-pitch-muted mt-4">
+            Kayıt olarak
+            <a href="{{ route('gizlilik') }}" wire:navigate class="text-bibB hover:underline">Gizlilik ve Aydınlatma Metni</a>'ni
+            okuduğunu ve kişisel verilerinin bu kapsamda işlenmesini kabul ettiğini onaylarsın.
+        </p>
+
         <div class="flex items-center justify-end mt-4">
             <a class="underline text-sm text-pitch-muted hover:text-pitch-ink rounded-md focus:outline-none focus:ring-2 focus:ring-gold" href="{{ route('login') }}" wire:navigate>
                 {{ __('Already registered?') }}

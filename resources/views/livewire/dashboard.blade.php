@@ -7,10 +7,18 @@
             <div class="relative">
                 <div class="flex items-center justify-between gap-2">
                     <div class="text-sm text-pitch-muted">{{ now()->translatedFormat('l, d F Y') }}</div>
-                    <button type="button" @click="window.dispatchEvent(new CustomEvent('open-tutorial'))"
-                            class="shrink-0 text-xs px-3 py-1.5 rounded-md bg-pitch-surface border border-pitch-line hover:brightness-125 transition">
-                        🎓 Rehber
-                    </button>
+                    <div class="shrink-0 flex items-center gap-2">
+                        @if ($kehanetGroup)
+                            <a href="{{ route('groups.kehanet', $kehanetGroup) }}" wire:navigate
+                               class="text-xs px-3 py-1.5 rounded-md bg-pitch-surface border border-bibB/40 text-bibB hover:brightness-125 transition whitespace-nowrap">
+                                🔮 {{ number_format($cimBalance) }} Çim
+                            </a>
+                        @endif
+                        <button type="button" @click="window.dispatchEvent(new CustomEvent('open-tutorial'))"
+                                class="text-xs px-3 py-1.5 rounded-md bg-pitch-surface border border-pitch-line hover:brightness-125 transition">
+                            🎓 Rehber
+                        </button>
+                    </div>
                 </div>
                 <h2 class="font-display uppercase tracking-wider text-3xl font-bold mt-1">Merhaba, {{ auth()->user()->name }} 👋</h2>
                 @if ($groups->isEmpty())

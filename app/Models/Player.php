@@ -86,6 +86,29 @@ class Player extends Model
         return in_array('KL', $this->positions ?? [], true);
     }
 
+    /** Mağazadan kuşanılan kart çerçevesi sınıfı (yoksa varsayılan altın). */
+    public function frameClass(): string
+    {
+        return \App\Support\CimShop::value(
+            $this->user?->equipped_frame, 'class',
+            'border-gold/50 shadow-[0_0_35px_rgba(255,200,61,.10)]',
+        );
+    }
+
+    /** Kuşanılan isim rengi sınıfı (yoksa boş — varsayılan renk). */
+    public function nameColorClass(): string
+    {
+        return \App\Support\CimShop::value($this->user?->equipped_color, 'class');
+    }
+
+    /** Kuşanılan unvan metni (yoksa null). */
+    public function titleText(): ?string
+    {
+        $metin = \App\Support\CimShop::value($this->user?->equipped_title, 'text');
+
+        return $metin !== '' ? $metin : null;
+    }
+
     /** Kart fotoğrafının tam URL'i (yoksa null — kartta siluet gösterilir). */
     public function photoUrl(): ?string
     {
