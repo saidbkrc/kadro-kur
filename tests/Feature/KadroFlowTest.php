@@ -1920,6 +1920,38 @@ class KadroFlowTest extends TestCase
         $this->assertNull($owner->refresh()->equipped_frame);
     }
 
+    public function test_saha_rozeti_dizilis_gorseline_yansir(): void
+    {
+        $owner = User::factory()->create();
+        $group = $this->makeGroup($owner);
+        $ownPlayer = $group->playerFor($owner);
+        $friend = $this->addMember($group);
+
+        $match = $this->makeMatch($group);
+        $match->setRsvp($ownPlayer, 'going');
+        $match->setRsvp($friend, 'going');
+        $match->applySquad([$ownPlayer->id], [$friend->id]);
+
+        // Rozet almadan sahada ikon yok
+        $this->actingAs($owner)->get(route('matches.show', $match))
+            ->assertOk()
+            ->assertDontSee('👑');
+
+        // Taç rozeti alınır (1000 Çim) → sahada diskin köşesinde görünür
+        $owner->forceFill(['cim_balance' => 1500, 'cim_granted_at' => now()])->save();
+        Livewire::actingAs($owner)
+            ->test(Groups\Kehanet::class, ['group' => $group])
+            ->call('buyItem', 'pitch_tac');
+
+        $this->assertSame('pitch_tac', $owner->refresh()->equipped_pitch);
+        $this->assertSame('👑', $ownPlayer->fresh()->pitchIcon());
+
+        $this->actingAs($owner)->get(route('matches.show', $match))
+            ->assertOk()
+            ->assertSee('👑')
+            ->assertSee('pointer-events="none"', false);  // sürüklemeyi engellemez
+    }
+
     public function test_istatistik_arama_ve_mac_sayfalama(): void
     {
         $owner = User::factory()->create();

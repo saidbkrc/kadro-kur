@@ -626,6 +626,10 @@
                                 <circle r="17" fill="{{ $fill }}" stroke="rgba(0,0,0,.4)" stroke-width="2"/>
                                 @php $label = $node['number'] ?? (($node['ovr_public'] ?? true) ? round($node['ovr']) : '–'); @endphp
                                 <text y="4.5" text-anchor="middle" font-family="Arial, sans-serif" font-size="{{ strlen((string) $label) > 1 ? 12 : 13 }}" font-weight="800" fill="#10240F">{{ $label }}</text>
+                                @if (! empty($node['icon']))
+                                    {{-- Mağazadan kuşanılan rozet: diskin sağ üst köşesinde, sürüklemeyi engellemez --}}
+                                    <text x="14" y="-9" text-anchor="middle" font-size="15" pointer-events="none">{{ $node['icon'] }}</text>
+                                @endif
                                 <text y="33" text-anchor="middle" font-family="Arial, sans-serif" font-size="11" font-weight="700" fill="#ffffff" paint-order="stroke" stroke="rgba(0,0,0,.65)" stroke-width="3">{{ $node['name'] }}</text>
                             </g>
                         @endforeach

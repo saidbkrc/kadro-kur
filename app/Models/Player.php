@@ -101,6 +101,14 @@ class Player extends Model
         return \App\Support\CimShop::value($this->user?->equipped_color, 'class');
     }
 
+    /** Saha dizilişinde diskin köşesinde gösterilen kozmetik rozet (yoksa null). */
+    public function pitchIcon(): ?string
+    {
+        $ikon = \App\Support\CimShop::value($this->user?->equipped_pitch, 'text');
+
+        return $ikon !== '' ? $ikon : null;
+    }
+
     /** Kuşanılan unvan metni (yoksa null). */
     public function titleText(): ?string
     {

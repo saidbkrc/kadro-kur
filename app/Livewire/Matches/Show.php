@@ -641,6 +641,7 @@ class Show extends Component
             'foot' => $r->player->foot ?? 'right',
             'ovr' => $r->player->displayRating(),
             'ovr_public' => $r->player->overallIsPublic(),
+            'icon' => $r->player->pitchIcon(),   // mağazadan kuşanılan saha rozeti
             'attrs' => $r->player->averageAttributes(),
         ])->values()->all();
     }

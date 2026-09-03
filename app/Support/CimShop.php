@@ -44,14 +44,24 @@ class CimShop
         'color_buz' => ['type' => 'color', 'name' => 'Buz İsim', 'icon' => '🔵', 'price' => 300, 'desc' => 'Adın buz mavisi.', 'class' => 'text-[#7CD4FF]'],
         'color_mor' => ['type' => 'color', 'name' => 'Mor İsim', 'icon' => '🟣', 'price' => 500, 'desc' => 'Adın mor parlar.', 'class' => 'text-[#C8A2FF]'],
 
-        // 🏷️ Unvanlar — profilde adının altında görünür
-        'title_efsane' => ['type' => 'title', 'name' => 'Efsane', 'icon' => '🐐', 'price' => 800, 'desc' => 'Profilinde "Efsane" yazar.', 'text' => 'Efsane'],
-        'title_kral' => ['type' => 'title', 'name' => 'Sahanın Kralı', 'icon' => '👑', 'price' => 1000, 'desc' => 'Profilinde "Sahanın Kralı" yazar.', 'text' => 'Sahanın Kralı'],
-        'title_kahin' => ['type' => 'title', 'name' => 'Çim Baronu', 'icon' => '🌱', 'price' => 1500, 'desc' => 'Profilinde "Çim Baronu" yazar.', 'text' => 'Çim Baronu'],
-        'title_duvar' => ['type' => 'title', 'name' => 'Aşılmaz', 'icon' => '🧱', 'price' => 700, 'desc' => 'Profilinde "Aşılmaz" yazar.', 'text' => 'Aşılmaz'],
+        // 🏷️ Unvanlar — Çim servetinin göstergesi, profilde adının altında
+        'title_toplayici' => ['type' => 'title', 'name' => 'Çim Toplayıcısı', 'icon' => '🪙', 'price' => 500, 'desc' => 'Yolun başı — profilinde "Çim Toplayıcısı" yazar.', 'text' => 'Çim Toplayıcısı'],
+        'title_musrif' => ['type' => 'title', 'name' => 'Çim Müsrifi', 'icon' => '💸', 'price' => 800, 'desc' => 'Kazandığını harcayanlara — "Çim Müsrifi".', 'text' => 'Çim Müsrifi'],
+        'title_yatirimci' => ['type' => 'title', 'name' => 'Çim Yatırımcısı', 'icon' => '📈', 'price' => 1200, 'desc' => 'Kuponu bilerek oynayanlara — "Çim Yatırımcısı".', 'text' => 'Çim Yatırımcısı'],
+        'title_baron' => ['type' => 'title', 'name' => 'Çim Baronu', 'icon' => '🌱', 'price' => 1500, 'desc' => 'Profilinde "Çim Baronu" yazar.', 'text' => 'Çim Baronu'],
+        'title_patron' => ['type' => 'title', 'name' => 'Çim Patronu', 'icon' => '🎩', 'price' => 2500, 'desc' => 'Kasanın sahibi — "Çim Patronu".', 'text' => 'Çim Patronu'],
+        'title_milyoner' => ['type' => 'title', 'name' => 'Çim Milyoneri', 'icon' => '💰', 'price' => 5000, 'desc' => 'Mağazanın en pahalısı — "Çim Milyoneri".', 'text' => 'Çim Milyoneri'],
+
+        // ⚽ Saha rozetleri — diziliş görselinde oyuncu diskinin köşesinde görünür
+        'pitch_yildiz' => ['type' => 'pitch', 'name' => 'Yıldız', 'icon' => '⭐', 'price' => 400, 'desc' => 'Sahada adının yanında yıldız.', 'text' => '⭐'],
+        'pitch_alev' => ['type' => 'pitch', 'name' => 'Alev', 'icon' => '🔥', 'price' => 400, 'desc' => 'Formda olduğunu herkes görsün.', 'text' => '🔥'],
+        'pitch_simsek' => ['type' => 'pitch', 'name' => 'Şimşek', 'icon' => '⚡', 'price' => 600, 'desc' => 'Hız senin işin.', 'text' => '⚡'],
+        'pitch_tac' => ['type' => 'pitch', 'name' => 'Taç', 'icon' => '👑', 'price' => 1000, 'desc' => 'Sahanın kralı sensin.', 'text' => '👑'],
+        'pitch_keci' => ['type' => 'pitch', 'name' => 'Keçi', 'icon' => '🐐', 'price' => 1500, 'desc' => 'GOAT — tartışmaya kapalı.', 'text' => '🐐'],
     ];
 
     public const TYPES = [
+        'pitch' => ['icon' => '⚽', 'name' => 'Saha Rozetleri', 'hint' => 'Diziliş görselinde diskinin köşesinde'],
         'frame' => ['icon' => '🖼️', 'name' => 'Kart Çerçeveleri', 'hint' => 'Oyuncu kartının kenarı'],
         'color' => ['icon' => '🎨', 'name' => 'İsim Renkleri', 'hint' => 'Adının rengi'],
         'title' => ['icon' => '🏷️', 'name' => 'Unvanlar', 'hint' => 'Profilinde adının altında'],

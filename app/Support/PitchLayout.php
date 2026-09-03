@@ -283,6 +283,7 @@ class PitchLayout
             'number' => $player['number'],
             'ovr' => $player['ovr'],
             'ovr_public' => $player['ovr_public'] ?? true,
+            'icon' => $player['icon'] ?? null,   // mağazadan kuşanılan saha rozeti
             'x' => round($x, 1),
             'y' => round($y, 1),
         ];
