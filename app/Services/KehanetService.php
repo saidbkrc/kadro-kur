@@ -436,7 +436,7 @@ class KehanetService
     }
 
     /** Oylaması kapanmış maçların ödüllerini dağıtır (scheduler saatlik çağırır). */
-    public function awardDueBonuses(): int
+    public function settleDueMatches(): int
     {
         $toplam = 0;
 
@@ -445,6 +445,13 @@ class KehanetService
             ->get();
 
         foreach ($adaylar as $match) {
+            // MVP/performans market'leri maç biterken "beklemede" kalır (oylama sürüyor).
+            // Pencere kapandığında onları sonuçlandıracak tek yer burası.
+            if (Prediction::where('match_id', $match->id)->where('status', 'pending')->exists()) {
+                $this->settleMatch($match); // sonunda awardMatchBonuses'ı da çağırır
+                $match->refresh();
+            }
+
             $toplam += $this->awardMatchBonuses($match);
         }
 

@@ -1845,6 +1845,50 @@ class KadroFlowTest extends TestCase
         Notification::assertNothingSent();
     }
 
+    public function test_kehanet_mvp_kuponu_oylama_kapaninca_sonuclanir(): void
+    {
+        Notification::fake();
+
+        $owner = User::factory()->create();
+        $group = $this->makeGroup($owner);
+        $ownPlayer = $group->playerFor($owner);
+        $yildiz = $this->addMember($group);
+
+        // Maç bitti ama MVP oylaması hâlâ açık
+        $match = $group->matches()->create([
+            'created_by' => $owner->id, 'title' => 'MVP maçı', 'starts_at' => now()->subHours(3),
+            'capacity' => 14, 'status' => 'completed', 'team_a_score' => 3, 'team_b_score' => 1,
+            'mvp_closes_at' => now()->addDays(5),
+        ]);
+        foreach ([$ownPlayer, $yildiz] as $p) {
+            $match->rsvps()->create(['player_id' => $p->id, 'status' => 'going', 'team' => 'A']);
+        }
+        $match->mvpVotes()->create(['voter_id' => $owner->id, 'player_id' => $yildiz->id]);
+
+        $kupon = \App\Models\Prediction::create([
+            'user_id' => $owner->id, 'match_id' => $match->id, 'market_key' => 'mvp',
+            'selection' => (string) $yildiz->id, 'odds' => 2.5, 'stake' => 40,
+        ]);
+
+        $servis = app(\App\Services\KehanetService::class);
+        $bakiyeOnce = $owner->refresh()->cim_balance;
+
+        // Maç biterken sonuçlandırma: oylama sürüyor → kupon beklemede kalmalı
+        $servis->settleMatch($match);
+        $this->assertSame('pending', $kupon->refresh()->status);
+
+        // Oylama penceresi kapanır — saatlik iş kuponu sonuçlandırmalı
+        $match->update(['mvp_closes_at' => now()->subMinute()]);
+        $servis->settleDueMatches();
+
+        $this->assertSame('won', $kupon->refresh()->status);
+        $this->assertSame(100, $kupon->payout);                       // 40 × 2.5
+
+        // Kupon ödemesi 100 + aynı iş maç ödüllerini de dağıtır
+        // (galibiyet 15 + oylamaya katıldı 10 + katılım 10 = 35)
+        $this->assertSame($bakiyeOnce + 135, $owner->refresh()->cim_balance);
+    }
+
     public function test_kehanet_mac_iptalinde_cim_iade_edilir(): void
     {
         $owner = User::factory()->create();
