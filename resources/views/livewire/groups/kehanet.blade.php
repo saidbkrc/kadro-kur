@@ -393,6 +393,12 @@
                     Biriken Çim'ini kart görünümüne harca. Satın aldıkların kalıcıdır ve istediğin zaman değiştirebilirsin —
                     <strong class="text-pitch-ink">hiçbiri oyun içi avantaj sağlamaz</strong>, sadece görünüm.
                 </p>
+                <div class="flex items-center gap-2 flex-wrap mt-3">
+                    @foreach (CimShop::RARITIES as $kademe)
+                        <span class="text-[9px] tracking-[.14em] uppercase px-1.5 py-0.5 rounded-full border {{ $kademe['class'] }}">{{ $kademe['name'] }}</span>
+                    @endforeach
+                    <span class="text-[11px] text-pitch-muted">· 🔒 işaretli ürünler sahada hak edilir · 📅 işaretliler sınırlı süre satışta</span>
+                </div>
             </div>
 
             @foreach (CimShop::grouped() as $tur => $urunler)
@@ -413,14 +419,31 @@
                             @php
                                 $sahip = in_array($key, $owned, true);
                                 $kusanili = auth()->user()->{'equipped_'.$tur} === $key;
+                                $kilitli = ($locked[$key] ?? false) && ! $sahip;
+                                $satista = CimShop::onSale($key);
+                                $kademe = CimShop::RARITIES[CimShop::rarity($key)];
+                                $kosul = CimShop::requirement($key);
+                                $suresi = CimShop::saleNote($key);
+                                $alinabilir = ! $kilitli && $satista;
                             @endphp
                             <div class="flex items-center gap-3 rounded-lg border px-3 py-2.5 transition
-                                        {{ $kusanili ? 'border-bibB bg-bibB/5' : ($sahip ? 'border-pitch-line' : 'border-pitch-line/60') }}">
-                                <span class="text-2xl shrink-0 {{ $sahip ? '' : 'opacity-40' }}">{{ $urun['icon'] }}</span>
+                                        {{ $kusanili ? 'border-bibB bg-bibB/5' : ($sahip ? 'border-pitch-line' : ($alinabilir ? 'border-pitch-line/60' : 'border-pitch-line/30')) }}">
+                                <span class="text-2xl shrink-0 {{ $sahip ? '' : 'opacity-40' }}">{{ $kilitli ? '🔒' : $urun['icon'] }}</span>
 
                                 <div class="min-w-0 flex-1">
-                                    <div class="text-sm font-semibold {{ $tur === 'color' && $sahip ? $urun['class'] : '' }}">{{ $urun['name'] }}</div>
+                                    <div class="flex items-center gap-2 flex-wrap">
+                                        <span class="text-sm font-semibold {{ $tur === 'color' && $sahip ? $urun['class'] : '' }}">{{ $urun['name'] }}</span>
+                                        <span class="text-[9px] tracking-[.14em] uppercase px-1.5 py-0.5 rounded-full border {{ $kademe['class'] }}">{{ $kademe['name'] }}</span>
+                                    </div>
                                     <div class="text-[11px] text-pitch-muted leading-snug">{{ $urun['desc'] }}</div>
+                                    @if ($kosul && ! $sahip)
+                                        <div class="text-[11px] mt-0.5 {{ $kilitli ? 'text-bibA' : 'text-bibB' }}">
+                                            {{ $kilitli ? '🔒 '.$kosul['label'] : '✓ Şartı sağlıyorsun' }}
+                                        </div>
+                                    @endif
+                                    @if ($suresi && ! $sahip)
+                                        <div class="text-[11px] mt-0.5 {{ $satista ? 'text-gold' : 'text-pitch-muted' }}">📅 {{ $suresi }}</div>
+                                    @endif
                                 </div>
 
                                 <div class="shrink-0">
@@ -429,6 +452,10 @@
                                     @elseif ($sahip)
                                         <button wire:click="equipItem('{{ $key }}')"
                                                 class="text-xs px-3 py-1.5 rounded-md border border-pitch-line hover:bg-pitch-surface2">Kuşan</button>
+                                    @elseif (! $satista)
+                                        <span class="text-xs text-pitch-muted">Satışta değil</span>
+                                    @elseif ($kilitli)
+                                        <span class="text-xs text-pitch-muted">Kilitli</span>
                                     @else
                                         <button wire:click="buyItem('{{ $key }}')"
                                                 data-confirm="{{ $urun['name'] }} — {{ number_format($urun['price']) }} Çim. Satın alınsın mı?"

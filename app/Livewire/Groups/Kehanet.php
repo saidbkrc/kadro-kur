@@ -55,7 +55,9 @@ class Kehanet extends Component
     /** Mağazadan kozmetik satın al. */
     public function buyItem(string $itemKey): void
     {
-        $this->notice = app(\App\Services\CimShopService::class)->buy(Auth::user(), $itemKey)['message'];
+        // Şarta bağlı ürünlerin rozet kontrolü bu gruptaki oyuncu kaydı üzerinden yapılır
+        $this->notice = app(\App\Services\CimShopService::class)
+            ->buy(Auth::user(), $itemKey, $this->group->playerFor(Auth::user()))['message'];
         Auth::user()->refresh();
     }
 
@@ -285,7 +287,9 @@ class Kehanet extends Component
         }
 
         if ($this->tab === 'magaza') {
-            $veri['owned'] = app(\App\Services\CimShopService::class)->owned($user);
+            $magaza = app(\App\Services\CimShopService::class);
+            $veri['owned'] = $magaza->owned($user);
+            $veri['locked'] = $magaza->lockedFor($this->group->playerFor($user));
         }
 
         if ($this->tab === 'oduller') {

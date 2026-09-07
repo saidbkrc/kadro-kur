@@ -85,6 +85,43 @@ class CimShop
         'pitch_simsek' => ['type' => 'pitch', 'name' => 'Şimşek', 'icon' => '⚡', 'price' => 600, 'desc' => 'Hız senin işin.', 'text' => '⚡'],
         'pitch_tac' => ['type' => 'pitch', 'name' => 'Taç', 'icon' => '👑', 'price' => 1000, 'desc' => 'Sahanın kralı sensin.', 'text' => '👑'],
         'pitch_keci' => ['type' => 'pitch', 'name' => 'Keçi', 'icon' => '🐐', 'price' => 1500, 'desc' => 'GOAT — tartışmaya kapalı.', 'text' => '🐐'],
+
+        // 🔒 Şarta bağlı ürünler — Çim yetmez, sahada hak etmen gerekir.
+        // 'requires' => ['badge' => <PlayerBadges anahtarı>, 'label' => insan diliyle koşul]
+        'pitch_duvar' => [
+            'type' => 'pitch', 'name' => 'Duvar', 'icon' => '🧱', 'price' => 800, 'text' => '🧱',
+            'desc' => 'Kaleyi kapatanlara. Sahada adının yanında tuğla duvar.',
+            'requires' => ['badge' => 'wall', 'label' => 'Kalede gol yemeden bir maç bitirmiş olmak'],
+        ],
+        'title_simsek' => [
+            'type' => 'title', 'name' => 'Şimşek', 'icon' => '⚡', 'price' => 1200, 'text' => 'Şimşek',
+            'desc' => 'Hat-trick yapanlara açılır — profilinde "Şimşek" yazar.',
+            'requires' => ['badge' => 'hat_trick', 'label' => 'Bir maçta 3 gol atmış olmak'],
+        ],
+        'frame_kral' => [
+            'type' => 'frame', 'name' => 'Kral Çerçevesi', 'icon' => '🦁', 'price' => 3000,
+            'desc' => 'Yalnızca gol kralları alabilir. Kırmızı-altın halka döner.',
+            'class' => 'cim-frame cim-frame-spin cim-frame-pulse border-transparent [--cim-a:#FF3B3B] [--cim-b:#FFC83D]',
+            'requires' => ['badge' => 'goal_king', 'label' => 'Toplam 50 gol atmış olmak'],
+        ],
+
+        // 📅 Sınırlı ürün — yalnızca belirli ayda satışta, her yıl tekrar açılır.
+        'frame_sezon' => [
+            'type' => 'frame', 'name' => 'Sezon Açılışı', 'icon' => '📅', 'price' => 1500, 'only_month' => 9,
+            'desc' => 'Sadece Eylül boyunca satışta. Kaçırırsan seneye.',
+            'class' => 'cim-frame cim-frame-spin cim-frame-glow border-transparent [--cim-a:#28AD55] [--cim-b:#FFC83D]',
+        ],
+    ];
+
+    /**
+     * Nadirlik kademeleri. Ürüne 'rarity' yazılmadıysa fiyattan türetilir —
+     * böylece yeni ürün eklerken ayrıca işaretlemek gerekmez.
+     */
+    public const RARITIES = [
+        'yaygin' => ['name' => 'Yaygın', 'class' => 'text-pitch-muted border-pitch-line'],
+        'nadir' => ['name' => 'Nadir', 'class' => 'text-[#7CD4FF] border-[#7CD4FF]/50'],
+        'destansi' => ['name' => 'Destansı', 'class' => 'text-[#C8A2FF] border-[#C8A2FF]/50'],
+        'efsanevi' => ['name' => 'Efsanevi', 'class' => 'text-gold border-gold/60'],
     ];
 
     public const TYPES = [
@@ -110,5 +147,61 @@ class CimShop
     public static function value(?string $key, string $field, string $default = ''): string
     {
         return self::ITEMS[$key][$field] ?? $default;
+    }
+
+    /** Ürünün nadirlik kademesi — açıkça yazılmadıysa fiyattan türetilir. */
+    public static function rarity(string $key): string
+    {
+        $urun = self::ITEMS[$key] ?? null;
+
+        if ($urun === null) {
+            return 'yaygin';
+        }
+
+        if (isset($urun['rarity'])) {
+            return $urun['rarity'];
+        }
+
+        return match (true) {
+            $urun['price'] >= 2000 => 'efsanevi',
+            $urun['price'] >= 1000 => 'destansi',
+            $urun['price'] >= 500 => 'nadir',
+            default => 'yaygin',
+        };
+    }
+
+    /** Ürün şu an satışta mı? ('only_month' verilmemişse her zaman satıştadır) */
+    public static function onSale(string $key): bool
+    {
+        $ay = self::ITEMS[$key]['only_month'] ?? null;
+
+        return $ay === null || (int) now()->month === (int) $ay;
+    }
+
+    /** Sınırlı üründe kalan süre metni (sınırsızsa null). */
+    public static function saleNote(string $key): ?string
+    {
+        $ay = self::ITEMS[$key]['only_month'] ?? null;
+
+        if ($ay === null) {
+            return null;
+        }
+
+        $adlar = ['', 'Ocak', 'Şubat', 'Mart', 'Nisan', 'Mayıs', 'Haziran',
+            'Temmuz', 'Ağustos', 'Eylül', 'Ekim', 'Kasım', 'Aralık'];
+
+        if (! self::onSale($key)) {
+            return 'Sadece '.$adlar[$ay].' ayında satışta';
+        }
+
+        $kalan = (int) ceil(now()->diffInDays(now()->endOfMonth(), true));
+
+        return $kalan <= 1 ? 'Son gün!' : "Satışta — {$kalan} gün kaldı";
+    }
+
+    /** Ürünün gerektirdiği rozet koşulu (yoksa null). */
+    public static function requirement(string $key): ?array
+    {
+        return self::ITEMS[$key]['requires'] ?? null;
     }
 }

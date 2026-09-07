@@ -1964,6 +1964,58 @@ class KadroFlowTest extends TestCase
         $this->assertNull($owner->refresh()->equipped_frame);
     }
 
+    public function test_cim_magazasi_kilitli_ve_sinirli_urunler(): void
+    {
+        $owner = User::factory()->create();
+        $group = $this->makeGroup($owner);
+        $player = $group->playerFor($owner);
+        $owner->forceFill(['cim_balance' => 9000, 'cim_granted_at' => now()])->save();
+
+        // Şarta bağlı ürün: hat-trick yokken alınamaz
+        Livewire::actingAs($owner)
+            ->test(Groups\Kehanet::class, ['group' => $group])
+            ->call('buyItem', 'title_simsek')   // hat_trick rozeti şart
+            ->assertSet('notice', fn ($v) => str_contains((string) $v, 'kilitli'));
+        $this->assertSame(9000, $owner->refresh()->cim_balance);
+
+        // Tek maçta 3 gol atınca şart sağlanır ve ürün açılır
+        $match = $group->matches()->create([
+            'created_by' => $owner->id, 'title' => 'Hat-trick maçı', 'starts_at' => now()->subDay(),
+            'capacity' => 14, 'status' => 'completed', 'team_a_score' => 4, 'team_b_score' => 1,
+            'mvp_closes_at' => now()->subHour(),
+        ]);
+        $match->rsvps()->create(['player_id' => $player->id, 'status' => 'going', 'team' => 'A']);
+        $match->goals()->create(['player_id' => $player->id, 'count' => 3]);
+
+        Livewire::actingAs($owner)
+            ->test(Groups\Kehanet::class, ['group' => $group])
+            ->call('buyItem', 'title_simsek');
+
+        $this->assertSame('title_simsek', $owner->refresh()->equipped_title);
+        $this->assertSame(9000 - 1200, $owner->cim_balance);
+
+        // Sınırlı ürün: yalnızca kendi ayında satışta (frame_sezon → Eylül)
+        $this->travelTo(now()->setDate(2026, 6, 15));
+        Livewire::actingAs($owner)
+            ->test(Groups\Kehanet::class, ['group' => $group])
+            ->call('buyItem', 'frame_sezon')
+            ->assertSet('notice', fn ($v) => str_contains((string) $v, 'satışta değil'));
+        $this->assertNull($owner->refresh()->equipped_frame);
+
+        $this->travelTo(now()->setDate(2026, 9, 15));
+        Livewire::actingAs($owner)
+            ->test(Groups\Kehanet::class, ['group' => $group])
+            ->call('buyItem', 'frame_sezon');
+        $this->assertSame('frame_sezon', $owner->refresh()->equipped_frame);
+        $this->travelBack();
+
+        // Nadirlik fiyattan türetilir
+        $this->assertSame('yaygin', \App\Support\CimShop::rarity('color_gold'));      // 300
+        $this->assertSame('nadir', \App\Support\CimShop::rarity('frame_zumrut'));     // 600
+        $this->assertSame('destansi', \App\Support\CimShop::rarity('frame_elmas'));   // 1200
+        $this->assertSame('efsanevi', \App\Support\CimShop::rarity('frame_efsane'));  // 2500
+    }
+
     public function test_isim_rengi_tum_listelerde_gorunur(): void
     {
         $owner = User::factory()->create();

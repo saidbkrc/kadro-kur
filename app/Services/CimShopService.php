@@ -3,14 +3,20 @@
 namespace App\Services;
 
 use App\Models\CimPurchase;
+use App\Models\Player;
 use App\Models\User;
 use App\Support\CimShop;
 
 /** Çim mağazası: satın alma ve kuşanma. Ürünler yalnızca görünüm değiştirir. */
 class CimShopService
 {
-    /** @return array{ok: bool, message: string} */
-    public function buy(User $user, string $itemKey): array
+    /**
+     * Ürünü satın alır. Şarta bağlı ürünlerde rozet kontrolü için $player gerekir —
+     * verilmezse şartlı ürünler alınamaz (koşulun doğrulanacağı grup belli değildir).
+     *
+     * @return array{ok: bool, message: string}
+     */
+    public function buy(User $user, string $itemKey, ?Player $player = null): array
     {
         $urun = CimShop::ITEMS[$itemKey] ?? null;
 
@@ -20,6 +26,14 @@ class CimShopService
 
         if (CimPurchase::where('user_id', $user->id)->where('item_key', $itemKey)->exists()) {
             return ['ok' => false, 'message' => 'Bu ürün zaten senin.'];
+        }
+
+        if (! CimShop::onSale($itemKey)) {
+            return ['ok' => false, 'message' => 'Bu ürün şu an satışta değil — '.CimShop::saleNote($itemKey).'.'];
+        }
+
+        if (($kosul = CimShop::requirement($itemKey)) !== null && ! $this->meetsRequirement($player, $kosul['badge'])) {
+            return ['ok' => false, 'message' => '🔒 Bu ürün kilitli — '.$kosul['label'].' gerekiyor.'];
         }
 
         if ($user->cim_balance < $urun['price']) {
@@ -69,5 +83,39 @@ class CimShopService
     public function owned(User $user): array
     {
         return CimPurchase::where('user_id', $user->id)->pluck('item_key')->all();
+    }
+
+    /** Oyuncu bu rozeti kazanmış mı? (şarta bağlı ürünlerin kilidi) */
+    public function meetsRequirement(?Player $player, string $badgeKey): bool
+    {
+        if ($player === null) {
+            return false;
+        }
+
+        foreach (app(PlayerBadges::class)->forPlayer($player) as $rozet) {
+            if ($rozet['key'] === $badgeKey) {
+                return (bool) $rozet['earned'];
+            }
+        }
+
+        return false;
+    }
+
+    /**
+     * Mağaza ekranı için ürün kilit durumu.
+     *
+     * @return array<string, bool> [item_key => kilitli mi]
+     */
+    public function lockedFor(?Player $player): array
+    {
+        $out = [];
+
+        foreach (CimShop::ITEMS as $key => $urun) {
+            if (($kosul = CimShop::requirement($key)) !== null) {
+                $out[$key] = ! $this->meetsRequirement($player, $kosul['badge']);
+            }
+        }
+
+        return $out;
     }
 }
