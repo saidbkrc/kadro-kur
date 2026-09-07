@@ -1929,11 +1929,13 @@ class KadroFlowTest extends TestCase
             ->assertSet('notice', fn ($v) => str_contains((string) $v, 'Yeterli Çim yok'));
         $this->assertSame(0, \App\Models\CimPurchase::count());
 
-        // Yeterli bakiyeyle alınır, Çim düşer ve otomatik kuşanılır
-        $owner->forceFill(['cim_balance' => 1000])->save();
+        // Yeterli bakiyeyle alınır, Çim düşer ve otomatik kuşanılır.
+        // Fiyat katalogdan okunur — mağaza fiyatları değişince test kırılmasın.
+        $fiyat = \App\Support\CimShop::ITEMS['frame_ates']['price'];
+        $owner->forceFill(['cim_balance' => $fiyat + 600])->save();
         Livewire::actingAs($owner)
             ->test(Groups\Kehanet::class, ['group' => $group])
-            ->call('buyItem', 'frame_ates');    // 400 Çim
+            ->call('buyItem', 'frame_ates');
 
         $owner->refresh();
         $this->assertSame(600, $owner->cim_balance);
@@ -1992,7 +1994,7 @@ class KadroFlowTest extends TestCase
             ->call('buyItem', 'title_simsek');
 
         $this->assertSame('title_simsek', $owner->refresh()->equipped_title);
-        $this->assertSame(9000 - 1200, $owner->cim_balance);
+        $this->assertSame(9000 - \App\Support\CimShop::ITEMS['title_simsek']['price'], $owner->cim_balance);
 
         // Sınırlı ürün: yalnızca kendi ayında satışta (frame_sezon → Eylül)
         $this->travelTo(now()->setDate(2026, 6, 15));
@@ -2009,11 +2011,18 @@ class KadroFlowTest extends TestCase
         $this->assertSame('frame_sezon', $owner->refresh()->equipped_frame);
         $this->travelBack();
 
-        // Nadirlik fiyattan türetilir
-        $this->assertSame('yaygin', \App\Support\CimShop::rarity('color_gold'));      // 300
-        $this->assertSame('nadir', \App\Support\CimShop::rarity('frame_zumrut'));     // 600
-        $this->assertSame('destansi', \App\Support\CimShop::rarity('frame_elmas'));   // 1200
-        $this->assertSame('efsanevi', \App\Support\CimShop::rarity('frame_efsane'));  // 2500
+        // Nadirlik fiyattan türetilir — dört kademe de gerçekten kullanılıyor olmalı
+        $this->assertSame('yaygin', \App\Support\CimShop::rarity('color_gold'));
+        $this->assertSame('nadir', \App\Support\CimShop::rarity('frame_zumrut'));
+        $this->assertSame('destansi', \App\Support\CimShop::rarity('frame_elmas'));
+        $this->assertSame('efsanevi', \App\Support\CimShop::rarity('frame_efsane'));
+
+        // Zam/indirim sonrası ürünler tek kademede toplanmasın (eşikler kaymış olur)
+        $dagilim = collect(\App\Support\CimShop::ITEMS)
+            ->countBy(fn ($u, $k) => \App\Support\CimShop::rarity($k));
+        foreach (array_keys(\App\Support\CimShop::RARITIES) as $kademe) {
+            $this->assertGreaterThanOrEqual(3, $dagilim[$kademe] ?? 0, "{$kademe} kademesi neredeyse boş");
+        }
     }
 
     public function test_isim_rengi_tum_listelerde_gorunur(): void
@@ -2071,8 +2080,11 @@ class KadroFlowTest extends TestCase
             ->assertOk()
             ->assertDontSee('👑');
 
-        // Taç rozeti alınır (1000 Çim) → sahada diskin köşesinde görünür
-        $owner->forceFill(['cim_balance' => 1500, 'cim_granted_at' => now()])->save();
+        // Taç rozeti alınır → sahada diskin köşesinde görünür
+        $owner->forceFill([
+            'cim_balance' => \App\Support\CimShop::ITEMS['pitch_tac']['price'] + 500,
+            'cim_granted_at' => now(),
+        ])->save();
         Livewire::actingAs($owner)
             ->test(Groups\Kehanet::class, ['group' => $group])
             ->call('buyItem', 'pitch_tac');
@@ -2172,10 +2184,13 @@ class KadroFlowTest extends TestCase
         $this->assertSame($bakiyeOnce, $owner->refresh()->cim_balance);
 
         // Normal ürün hediye edilir: Çim gönderenden düşer, ürün alıcıya yazılır
-        $c->call('openGift', 'frame_buz')       // 400 Çim
+        $c->call('openGift', 'frame_buz')
             ->call('giftItem', $friend->user_id);
 
-        $this->assertSame($bakiyeOnce - 400, $owner->refresh()->cim_balance);
+        $this->assertSame(
+            $bakiyeOnce - \App\Support\CimShop::ITEMS['frame_buz']['price'],
+            $owner->refresh()->cim_balance,
+        );
         $this->assertSame($owner->id, \App\Models\CimPurchase::where('user_id', $friend->user_id)
             ->where('item_key', 'frame_buz')->value('gifted_by'));
 

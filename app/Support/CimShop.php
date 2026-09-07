@@ -14,92 +14,92 @@ class CimShop
         // 🖼️ Kart çerçeveleri — oyuncu kartının kenarında maskelenmiş gradyan halka.
         // Renkler --cim-a / --cim-b değişkenleriyle geçilir (bkz. app.css).
         'frame_ates' => [
-            'type' => 'frame', 'name' => 'Ateş Çerçevesi', 'icon' => '🔥', 'price' => 400,
+            'type' => 'frame', 'name' => 'Ateş Çerçevesi', 'icon' => '🔥', 'price' => 600,
             'desc' => 'Turuncudan altına geçen halka, sıcak bir parıltı.',
             'class' => 'cim-frame cim-frame-glow border-transparent [--cim-a:#FF7A1A] [--cim-b:#FFC83D]',
         ],
         'frame_buz' => [
-            'type' => 'frame', 'name' => 'Buz Çerçevesi', 'icon' => '🧊', 'price' => 400,
+            'type' => 'frame', 'name' => 'Buz Çerçevesi', 'icon' => '🧊', 'price' => 600,
             'desc' => 'Soğuk mavi halka ve buğulu bir hâle.',
             'class' => 'cim-frame cim-frame-glow border-transparent [--cim-a:#7CD4FF] [--cim-b:#BFE9FF]',
         ],
         'frame_zumrut' => [
-            'type' => 'frame', 'name' => 'Zümrüt Çerçevesi', 'icon' => '💚', 'price' => 600,
+            'type' => 'frame', 'name' => 'Zümrüt Çerçevesi', 'icon' => '💚', 'price' => 1000,
             'desc' => 'Sahanın iki yeşili arasında geçiş yapan halka.',
             'class' => 'cim-frame cim-frame-glow border-transparent [--cim-a:#C8F04B] [--cim-b:#28AD55]',
         ],
         'frame_elmas' => [
-            'type' => 'frame', 'name' => 'Elmas Çerçeve', 'icon' => '💎', 'price' => 1200,
+            'type' => 'frame', 'name' => 'Elmas Çerçeve', 'icon' => '💎', 'price' => 2600,
             'desc' => 'Mor-mavi halka kartın çevresinde yavaşça döner.',
             'class' => 'cim-frame cim-frame-spin cim-frame-glow border-transparent [--cim-a:#D9C7FF] [--cim-b:#7CD4FF]',
         ],
         'frame_holo' => [
-            'type' => 'frame', 'name' => 'Holografik Çerçeve', 'icon' => '🪞', 'price' => 1800,
+            'type' => 'frame', 'name' => 'Holografik Çerçeve', 'icon' => '🪞', 'price' => 4000,
             'desc' => 'Tüm tayfı dolaşan halka kartın çevresinde döner.',
             'class' => 'cim-frame cim-frame-spin cim-frame-rainbow cim-frame-glow border-transparent [--cim-a:#C8A2FF]',
         ],
         'frame_efsane' => [
-            'type' => 'frame', 'name' => 'Efsane Çerçeve', 'icon' => '👑', 'price' => 2500,
+            'type' => 'frame', 'name' => 'Efsane Çerçeve', 'icon' => '👑', 'price' => 7500,
             'desc' => 'Dönen altın halka + nefes alan parıltı. Mağazanın en üstü.',
             'class' => 'cim-frame cim-frame-spin cim-frame-pulse border-transparent [--cim-a:#FFC83D] [--cim-b:#FF7A1A]',
         ],
 
         // 🎨 İsim renkleri — profilde ve listelerde adın. Düz renkler giriş
         // kademesi; gradyanlılar üst kademe (metin gradyanla boyanır ve kayar).
-        'color_gold' => ['type' => 'color', 'name' => 'Altın İsim', 'icon' => '🟡', 'price' => 300, 'desc' => 'Adın altın renginde yazılır.', 'class' => 'text-gold', 'hex' => '#FFC83D'],
-        'color_ates' => ['type' => 'color', 'name' => 'Ateş İsim', 'icon' => '🟠', 'price' => 300, 'desc' => 'Adın turuncu yanar.', 'class' => 'text-[#FF7A1A]', 'hex' => '#FF7A1A'],
-        'color_buz' => ['type' => 'color', 'name' => 'Buz İsim', 'icon' => '🔵', 'price' => 300, 'desc' => 'Adın buz mavisi.', 'class' => 'text-[#7CD4FF]', 'hex' => '#7CD4FF'],
-        'color_mor' => ['type' => 'color', 'name' => 'Mor İsim', 'icon' => '🟣', 'price' => 500, 'desc' => 'Adın mor parlar.', 'class' => 'text-[#C8A2FF]', 'hex' => '#C8A2FF'],
+        'color_gold' => ['type' => 'color', 'name' => 'Altın İsim', 'icon' => '🟡', 'price' => 450, 'desc' => 'Adın altın renginde yazılır.', 'class' => 'text-gold', 'hex' => '#FFC83D'],
+        'color_ates' => ['type' => 'color', 'name' => 'Ateş İsim', 'icon' => '🟠', 'price' => 450, 'desc' => 'Adın turuncu yanar.', 'class' => 'text-[#FF7A1A]', 'hex' => '#FF7A1A'],
+        'color_buz' => ['type' => 'color', 'name' => 'Buz İsim', 'icon' => '🔵', 'price' => 450, 'desc' => 'Adın buz mavisi.', 'class' => 'text-[#7CD4FF]', 'hex' => '#7CD4FF'],
+        'color_mor' => ['type' => 'color', 'name' => 'Mor İsim', 'icon' => '🟣', 'price' => 750, 'desc' => 'Adın mor parlar.', 'class' => 'text-[#C8A2FF]', 'hex' => '#C8A2FF'],
         'color_alev' => [
-            'type' => 'color', 'name' => 'Alev Geçişi', 'icon' => '🔥', 'price' => 900,
+            'type' => 'color', 'name' => 'Alev Geçişi', 'icon' => '🔥', 'price' => 1500,
             'desc' => 'Adın turuncudan altına akan bir gradyanla yazılır ve parlar.',
             'class' => 'cim-name-grad cim-name-shine [--cim-a:#FF7A1A] [--cim-b:#FFC83D]', 'hex' => '#FF7A1A',
         ],
         'color_cim' => [
-            'type' => 'color', 'name' => 'Çim Gradyanı', 'icon' => '🌱', 'price' => 900,
+            'type' => 'color', 'name' => 'Çim Gradyanı', 'icon' => '🌱', 'price' => 1500,
             'desc' => 'Sahanın iki yeşili adında akar.',
             'class' => 'cim-name-grad cim-name-shine [--cim-a:#C8F04B] [--cim-b:#28AD55]', 'hex' => '#C8F04B',
         ],
         'color_holo' => [
-            'type' => 'color', 'name' => 'Holografik İsim', 'icon' => '🪞', 'price' => 1500,
+            'type' => 'color', 'name' => 'Holografik İsim', 'icon' => '🪞', 'price' => 3500,
             'desc' => 'Mavi-mor gradyan adın üzerinde sürekli kayar.',
             'class' => 'cim-name-grad cim-name-shine [--cim-a:#7CD4FF] [--cim-b:#C8A2FF]', 'hex' => '#A9C9FF',
         ],
         'color_altin_parlak' => [
-            'type' => 'color', 'name' => 'Parlayan Altın', 'icon' => '✨', 'price' => 2000,
+            'type' => 'color', 'name' => 'Parlayan Altın', 'icon' => '✨', 'price' => 4500,
             'desc' => 'Altın adının üzerinden sürekli bir ışık geçer. İsim renklerinin en üstü.',
             'class' => 'cim-name-grad cim-name-shine [--cim-a:#FFC83D] [--cim-b:#FFFFFF]', 'hex' => '#FFC83D',
         ],
 
         // 🏷️ Unvanlar — Çim servetinin göstergesi, profilde adının altında
-        'title_toplayici' => ['type' => 'title', 'name' => 'Çim Toplayıcısı', 'icon' => '🪙', 'price' => 500, 'desc' => 'Yolun başı — profilinde "Çim Toplayıcısı" yazar.', 'text' => 'Çim Toplayıcısı'],
-        'title_musrif' => ['type' => 'title', 'name' => 'Çim Müsrifi', 'icon' => '💸', 'price' => 800, 'desc' => 'Kazandığını harcayanlara — "Çim Müsrifi".', 'text' => 'Çim Müsrifi'],
-        'title_yatirimci' => ['type' => 'title', 'name' => 'Çim Yatırımcısı', 'icon' => '📈', 'price' => 1200, 'desc' => 'Kuponu bilerek oynayanlara — "Çim Yatırımcısı".', 'text' => 'Çim Yatırımcısı'],
-        'title_baron' => ['type' => 'title', 'name' => 'Çim Baronu', 'icon' => '🌱', 'price' => 1500, 'desc' => 'Profilinde "Çim Baronu" yazar.', 'text' => 'Çim Baronu'],
-        'title_patron' => ['type' => 'title', 'name' => 'Çim Patronu', 'icon' => '🎩', 'price' => 2500, 'desc' => 'Kasanın sahibi — "Çim Patronu".', 'text' => 'Çim Patronu'],
-        'title_milyoner' => ['type' => 'title', 'name' => 'Çim Milyoneri', 'icon' => '💰', 'price' => 5000, 'desc' => 'Mağazanın en pahalısı — "Çim Milyoneri".', 'text' => 'Çim Milyoneri'],
+        'title_toplayici' => ['type' => 'title', 'name' => 'Çim Toplayıcısı', 'icon' => '🪙', 'price' => 750, 'desc' => 'Yolun başı — profilinde "Çim Toplayıcısı" yazar.', 'text' => 'Çim Toplayıcısı'],
+        'title_musrif' => ['type' => 'title', 'name' => 'Çim Müsrifi', 'icon' => '💸', 'price' => 1400, 'desc' => 'Kazandığını harcayanlara — "Çim Müsrifi".', 'text' => 'Çim Müsrifi'],
+        'title_yatirimci' => ['type' => 'title', 'name' => 'Çim Yatırımcısı', 'icon' => '📈', 'price' => 2600, 'desc' => 'Kuponu bilerek oynayanlara — "Çim Yatırımcısı".', 'text' => 'Çim Yatırımcısı'],
+        'title_baron' => ['type' => 'title', 'name' => 'Çim Baronu', 'icon' => '🌱', 'price' => 3500, 'desc' => 'Profilinde "Çim Baronu" yazar.', 'text' => 'Çim Baronu'],
+        'title_patron' => ['type' => 'title', 'name' => 'Çim Patronu', 'icon' => '🎩', 'price' => 7500, 'desc' => 'Kasanın sahibi — "Çim Patronu".', 'text' => 'Çim Patronu'],
+        'title_milyoner' => ['type' => 'title', 'name' => 'Çim Milyoneri', 'icon' => '💰', 'price' => 15000, 'desc' => 'Mağazanın en pahalısı — "Çim Milyoneri".', 'text' => 'Çim Milyoneri'],
 
         // ⚽ Saha rozetleri — diziliş görselinde oyuncu diskinin köşesinde görünür
-        'pitch_yildiz' => ['type' => 'pitch', 'name' => 'Yıldız', 'icon' => '⭐', 'price' => 400, 'desc' => 'Sahada adının yanında yıldız.', 'text' => '⭐'],
-        'pitch_alev' => ['type' => 'pitch', 'name' => 'Alev', 'icon' => '🔥', 'price' => 400, 'desc' => 'Formda olduğunu herkes görsün.', 'text' => '🔥'],
-        'pitch_simsek' => ['type' => 'pitch', 'name' => 'Şimşek', 'icon' => '⚡', 'price' => 600, 'desc' => 'Hız senin işin.', 'text' => '⚡'],
-        'pitch_tac' => ['type' => 'pitch', 'name' => 'Taç', 'icon' => '👑', 'price' => 1000, 'desc' => 'Sahanın kralı sensin.', 'text' => '👑'],
-        'pitch_keci' => ['type' => 'pitch', 'name' => 'Keçi', 'icon' => '🐐', 'price' => 1500, 'desc' => 'GOAT — tartışmaya kapalı.', 'text' => '🐐'],
+        'pitch_yildiz' => ['type' => 'pitch', 'name' => 'Yıldız', 'icon' => '⭐', 'price' => 600, 'desc' => 'Sahada adının yanında yıldız.', 'text' => '⭐'],
+        'pitch_alev' => ['type' => 'pitch', 'name' => 'Alev', 'icon' => '🔥', 'price' => 600, 'desc' => 'Formda olduğunu herkes görsün.', 'text' => '🔥'],
+        'pitch_simsek' => ['type' => 'pitch', 'name' => 'Şimşek', 'icon' => '⚡', 'price' => 1000, 'desc' => 'Hız senin işin.', 'text' => '⚡'],
+        'pitch_tac' => ['type' => 'pitch', 'name' => 'Taç', 'icon' => '👑', 'price' => 1700, 'desc' => 'Sahanın kralı sensin.', 'text' => '👑'],
+        'pitch_keci' => ['type' => 'pitch', 'name' => 'Keçi', 'icon' => '🐐', 'price' => 3500, 'desc' => 'GOAT — tartışmaya kapalı.', 'text' => '🐐'],
 
         // 🔒 Şarta bağlı ürünler — Çim yetmez, sahada hak etmen gerekir.
         // 'requires' => ['badge' => <PlayerBadges anahtarı>, 'label' => insan diliyle koşul]
         'pitch_duvar' => [
-            'type' => 'pitch', 'name' => 'Duvar', 'icon' => '🧱', 'price' => 800, 'text' => '🧱',
+            'type' => 'pitch', 'name' => 'Duvar', 'icon' => '🧱', 'price' => 1400, 'text' => '🧱',
             'desc' => 'Kaleyi kapatanlara. Sahada adının yanında tuğla duvar.',
             'requires' => ['badge' => 'wall', 'label' => 'Kalede gol yemeden bir maç bitirmiş olmak'],
         ],
         'title_simsek' => [
-            'type' => 'title', 'name' => 'Şimşek', 'icon' => '⚡', 'price' => 1200, 'text' => 'Şimşek',
+            'type' => 'title', 'name' => 'Şimşek', 'icon' => '⚡', 'price' => 2600, 'text' => 'Şimşek',
             'desc' => 'Hat-trick yapanlara açılır — profilinde "Şimşek" yazar.',
             'requires' => ['badge' => 'hat_trick', 'label' => 'Bir maçta 3 gol atmış olmak'],
         ],
         'frame_kral' => [
-            'type' => 'frame', 'name' => 'Kral Çerçevesi', 'icon' => '🦁', 'price' => 3000,
+            'type' => 'frame', 'name' => 'Kral Çerçevesi', 'icon' => '🦁', 'price' => 9000,
             'desc' => 'Yalnızca gol kralları alabilir. Kırmızı-altın halka döner.',
             'class' => 'cim-frame cim-frame-spin cim-frame-pulse border-transparent [--cim-a:#FF3B3B] [--cim-b:#FFC83D]',
             'requires' => ['badge' => 'goal_king', 'label' => 'Toplam 50 gol atmış olmak'],
@@ -107,47 +107,47 @@ class CimShop
 
         // 📅 Sınırlı ürün — yalnızca belirli ayda satışta, her yıl tekrar açılır.
         'frame_sezon' => [
-            'type' => 'frame', 'name' => 'Sezon Açılışı', 'icon' => '📅', 'price' => 1500, 'only_month' => 9,
+            'type' => 'frame', 'name' => 'Sezon Açılışı', 'icon' => '📅', 'price' => 3500, 'only_month' => 9,
             'desc' => 'Sadece Eylül boyunca satışta. Kaçırırsan seneye.',
             'class' => 'cim-frame cim-frame-spin cim-frame-glow border-transparent [--cim-a:#28AD55] [--cim-b:#FFC83D]',
         ],
 
         // 👕 Forma desenleri — diziliş görselinde oyuncu diski. 'pattern' anahtarı
         // SVG'de tanımlı desene karşılık gelir (takım rengi korunur, desen değişir).
-        'kit_cizgili' => ['type' => 'kit', 'name' => 'Çizgili Forma', 'icon' => '👕', 'price' => 500, 'pattern' => 'cizgili', 'desc' => 'Klasik dikey çizgiler. Diskin sahada çizgili görünür.'],
-        'kit_enine' => ['type' => 'kit', 'name' => 'Enine Bantlı', 'icon' => '🎽', 'price' => 500, 'pattern' => 'enine', 'desc' => 'Yatay bantlı forma deseni.'],
-        'kit_capraz' => ['type' => 'kit', 'name' => 'Çapraz Bant', 'icon' => '🏳️', 'price' => 900, 'pattern' => 'capraz', 'desc' => 'Göğüsten geçen çapraz bant.'],
-        'kit_yarim' => ['type' => 'kit', 'name' => 'Yarım Yarım', 'icon' => '🔲', 'price' => 900, 'pattern' => 'yarim', 'desc' => 'Diskin yarısı koyu, yarısı takım rengi.'],
-        'kit_kareli' => ['type' => 'kit', 'name' => 'Kareli', 'icon' => '🏁', 'price' => 1400, 'pattern' => 'kareli', 'desc' => 'Damalı desen — uzaktan bile belli olur.'],
+        'kit_cizgili' => ['type' => 'kit', 'name' => 'Çizgili Forma', 'icon' => '👕', 'price' => 750, 'pattern' => 'cizgili', 'desc' => 'Klasik dikey çizgiler. Diskin sahada çizgili görünür.'],
+        'kit_enine' => ['type' => 'kit', 'name' => 'Enine Bantlı', 'icon' => '🎽', 'price' => 750, 'pattern' => 'enine', 'desc' => 'Yatay bantlı forma deseni.'],
+        'kit_capraz' => ['type' => 'kit', 'name' => 'Çapraz Bant', 'icon' => '🏳️', 'price' => 1500, 'pattern' => 'capraz', 'desc' => 'Göğüsten geçen çapraz bant.'],
+        'kit_yarim' => ['type' => 'kit', 'name' => 'Yarım Yarım', 'icon' => '🔲', 'price' => 1500, 'pattern' => 'yarim', 'desc' => 'Diskin yarısı koyu, yarısı takım rengi.'],
+        'kit_kareli' => ['type' => 'kit', 'name' => 'Kareli', 'icon' => '🏁', 'price' => 3000, 'pattern' => 'kareli', 'desc' => 'Damalı desen — uzaktan bile belli olur.'],
 
         // 🎉 Gol sevinçleri — attığın golün yanında görünür
-        'cel_kollar' => ['type' => 'celebration', 'name' => 'Kollar Havada', 'icon' => '🙌', 'price' => 400, 'text' => '🙌', 'desc' => 'Golünün yanında kollar havada.'],
-        'cel_kalp' => ['type' => 'celebration', 'name' => 'Kalp', 'icon' => '❤️', 'price' => 400, 'text' => '❤️', 'desc' => 'Golünü sevdiklerine adarsın.'],
-        'cel_sus' => ['type' => 'celebration', 'name' => 'Susturma', 'icon' => '🤫', 'price' => 700, 'text' => '🤫', 'desc' => 'Konuşanları susturursun.'],
-        'cel_roket' => ['type' => 'celebration', 'name' => 'Roket', 'icon' => '🚀', 'price' => 900, 'text' => '🚀', 'desc' => 'Gol değil füze.'],
-        'cel_soguk' => ['type' => 'celebration', 'name' => 'Buz Gibi', 'icon' => '🥶', 'price' => 1200, 'text' => '🥶', 'desc' => 'Soğukkanlı bitiriş.'],
+        'cel_kollar' => ['type' => 'celebration', 'name' => 'Kollar Havada', 'icon' => '🙌', 'price' => 600, 'text' => '🙌', 'desc' => 'Golünün yanında kollar havada.'],
+        'cel_kalp' => ['type' => 'celebration', 'name' => 'Kalp', 'icon' => '❤️', 'price' => 600, 'text' => '❤️', 'desc' => 'Golünü sevdiklerine adarsın.'],
+        'cel_sus' => ['type' => 'celebration', 'name' => 'Susturma', 'icon' => '🤫', 'price' => 1200, 'text' => '🤫', 'desc' => 'Konuşanları susturursun.'],
+        'cel_roket' => ['type' => 'celebration', 'name' => 'Roket', 'icon' => '🚀', 'price' => 1500, 'text' => '🚀', 'desc' => 'Gol değil füze.'],
+        'cel_soguk' => ['type' => 'celebration', 'name' => 'Buz Gibi', 'icon' => '🥶', 'price' => 2600, 'text' => '🥶', 'desc' => 'Soğukkanlı bitiriş.'],
 
         // 🖼️ Avatar halkaları — profil fotoğrafının çevresi
         'avatar_altin' => [
-            'type' => 'avatar', 'name' => 'Altın Halka', 'icon' => '🟡', 'price' => 600,
+            'type' => 'avatar', 'name' => 'Altın Halka', 'icon' => '🟡', 'price' => 1000,
             'desc' => 'Fotoğrafının çevresi altın parlar.',
             'class' => 'cim-frame cim-frame-glow [--cim-a:#FFC83D] [--cim-b:#FF7A1A]',
         ],
         'avatar_buz' => [
-            'type' => 'avatar', 'name' => 'Buz Halka', 'icon' => '🧊', 'price' => 600,
+            'type' => 'avatar', 'name' => 'Buz Halka', 'icon' => '🧊', 'price' => 1000,
             'desc' => 'Soğuk mavi bir halka.',
             'class' => 'cim-frame cim-frame-glow [--cim-a:#7CD4FF] [--cim-b:#BFE9FF]',
         ],
         'avatar_tayf' => [
-            'type' => 'avatar', 'name' => 'Tayf Halkası', 'icon' => '🌈', 'price' => 1600,
+            'type' => 'avatar', 'name' => 'Tayf Halkası', 'icon' => '🌈', 'price' => 3500,
             'desc' => 'Fotoğrafının çevresinde dönen tayf.',
             'class' => 'cim-frame cim-frame-spin cim-frame-rainbow cim-frame-glow [--cim-a:#C8A2FF]',
         ],
 
         // 🏆 Rozet vitrini — kazandığın rozetlerden seçtiklerini profilinde öne çıkarır.
         // Satın alınan şey slot sayısıdır; rozetler zaten sahada kazanılmıştır.
-        'showcase_3' => ['type' => 'showcase', 'name' => 'Rozet Vitrini', 'icon' => '🏆', 'price' => 1000, 'slots' => 3, 'desc' => 'Profilinde 3 rozetini öne çıkar.'],
-        'showcase_5' => ['type' => 'showcase', 'name' => 'Geniş Vitrin', 'icon' => '🏛️', 'price' => 2200, 'slots' => 5, 'desc' => 'Profilinde 5 rozetini öne çıkar.'],
+        'showcase_3' => ['type' => 'showcase', 'name' => 'Rozet Vitrini', 'icon' => '🏆', 'price' => 1700, 'slots' => 3, 'desc' => 'Profilinde 3 rozetini öne çıkar.'],
+        'showcase_5' => ['type' => 'showcase', 'name' => 'Geniş Vitrin', 'icon' => '🏛️', 'price' => 6500, 'slots' => 5, 'desc' => 'Profilinde 5 rozetini öne çıkar.'],
     ];
 
     /**
@@ -203,10 +203,12 @@ class CimShop
             return $urun['rarity'];
         }
 
+        // ⚠️ Eşikler fiyat ölçeğine bağlı — toplu zam/indirim yaparsan bunları da
+        // birlikte kaydır, yoksa her şey tek kademede toplanır.
         return match (true) {
-            $urun['price'] >= 2000 => 'efsanevi',
-            $urun['price'] >= 1000 => 'destansi',
-            $urun['price'] >= 500 => 'nadir',
+            $urun['price'] >= 5000 => 'efsanevi',
+            $urun['price'] >= 2500 => 'destansi',
+            $urun['price'] >= 1000 => 'nadir',
             default => 'yaygin',
         };
     }
