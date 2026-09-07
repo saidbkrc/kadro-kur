@@ -11,38 +11,65 @@ namespace App\Support;
 class CimShop
 {
     public const ITEMS = [
-        // 🖼️ Kart çerçeveleri — oyuncu kartının kenarı ve parıltısı
+        // 🖼️ Kart çerçeveleri — oyuncu kartının kenarında maskelenmiş gradyan halka.
+        // Renkler --cim-a / --cim-b değişkenleriyle geçilir (bkz. app.css).
         'frame_ates' => [
             'type' => 'frame', 'name' => 'Ateş Çerçevesi', 'icon' => '🔥', 'price' => 400,
-            'desc' => 'Kartın turuncu alevle çevrelenir.',
-            'class' => 'border-[#FF7A1A] shadow-[0_0_35px_rgba(255,122,26,.35)]',
+            'desc' => 'Turuncudan altına geçen halka, sıcak bir parıltı.',
+            'class' => 'cim-frame cim-frame-glow border-transparent [--cim-a:#FF7A1A] [--cim-b:#FFC83D]',
         ],
         'frame_buz' => [
             'type' => 'frame', 'name' => 'Buz Çerçevesi', 'icon' => '🧊', 'price' => 400,
-            'desc' => 'Soğuk mavi bir hâle.',
-            'class' => 'border-[#7CD4FF] shadow-[0_0_35px_rgba(124,212,255,.35)]',
+            'desc' => 'Soğuk mavi halka ve buğulu bir hâle.',
+            'class' => 'cim-frame cim-frame-glow border-transparent [--cim-a:#7CD4FF] [--cim-b:#BFE9FF]',
         ],
         'frame_zumrut' => [
             'type' => 'frame', 'name' => 'Zümrüt Çerçevesi', 'icon' => '💚', 'price' => 600,
-            'desc' => 'Sahanın yeşili kartına yansır.',
-            'class' => 'border-[#C8F04B] shadow-[0_0_35px_rgba(200,240,75,.35)]',
+            'desc' => 'Sahanın iki yeşili arasında geçiş yapan halka.',
+            'class' => 'cim-frame cim-frame-glow border-transparent [--cim-a:#C8F04B] [--cim-b:#28AD55]',
         ],
         'frame_elmas' => [
             'type' => 'frame', 'name' => 'Elmas Çerçeve', 'icon' => '💎', 'price' => 1200,
-            'desc' => 'Beyaz-mor parıltılı, nadir görünüm.',
-            'class' => 'border-[#D9C7FF] shadow-[0_0_45px_rgba(217,199,255,.45)]',
+            'desc' => 'Mor-mavi halka kartın çevresinde yavaşça döner.',
+            'class' => 'cim-frame cim-frame-spin cim-frame-glow border-transparent [--cim-a:#D9C7FF] [--cim-b:#7CD4FF]',
+        ],
+        'frame_holo' => [
+            'type' => 'frame', 'name' => 'Holografik Çerçeve', 'icon' => '🪞', 'price' => 1800,
+            'desc' => 'Tüm tayfı dolaşan halka kartın çevresinde döner.',
+            'class' => 'cim-frame cim-frame-spin cim-frame-rainbow cim-frame-glow border-transparent [--cim-a:#C8A2FF]',
         ],
         'frame_efsane' => [
             'type' => 'frame', 'name' => 'Efsane Çerçeve', 'icon' => '👑', 'price' => 2500,
-            'desc' => 'Altın gradyan — mağazanın en üstü.',
-            'class' => 'border-gold shadow-[0_0_55px_rgba(255,200,61,.55)] ring-1 ring-gold/40',
+            'desc' => 'Dönen altın halka + nefes alan parıltı. Mağazanın en üstü.',
+            'class' => 'cim-frame cim-frame-spin cim-frame-pulse border-transparent [--cim-a:#FFC83D] [--cim-b:#FF7A1A]',
         ],
 
-        // 🎨 İsim renkleri — profilde ve listelerde adın
+        // 🎨 İsim renkleri — profilde ve listelerde adın. Düz renkler giriş
+        // kademesi; gradyanlılar üst kademe (metin gradyanla boyanır ve kayar).
         'color_gold' => ['type' => 'color', 'name' => 'Altın İsim', 'icon' => '🟡', 'price' => 300, 'desc' => 'Adın altın renginde yazılır.', 'class' => 'text-gold', 'hex' => '#FFC83D'],
         'color_ates' => ['type' => 'color', 'name' => 'Ateş İsim', 'icon' => '🟠', 'price' => 300, 'desc' => 'Adın turuncu yanar.', 'class' => 'text-[#FF7A1A]', 'hex' => '#FF7A1A'],
         'color_buz' => ['type' => 'color', 'name' => 'Buz İsim', 'icon' => '🔵', 'price' => 300, 'desc' => 'Adın buz mavisi.', 'class' => 'text-[#7CD4FF]', 'hex' => '#7CD4FF'],
         'color_mor' => ['type' => 'color', 'name' => 'Mor İsim', 'icon' => '🟣', 'price' => 500, 'desc' => 'Adın mor parlar.', 'class' => 'text-[#C8A2FF]', 'hex' => '#C8A2FF'],
+        'color_alev' => [
+            'type' => 'color', 'name' => 'Alev Geçişi', 'icon' => '🔥', 'price' => 900,
+            'desc' => 'Adın turuncudan altına akan bir gradyanla yazılır ve parlar.',
+            'class' => 'cim-name-grad cim-name-shine [--cim-a:#FF7A1A] [--cim-b:#FFC83D]', 'hex' => '#FF7A1A',
+        ],
+        'color_cim' => [
+            'type' => 'color', 'name' => 'Çim Gradyanı', 'icon' => '🌱', 'price' => 900,
+            'desc' => 'Sahanın iki yeşili adında akar.',
+            'class' => 'cim-name-grad cim-name-shine [--cim-a:#C8F04B] [--cim-b:#28AD55]', 'hex' => '#C8F04B',
+        ],
+        'color_holo' => [
+            'type' => 'color', 'name' => 'Holografik İsim', 'icon' => '🪞', 'price' => 1500,
+            'desc' => 'Mavi-mor gradyan adın üzerinde sürekli kayar.',
+            'class' => 'cim-name-grad cim-name-shine [--cim-a:#7CD4FF] [--cim-b:#C8A2FF]', 'hex' => '#A9C9FF',
+        ],
+        'color_altin_parlak' => [
+            'type' => 'color', 'name' => 'Parlayan Altın', 'icon' => '✨', 'price' => 2000,
+            'desc' => 'Altın adının üzerinden sürekli bir ışık geçer. İsim renklerinin en üstü.',
+            'class' => 'cim-name-grad cim-name-shine [--cim-a:#FFC83D] [--cim-b:#FFFFFF]', 'hex' => '#FFC83D',
+        ],
 
         // 🏷️ Unvanlar — Çim servetinin göstergesi, profilde adının altında
         'title_toplayici' => ['type' => 'title', 'name' => 'Çim Toplayıcısı', 'icon' => '🪙', 'price' => 500, 'desc' => 'Yolun başı — profilinde "Çim Toplayıcısı" yazar.', 'text' => 'Çim Toplayıcısı'],

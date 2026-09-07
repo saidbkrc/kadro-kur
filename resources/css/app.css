@@ -1,3 +1,113 @@
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
+
+/*
+ * Çim mağazası kozmetikleri.
+ * Renkler ürün tanımından gelir (CimShop.php) — Tailwind'in keyfi özellik
+ * sözdizimiyle: [--cim-a:#FF7A1A]. Böylece yeni ürün eklemek için burayı
+ * değiştirmek gerekmez, sadece ITEMS'a satır eklenir.
+ */
+
+/* Dönen gradyan için açı değişkeni. Tarayıcı desteklemezse animasyon
+   çalışmaz ama halka sabit gradyan olarak yine görünür. */
+@property --cim-angle {
+    syntax: '<angle>';
+    initial-value: 0deg;
+    inherits: false;
+}
+
+@keyframes cim-spin {
+    to { --cim-angle: 360deg; }
+}
+
+@keyframes cim-pulse {
+    0%, 100% { box-shadow: 0 0 22px -6px var(--cim-a, theme(colors.gold)); }
+    50%      { box-shadow: 0 0 48px -2px var(--cim-a, theme(colors.gold)); }
+}
+
+@keyframes cim-slide {
+    to { background-position: -200% 0; }
+}
+
+@layer components {
+
+    /* ---------- Kart çerçeveleri ---------- */
+
+    /* Kartın kenarına maskelenmiş gradyan halka çizer. Kartın kendi
+       arka planına dokunmaz — üstüne biner. */
+    .cim-frame::after {
+        content: '';
+        position: absolute;
+        inset: -1px;
+        padding: 2px;
+        border-radius: inherit;
+        pointer-events: none;
+        background: conic-gradient(
+            from var(--cim-angle, 0deg),
+            var(--cim-a, theme(colors.gold)),
+            var(--cim-b, theme(colors.gold)),
+            var(--cim-a, theme(colors.gold))
+        );
+        -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+                mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+        -webkit-mask-composite: xor;
+                mask-composite: exclude;
+    }
+
+    /* Halka yavaşça döner — holografik his */
+    .cim-frame-spin::after {
+        animation: cim-spin 6s linear infinite;
+    }
+
+    /* İki renk yerine tüm tayf — üst kademe ürünü diğerlerinden ayırır */
+    .cim-frame-rainbow::after {
+        background: conic-gradient(
+            from var(--cim-angle, 0deg),
+            #FF7A1A, #FFC83D, #C8F04B, #28AD55, #7CD4FF, #C8A2FF, #FF7A1A
+        );
+    }
+
+    /* Sabit dış parıltı */
+    .cim-frame-glow {
+        box-shadow: 0 0 35px -6px var(--cim-a, theme(colors.gold));
+    }
+
+    /* Nefes alan parıltı — en üst kademe ürünler için */
+    .cim-frame-pulse {
+        animation: cim-pulse 2.8s ease-in-out infinite;
+    }
+
+    /* ---------- İsim renkleri ---------- */
+
+    /* Gradyan isim: metnin kendisi gradyanla boyanır. */
+    .cim-name-grad {
+        background-image: linear-gradient(
+            90deg,
+            var(--cim-a, theme(colors.gold)),
+            var(--cim-b, theme(colors.gold)),
+            var(--cim-a, theme(colors.gold))
+        );
+        background-size: 200% 100%;
+        -webkit-background-clip: text;
+                background-clip: text;
+        color: transparent;
+        /* Alt çizgi de metinle aynı renkte kalsın (link'lerde hover:underline var) */
+        text-decoration-color: var(--cim-a, theme(colors.gold));
+    }
+
+    /* Gradyan soldan sağa kayar — parlıyormuş hissi */
+    .cim-name-shine {
+        animation: cim-slide 3.5s linear infinite;
+    }
+}
+
+/* Hareket azaltma tercihi olan kullanıcılarda animasyonlar durur;
+   renkler ve halka yerinde kalır. */
+@media (prefers-reduced-motion: reduce) {
+    .cim-frame-spin::after,
+    .cim-frame-pulse,
+    .cim-name-shine {
+        animation: none;
+    }
+}

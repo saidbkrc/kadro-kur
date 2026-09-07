@@ -282,7 +282,8 @@
                                 <button type="button" wire:click="voteMvp({{ $rsvp->player_id }})"
                                         data-confirm="{{ $rsvp->player->name }} için MVP oyu vereceksin. Bu oy değiştirilemez. Emin misin?"
                                         class="px-4 py-2 rounded-md text-sm font-medium border border-pitch-line hover:bg-pitch-surface2 hover:border-gold transition truncate">
-                                    {{ $rsvp->player->name }}
+                                    <span class="{{ $rsvp->player->nameColorClass() }}">{{ $rsvp->player->name }}</span>
+                                    @if ($rsvp->player->pitchIcon())<span class="ms-0.5">{{ $rsvp->player->pitchIcon() }}</span>@endif
                                 </button>
                             @endif
                         @endforeach
@@ -292,7 +293,10 @@
                         @foreach ($mvpResults as $result)
                             <li class="flex items-center gap-3">
                                 <span class="w-8 text-center">{{ $loop->first ? '👑' : $loop->iteration.'.' }}</span>
-                                <span class="font-semibold {{ $loop->first ? 'text-gold' : '' }}">{{ $result->player->name }}</span>
+                                <span class="font-semibold {{ $result->player->nameColorClass() ?: ($loop->first ? 'text-gold' : '') }}">{{ $result->player->name }}</span>
+                                @if ($result->player->titleText())
+                                    <span class="text-[10px] tracking-[.18em] text-pitch-muted uppercase hidden sm:inline">{{ $result->player->titleText() }}</span>
+                                @endif
                                 <span class="text-sm text-pitch-muted">{{ $result->votes }} oy</span>
                                 @if ($result->player_id === $myMvpVote?->player_id)
                                     <span class="text-xs text-bibB">(senin oyun)</span>
@@ -548,6 +552,7 @@
                                                {{ $swapArmed === $rsvp->player_id ? 'bg-gold/10 shadow-[inset_3px_0_0_#FFC83D]' : '' }}">
                                         <x-ovr-badge :player="$rsvp->player" num-class="text-lg w-9" />
                                         <span class="font-semibold {{ $rsvp->player->nameColorClass() }}">{{ $rsvp->player->name }}
+                                            @if ($rsvp->player->pitchIcon())<span class="font-normal">{{ $rsvp->player->pitchIcon() }}</span>@endif
                                             @if ($rsvp->player->shirt_number)<span class="text-pitch-muted text-xs font-normal">#{{ $rsvp->player->shirt_number }}</span>@endif
                                             @if ($myPlayer && $rsvp->player_id === $myPlayer->id)<span class="text-xs text-pitch-muted font-normal">(sen)</span>@endif
                                         </span>
