@@ -209,6 +209,18 @@ class PushNotifier
         );
     }
 
+    /** Mağazadan hediye gelen kozmetik. */
+    public function shopGift(User $alici, User $gonderen, string $itemName, int $groupId): void
+    {
+        $this->send(
+            collect([$alici]),
+            '🎁 Sana hediye var!',
+            $gonderen->name.' sana "'.$itemName.'" gönderdi — mağazadan kuşanabilirsin.',
+            route('groups.kehanet', $groupId),
+            'hediye-'.$groupId.'-'.$alici->id.'-'.$itemName,
+        );
+    }
+
     /** Maç başarı ödülü: MVP / en çok gol / forma golü karşılığı Çim. */
     public function kehanetBonus(?User $user, FootballMatch $match, int $total, array $reasons): void
     {

@@ -51,6 +51,7 @@ class User extends Authenticatable implements FilamentUser
             'is_admin' => 'boolean',
             'tutorial_seen_at' => 'datetime',
             'cim_granted_at' => 'datetime',
+            'showcase_badges' => 'array',
         ];
     }
 

@@ -85,6 +85,61 @@ class CimShopService
         return CimPurchase::where('user_id', $user->id)->pluck('item_key')->all();
     }
 
+    /**
+     * Ürünü başkasına hediye eder. Çim gönderenden düşer, ürün alıcıya yazılır.
+     * Kuşanma alıcının kararıdır — hediye otomatik kuşanılmaz.
+     *
+     * Şart ve satış kontrolleri ALICI üzerinden yapılır: hediye, sahada
+     * hak edilmesi gereken bir ürünün kilidini açmaz.
+     *
+     * @return array{ok: bool, message: string}
+     */
+    public function gift(User $from, User $to, string $itemKey, ?Player $toPlayer, int $groupId): array
+    {
+        $urun = CimShop::ITEMS[$itemKey] ?? null;
+
+        if ($urun === null) {
+            return ['ok' => false, 'message' => 'Böyle bir ürün yok.'];
+        }
+
+        if ($from->id === $to->id) {
+            return ['ok' => false, 'message' => 'Kendine hediye edemezsin — doğrudan satın al.'];
+        }
+
+        if (CimPurchase::where('user_id', $to->id)->where('item_key', $itemKey)->exists()) {
+            return ['ok' => false, 'message' => $to->name.' bu ürüne zaten sahip.'];
+        }
+
+        if (! CimShop::onSale($itemKey)) {
+            return ['ok' => false, 'message' => 'Bu ürün şu an satışta değil — '.CimShop::saleNote($itemKey).'.'];
+        }
+
+        if (($kosul = CimShop::requirement($itemKey)) !== null && ! $this->meetsRequirement($toPlayer, $kosul['badge'])) {
+            return ['ok' => false, 'message' => '🔒 '.$to->name.' bu ürünün şartını sağlamıyor — '.$kosul['label'].'.'];
+        }
+
+        if ($from->cim_balance < $urun['price']) {
+            $eksik = $urun['price'] - $from->cim_balance;
+
+            return ['ok' => false, 'message' => "Yeterli Çim yok — {$eksik} Çim daha lazım."];
+        }
+
+        CimPurchase::create([
+            'user_id' => $to->id,
+            'item_key' => $itemKey,
+            'price' => $urun['price'],
+            'gifted_by' => $from->id,
+        ]);
+
+        app(KehanetService::class)->adjustBalance(
+            $from->id, -$urun['price'], 'shop', $urun['name'].' → '.$to->name.' (hediye)',
+        );
+
+        app(PushNotifier::class)->shopGift($to, $from, $urun['name'], $groupId);
+
+        return ['ok' => true, 'message' => "🎁 {$urun['name']} → {$to->name} gönderildi."];
+    }
+
     /** Oyuncu bu rozeti kazanmış mı? (şarta bağlı ürünlerin kilidi) */
     public function meetsRequirement(?Player $player, string $badgeKey): bool
     {

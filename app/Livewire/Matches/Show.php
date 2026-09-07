@@ -642,6 +642,7 @@ class Show extends Component
             'ovr' => $r->player->displayRating(),
             'ovr_public' => $r->player->overallIsPublic(),
             'icon' => $r->player->pitchIcon(),   // mağazadan kuşanılan saha rozeti
+            'kit' => $r->player->kitPattern(),   // mağazadan kuşanılan forma deseni
             'name_color' => $r->player->nameColorHex(),
             'attrs' => $r->player->averageAttributes(),
         ])->values()->all();

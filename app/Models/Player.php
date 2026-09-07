@@ -123,6 +123,40 @@ class Player extends Model
         return $metin !== '' ? $metin : null;
     }
 
+    /** Diziliş diskinde kullanılacak forma deseni anahtarı (yoksa null = düz renk). */
+    public function kitPattern(): ?string
+    {
+        $desen = \App\Support\CimShop::value($this->user?->equipped_kit, 'pattern');
+
+        return $desen !== '' ? $desen : null;
+    }
+
+    /** Golün yanında gösterilen sevinç ikonu (yoksa null). */
+    public function celebrationIcon(): ?string
+    {
+        $ikon = \App\Support\CimShop::value($this->user?->equipped_celebration, 'text');
+
+        return $ikon !== '' ? $ikon : null;
+    }
+
+    /** Profil fotoğrafının çevresindeki halka sınıfı (yoksa boş). */
+    public function avatarRingClass(): string
+    {
+        return \App\Support\CimShop::value($this->user?->equipped_avatar, 'class');
+    }
+
+    /** Vitrinde öne çıkarılabilecek rozet sayısı (vitrin alınmadıysa 0). */
+    public function showcaseSlots(): int
+    {
+        return (int) (\App\Support\CimShop::ITEMS[$this->user?->equipped_showcase]['slots'] ?? 0);
+    }
+
+    /** Vitrine seçilmiş rozet anahtarları (slot sayısıyla sınırlı). */
+    public function showcaseBadgeKeys(): array
+    {
+        return array_slice((array) ($this->user?->showcase_badges ?? []), 0, $this->showcaseSlots());
+    }
+
     /** Kart fotoğrafının tam URL'i (yoksa null — kartta siluet gösterilir). */
     public function photoUrl(): ?string
     {

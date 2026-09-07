@@ -457,18 +457,49 @@
                                     @elseif ($kilitli)
                                         <span class="text-xs text-pitch-muted">Kilitli</span>
                                     @else
-                                        <button wire:click="buyItem('{{ $key }}')"
-                                                data-confirm="{{ $urun['name'] }} — {{ number_format($urun['price']) }} Çim. Satın alınsın mı?"
-                                                data-confirm-danger="false"
-                                                class="text-xs px-3 py-1.5 rounded-md border transition whitespace-nowrap
-                                                       {{ $balance >= $urun['price']
-                                                          ? 'border-gold/50 bg-gold/10 text-gold hover:brightness-125'
-                                                          : 'border-pitch-line text-pitch-muted opacity-60' }}">
-                                            {{ number_format($urun['price']) }} Çim
-                                        </button>
+                                        <div class="flex items-center gap-1">
+                                            <button wire:click="buyItem('{{ $key }}')"
+                                                    data-confirm="{{ $urun['name'] }} — {{ number_format($urun['price']) }} Çim. Satın alınsın mı?"
+                                                    data-confirm-danger="false"
+                                                    class="text-xs px-3 py-1.5 rounded-md border transition whitespace-nowrap
+                                                           {{ $balance >= $urun['price']
+                                                              ? 'border-gold/50 bg-gold/10 text-gold hover:brightness-125'
+                                                              : 'border-pitch-line text-pitch-muted opacity-60' }}">
+                                                {{ number_format($urun['price']) }} Çim
+                                            </button>
+                                            <button wire:click="openGift('{{ $key }}')" title="Birine hediye et"
+                                                    class="text-xs px-2 py-1.5 rounded-md border border-pitch-line hover:bg-pitch-surface2">🎁</button>
+                                        </div>
                                     @endif
                                 </div>
                             </div>
+
+                            {{-- Hediye alıcı seçimi: yalnızca açık olan ürünün altında --}}
+                            @if ($giftItem === $key)
+                                <div class="sm:col-span-2 rounded-lg border border-gold/40 bg-gold/5 px-3 py-3">
+                                    <div class="flex items-baseline justify-between gap-2 flex-wrap mb-2">
+                                        <span class="text-xs text-pitch-ink">
+                                            🎁 <strong>{{ $urun['name'] }}</strong> kime gitsin?
+                                            <span class="text-pitch-muted">({{ number_format($urun['price']) }} Çim senden düşer)</span>
+                                        </span>
+                                        <button wire:click="openGift(null)" class="text-[11px] text-pitch-muted hover:text-pitch-ink underline">Vazgeç</button>
+                                    </div>
+                                    @if ($giftTargets->isEmpty())
+                                        <p class="text-xs text-pitch-muted">Grupta hediye edilebilecek başka üye yok.</p>
+                                    @else
+                                        <div class="flex flex-wrap gap-1.5">
+                                            @foreach ($giftTargets as $uye)
+                                                <button wire:click="giftItem({{ $uye->id }})"
+                                                        data-confirm="{{ $urun['name'] }} → {{ $uye->name }}. {{ number_format($urun['price']) }} Çim senden düşecek. Gönderilsin mi?"
+                                                        data-confirm-danger="false"
+                                                        class="text-xs px-3 py-1.5 rounded-md border border-pitch-line hover:bg-pitch-surface2 hover:border-gold transition">
+                                                    {{ $uye->name }}
+                                                </button>
+                                            @endforeach
+                                        </div>
+                                    @endif
+                                </div>
+                            @endif
                         @endforeach
                     </div>
                 </div>

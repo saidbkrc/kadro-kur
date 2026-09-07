@@ -35,6 +35,13 @@ class PlayerProfile extends Component
 
     public ?string $traitNotice = null;
 
+    /** Rozet vitrini seçim paneli (yalnızca kendi profilinde, vitrin satın alındıysa) */
+    public bool $showShowcasePicker = false;
+
+    public array $selectedShowcase = [];
+
+    public ?string $showcaseNotice = null;
+
     public function mount(Group $group, Player $player): void
     {
         abort_unless($group->isMember(Auth::user()), 403);
@@ -152,6 +159,64 @@ class PlayerProfile extends Component
         }
 
         $this->traitNotice = '✓ Kaydedildi.';
+    }
+
+    /* ---------- Rozet vitrini ---------- */
+
+    /** Vitrin seçimini açar; mevcut seçim önceden işaretli gelir. */
+    public function openShowcasePicker(): void
+    {
+        abort_unless($this->player->user_id === Auth::id(), 403);
+        abort_if($this->player->showcaseSlots() === 0, 403);
+
+        $this->selectedShowcase = $this->player->showcaseBadgeKeys();
+        $this->showShowcasePicker = true;
+        $this->showcaseNotice = null;
+    }
+
+    /** Rozeti vitrine ekler/çıkarır (slot dolduysa yenisi eklenmez). */
+    public function toggleShowcase(string $key): void
+    {
+        abort_unless($this->player->user_id === Auth::id(), 403);
+
+        if (in_array($key, $this->selectedShowcase, true)) {
+            $this->selectedShowcase = array_values(array_diff($this->selectedShowcase, [$key]));
+
+            return;
+        }
+
+        if (count($this->selectedShowcase) >= $this->player->showcaseSlots()) {
+            $this->showcaseNotice = 'Vitrin dolu — önce birini çıkar.';
+
+            return;
+        }
+
+        $this->selectedShowcase[] = $key;
+        $this->showcaseNotice = null;
+    }
+
+    /** Seçimi kaydeder — yalnızca gerçekten kazanılmış rozetler vitrine girer. */
+    public function saveShowcase(PlayerBadges $badges): void
+    {
+        abort_unless($this->player->user_id === Auth::id(), 403);
+        abort_if($this->player->showcaseSlots() === 0, 403);
+
+        $kazanilan = collect($badges->forPlayer($this->player))
+            ->where('earned', true)
+            ->pluck('key');
+
+        $secim = collect($this->selectedShowcase)
+            ->filter(fn ($k) => $kazanilan->contains($k))
+            ->unique()
+            ->take($this->player->showcaseSlots())
+            ->values()
+            ->all();
+
+        $this->player->user->forceFill(['showcase_badges' => $secim])->save();
+        $this->player->load('user');
+
+        $this->showShowcasePicker = false;
+        $this->showcaseNotice = '✓ Vitrin güncellendi.';
     }
 
     public function render(PlayerBadges $badges): View

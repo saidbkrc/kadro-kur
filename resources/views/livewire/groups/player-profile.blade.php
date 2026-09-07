@@ -133,12 +133,15 @@
                             {{ ($player->positions[0] ?? '—') }} · {{ $player->footBadge() }}
                         </div>
                     </div>
-                    <div class="w-24 h-24 rounded-xl overflow-hidden border border-pitch-line bg-pitch-bg flex items-center justify-center shrink-0">
-                        @if ($player->photoUrl())
-                            <img src="{{ $player->photoUrl() }}" alt="{{ $player->name }}" class="w-full h-full object-cover">
-                        @else
-                            <span class="text-4xl opacity-40">👤</span>
-                        @endif
+                    {{-- Halka dış sarmalayıcıda: iç kutu overflow-hidden olduğu için orada kırpılırdı --}}
+                    <div class="relative shrink-0 rounded-xl {{ $player->avatarRingClass() }}">
+                        <div class="w-24 h-24 rounded-xl overflow-hidden border border-pitch-line bg-pitch-bg flex items-center justify-center">
+                            @if ($player->photoUrl())
+                                <img src="{{ $player->photoUrl() }}" alt="{{ $player->name }}" class="w-full h-full object-cover">
+                            @else
+                                <span class="text-4xl opacity-40">👤</span>
+                            @endif
+                        </div>
                     </div>
                 </div>
 
@@ -305,6 +308,75 @@
                 </div>
             @endif
         </div>
+
+        {{-- Rozet vitrini: mağazadan alınan slotlara seçilen rozetler öne çıkar --}}
+        @php
+            $slots = $player->showcaseSlots();
+            $vitrinKeys = $player->showcaseBadgeKeys();
+            $vitrin = collect($badges)->whereIn('key', $vitrinKeys);
+            $benimProfilim = $player->user_id === auth()->id();
+            $kazanilan = collect($badges)->where('earned', true);
+        @endphp
+        @if ($slots > 0 && ($vitrin->isNotEmpty() || $benimProfilim))
+            <div class="bg-pitch-surface border border-pitch-line rounded-xl p-4 sm:p-6">
+                <div class="flex items-baseline justify-between gap-2 flex-wrap mb-4">
+                    <h3 class="font-display uppercase tracking-wider text-lg font-semibold">🏆 Vitrin</h3>
+                    @if ($benimProfilim)
+                        <button wire:click="openShowcasePicker" class="text-xs text-pitch-muted hover:text-pitch-ink underline">
+                            {{ $vitrin->isEmpty() ? 'Rozet seç' : 'Değiştir' }} ({{ $vitrin->count() }}/{{ $slots }})
+                        </button>
+                    @endif
+                </div>
+
+                @if ($showcaseNotice)
+                    <p class="text-xs text-bibB mb-3">{{ $showcaseNotice }}</p>
+                @endif
+
+                @if ($vitrin->isNotEmpty())
+                    <div class="grid grid-cols-3 sm:grid-cols-5 gap-3">
+                        @foreach ($vitrin as $badge)
+                            <div class="text-center rounded-lg border border-gold/40 bg-gold/5 px-2 py-3">
+                                <div class="text-3xl leading-none">{{ $badge['icon'] }}</div>
+                                <div class="text-[11px] font-semibold text-gold mt-1.5 leading-tight">{{ $badge['name'] }}</div>
+                            </div>
+                        @endforeach
+                    </div>
+                @elseif ($benimProfilim)
+                    <p class="text-xs text-pitch-muted">Henüz rozet seçmedin — "Rozet seç" ile {{ $slots }} rozetini öne çıkarabilirsin.</p>
+                @endif
+
+                {{-- Seçim paneli: yalnızca kazanılmış rozetler seçilebilir --}}
+                @if ($showShowcasePicker && $benimProfilim)
+                    <div class="mt-4 pt-4 border-t border-pitch-line">
+                        <p class="text-xs text-pitch-muted mb-3">
+                            Kazandığın rozetlerden <strong class="text-pitch-ink">{{ $slots }}</strong> tanesini seç.
+                            Seçili: {{ count($selectedShowcase) }}/{{ $slots }}
+                        </p>
+
+                        @if ($kazanilan->isEmpty())
+                            <p class="text-xs text-pitch-muted">Henüz kazanılmış rozetin yok.</p>
+                        @else
+                            <div class="grid grid-cols-3 sm:grid-cols-6 gap-2">
+                                @foreach ($kazanilan as $badge)
+                                    @php $secili = in_array($badge['key'], $selectedShowcase, true); @endphp
+                                    <button type="button" wire:click="toggleShowcase('{{ $badge['key'] }}')"
+                                            class="text-center rounded-lg border px-2 py-2 transition
+                                                   {{ $secili ? 'border-bibB bg-bibB/10' : 'border-pitch-line hover:bg-pitch-surface2' }}">
+                                        <div class="text-2xl leading-none">{{ $badge['icon'] }}</div>
+                                        <div class="text-[10px] mt-1 leading-tight {{ $secili ? 'text-bibB' : 'text-pitch-muted' }}">{{ $badge['name'] }}</div>
+                                    </button>
+                                @endforeach
+                            </div>
+
+                            <div class="flex gap-2 mt-4">
+                                <x-primary-button type="button" wire:click="saveShowcase">Kaydet</x-primary-button>
+                                <x-secondary-button type="button" wire:click="$set('showShowcasePicker', false)">Vazgeç</x-secondary-button>
+                            </div>
+                        @endif
+                    </div>
+                @endif
+            </div>
+        @endif
 
         {{-- Rozetler --}}
         @php

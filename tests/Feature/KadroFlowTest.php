@@ -2086,6 +2086,112 @@ class KadroFlowTest extends TestCase
             ->assertSee('pointer-events="none"', false);  // sürüklemeyi engellemez
     }
 
+    public function test_forma_deseni_ve_gol_sevinci_gorunur(): void
+    {
+        $owner = User::factory()->create();
+        $group = $this->makeGroup($owner);
+        $ownPlayer = $group->playerFor($owner);
+        $friend = $this->addMember($group);
+        $owner->forceFill(['cim_balance' => 4000, 'cim_granted_at' => now()])->save();
+
+        $match = $this->makeMatch($group);
+        $match->setRsvp($ownPlayer, 'going');
+        $match->setRsvp($friend, 'going');
+        $match->applySquad([$ownPlayer->id], [$friend->id]);
+
+        // Desen almadan disk düz takım renginde
+        $this->actingAs($owner)->get(route('matches.show', $match))
+            ->assertOk()
+            ->assertDontSee('url(#kit-cizgili-A)', false);
+
+        Livewire::actingAs($owner)
+            ->test(Groups\Kehanet::class, ['group' => $group])
+            ->call('buyItem', 'kit_cizgili');
+
+        $this->assertSame('cizgili', $ownPlayer->fresh()->kitPattern());
+        $this->actingAs($owner)->get(route('matches.show', $match))
+            ->assertOk()
+            ->assertSee('url(#kit-cizgili-A)', false);
+
+        // Gol sevinci maç sonu golcü listesinde görünür
+        Livewire::actingAs($owner)
+            ->test(Groups\Kehanet::class, ['group' => $group])
+            ->call('buyItem', 'cel_roket');
+
+        $match->update(['status' => 'completed', 'team_a_score' => 2, 'team_b_score' => 0, 'mvp_closes_at' => now()->addDay()]);
+        $match->goals()->create(['player_id' => $ownPlayer->id, 'count' => 2]);
+
+        $this->assertSame('🚀', $ownPlayer->fresh()->celebrationIcon());
+        $this->actingAs($owner)->get(route('matches.show', $match))
+            ->assertOk()
+            ->assertSee('🚀');
+    }
+
+    public function test_rozet_vitrini_ve_hediye_etme(): void
+    {
+        Notification::fake();
+
+        $owner = User::factory()->create();
+        $group = $this->makeGroup($owner);
+        $ownPlayer = $group->playerFor($owner);
+        $friend = $this->addMember($group);
+        $owner->forceFill(['cim_balance' => 6000, 'cim_granted_at' => now()])->save();
+
+        // "İlk Maç" rozetini kazandıracak tamamlanmış maç
+        $match = $group->matches()->create([
+            'created_by' => $owner->id, 'title' => 'Vitrin maçı', 'starts_at' => now()->subDay(),
+            'capacity' => 14, 'status' => 'completed', 'team_a_score' => 1, 'team_b_score' => 0,
+            'mvp_closes_at' => now()->subHour(),
+        ]);
+        $match->rsvps()->create(['player_id' => $ownPlayer->id, 'status' => 'going', 'team' => 'A']);
+
+        // Vitrin alınmadan slot yok
+        $this->assertSame(0, $ownPlayer->fresh()->showcaseSlots());
+
+        Livewire::actingAs($owner)
+            ->test(Groups\Kehanet::class, ['group' => $group])
+            ->call('buyItem', 'showcase_3');
+        $this->assertSame(3, $ownPlayer->fresh()->showcaseSlots());
+
+        // Kazanılmış rozet vitrine girer, kazanılmamış olan elenir
+        Livewire::actingAs($owner)
+            ->test(Groups\PlayerProfile::class, ['group' => $group, 'player' => $ownPlayer])
+            ->call('openShowcasePicker')
+            ->call('toggleShowcase', 'first_match')
+            ->call('toggleShowcase', 'goal_king')   // kazanılmadı → kaydedilmemeli
+            ->call('saveShowcase');
+
+        $this->assertSame(['first_match'], $owner->refresh()->showcase_badges);
+
+        // Hediye: şartlı ürün alıcının şartını sağlamıyorsa gönderilemez
+        $bakiyeOnce = $owner->cim_balance;
+        $c = Livewire::actingAs($owner)->test(Groups\Kehanet::class, ['group' => $group]);
+        $c->call('openGift', 'title_simsek')
+            ->call('giftItem', $friend->user_id)
+            ->assertSet('notice', fn ($v) => str_contains((string) $v, 'şartını sağlamıyor'));
+        $this->assertSame($bakiyeOnce, $owner->refresh()->cim_balance);
+
+        // Normal ürün hediye edilir: Çim gönderenden düşer, ürün alıcıya yazılır
+        $c->call('openGift', 'frame_buz')       // 400 Çim
+            ->call('giftItem', $friend->user_id);
+
+        $this->assertSame($bakiyeOnce - 400, $owner->refresh()->cim_balance);
+        $this->assertSame($owner->id, \App\Models\CimPurchase::where('user_id', $friend->user_id)
+            ->where('item_key', 'frame_buz')->value('gifted_by'));
+
+        // Hediye otomatik kuşanılmaz — karar alıcının
+        $this->assertNull($friend->user->refresh()->equipped_frame);
+        $this->assertSame(0, $friend->user->cim_balance);
+
+        Notification::assertSentTo($friend->user, MatchPushNotification::class,
+            fn ($n) => str_contains($n->title, 'hediye'));
+
+        // Aynı ürün ikinci kez hediye edilemez
+        $c->call('openGift', 'frame_buz')
+            ->call('giftItem', $friend->user_id)
+            ->assertSet('notice', fn ($v) => str_contains((string) $v, 'zaten sahip'));
+    }
+
     public function test_istatistik_arama_ve_mac_sayfalama(): void
     {
         $owner = User::factory()->create();

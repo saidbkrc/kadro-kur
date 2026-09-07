@@ -222,7 +222,13 @@
                             <h3 class="font-display uppercase tracking-wider text-lg font-semibold mb-3">⚽ Golleri Atanlar</h3>
                             <ul class="space-y-1.5 text-sm">
                                 @foreach ($matchGoals as $goal)
-                                    <li><strong class="text-gold">{{ $goal->count }}×</strong> {{ $goal->player?->name ?? 'Bilinmiyor' }}</li>
+                                    <li>
+                                        <strong class="text-gold">{{ $goal->count }}×</strong>
+                                        <span class="{{ $goal->player?->nameColorClass() }}">{{ $goal->player?->name ?? 'Bilinmiyor' }}</span>
+                                        @if ($goal->player?->celebrationIcon())
+                                            <span title="Gol sevinci">{{ $goal->player->celebrationIcon() }}</span>
+                                        @endif
+                                    </li>
                                 @endforeach
                             </ul>
                         </div>
@@ -625,10 +631,38 @@
                         <path d="M 119 {{ PitchLayout::H / 2 - 46 }} A 52 52 0 0 1 119 {{ PitchLayout::H / 2 + 46 }}"/>
                         <path d="M {{ PitchLayout::W - 119 }} {{ PitchLayout::H / 2 - 46 }} A 52 52 0 0 0 {{ PitchLayout::W - 119 }} {{ PitchLayout::H / 2 + 46 }}"/>
                     </g>
+                    {{-- Mağazadan kuşanılan forma desenleri. Takım rengi korunur, üzerine
+                         koyu bant/kare biner; her takım için ayrı desen tanımı gerekir. --}}
+                    <defs>
+                        @foreach ([['A', '#FF7A1A'], ['B', '#C8F04B']] as [$side, $fill])
+                            <pattern id="kit-cizgili-{{ $side }}" width="8" height="8" patternUnits="userSpaceOnUse">
+                                <rect width="8" height="8" fill="{{ $fill }}"/>
+                                <rect width="4" height="8" fill="rgba(0,0,0,.42)"/>
+                            </pattern>
+                            <pattern id="kit-enine-{{ $side }}" width="8" height="8" patternUnits="userSpaceOnUse">
+                                <rect width="8" height="8" fill="{{ $fill }}"/>
+                                <rect width="8" height="4" fill="rgba(0,0,0,.42)"/>
+                            </pattern>
+                            <pattern id="kit-capraz-{{ $side }}" width="12" height="12" patternUnits="userSpaceOnUse" patternTransform="rotate(45)">
+                                <rect width="12" height="12" fill="{{ $fill }}"/>
+                                <rect width="12" height="5" fill="rgba(0,0,0,.45)"/>
+                            </pattern>
+                            {{-- Disk -17..17 arasında; tile'ı kaydırarak bölünme tam ortaya gelir --}}
+                            <pattern id="kit-yarim-{{ $side }}" width="34" height="34" patternUnits="userSpaceOnUse" patternTransform="translate(-17,0)">
+                                <rect width="34" height="34" fill="{{ $fill }}"/>
+                                <rect width="17" height="34" fill="rgba(0,0,0,.6)"/>
+                            </pattern>
+                            <pattern id="kit-kareli-{{ $side }}" width="10" height="10" patternUnits="userSpaceOnUse">
+                                <rect width="10" height="10" fill="{{ $fill }}"/>
+                                <rect width="5" height="5" fill="rgba(0,0,0,.42)"/>
+                                <rect x="5" y="5" width="5" height="5" fill="rgba(0,0,0,.42)"/>
+                            </pattern>
+                        @endforeach
+                    </defs>
                     @foreach ([['A', $pitchA, '#FF7A1A'], ['B', $pitchB, '#C8F04B']] as [$side, $nodes, $fill])
                         @foreach ($nodes as $node)
                             <g class="{{ $canManage ? 'pnode cursor-grab' : '' }}" data-id="{{ $node['id'] }}" transform="translate({{ $node['x'] }},{{ $node['y'] }})">
-                                <circle r="17" fill="{{ $fill }}" stroke="rgba(0,0,0,.4)" stroke-width="2"/>
+                                <circle r="17" fill="{{ empty($node['kit']) ? $fill : 'url(#kit-'.$node['kit'].'-'.$side.')' }}" stroke="rgba(0,0,0,.4)" stroke-width="2"/>
                                 @php $label = $node['number'] ?? (($node['ovr_public'] ?? true) ? round($node['ovr']) : '–'); @endphp
                                 <text y="4.5" text-anchor="middle" font-family="Arial, sans-serif" font-size="{{ strlen((string) $label) > 1 ? 12 : 13 }}" font-weight="800" fill="#10240F">{{ $label }}</text>
                                 @if (! empty($node['icon']))

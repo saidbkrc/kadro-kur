@@ -284,6 +284,7 @@ class PitchLayout
             'ovr' => $player['ovr'],
             'ovr_public' => $player['ovr_public'] ?? true,
             'icon' => $player['icon'] ?? null,   // mağazadan kuşanılan saha rozeti
+            'kit' => $player['kit'] ?? null,     // mağazadan kuşanılan forma deseni
             'name_color' => $player['name_color'] ?? '#ffffff',
             'x' => round($x, 1),
             'y' => round($y, 1),

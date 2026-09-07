@@ -61,6 +61,39 @@ class Kehanet extends Component
         Auth::user()->refresh();
     }
 
+    /** Hediye paneli açık olan ürünün anahtarı (null = kapalı). */
+    public ?string $giftItem = null;
+
+    public function openGift(?string $itemKey): void
+    {
+        $this->giftItem = $itemKey;
+    }
+
+    /** Ürünü gruptaki bir üyeye hediye eder. */
+    public function giftItem(int $userId): void
+    {
+        if ($this->giftItem === null) {
+            return;
+        }
+
+        // İzolasyon: alıcı yalnızca bu grubun üyesi olabilir
+        $alici = $this->group->members()->whereKey($userId)->first();
+
+        if ($alici === null) {
+            $this->notice = 'Bu kişi grupta değil.';
+            $this->giftItem = null;
+
+            return;
+        }
+
+        $this->notice = app(\App\Services\CimShopService::class)->gift(
+            Auth::user(), $alici, $this->giftItem, $this->group->playerFor($alici), $this->group->id,
+        )['message'];
+
+        $this->giftItem = null;
+        Auth::user()->refresh();
+    }
+
     /** Sahip olunan ürünü kuşan / çıkar. */
     public function equipItem(?string $itemKey, ?string $type = null): void
     {
@@ -290,6 +323,11 @@ class Kehanet extends Component
             $magaza = app(\App\Services\CimShopService::class);
             $veri['owned'] = $magaza->owned($user);
             $veri['locked'] = $magaza->lockedFor($this->group->playerFor($user));
+
+            // Hediye alıcı listesi yalnızca panel açıkken çekilir
+            $veri['giftTargets'] = $this->giftItem === null
+                ? collect()
+                : $this->group->members()->where('users.id', '!=', $user->id)->orderBy('name')->get(['users.id', 'name']);
         }
 
         if ($this->tab === 'oduller') {
