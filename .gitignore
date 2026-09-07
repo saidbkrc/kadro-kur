@@ -21,3 +21,6 @@ yarn-error.log
 # Deploy artefaktlari
 vendor.zip
 *.zip
+
+# Yerel gelistirme sunucusu ayari (kisiye ozel port) — .claude/commands takipli kalir
+/.claude/launch.json
