@@ -7,6 +7,10 @@ export default {
         './vendor/laravel/framework/src/Illuminate/Pagination/resources/views/*.blade.php',
         './storage/framework/views/*.php',
         './resources/views/**/*.blade.php',
+        // Kozmetik sinif adlari PHP'de tanimli (magaza urunleri, oyuncu karti) —
+        // taranmazsa Tailwind bu siniflari hic uretmez, urunler gorunmez kalir.
+        './app/Support/CimShop.php',
+        './app/Models/Player.php',
     ],
 
     theme: {
