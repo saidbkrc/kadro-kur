@@ -92,7 +92,7 @@ class Kehanet
         'iska' => ['icon' => '🤦', 'name' => 'Günün ıskası', 'kind' => 'oyuncu', 'source' => 'event'],
         // prior: veri yokken olasılık kadroya eşit değil, pozisyona göre bölünür (bkz. OddsCalculator)
         'kurtaris' => ['icon' => '🧤', 'name' => 'Günün kurtarışı', 'kind' => 'oyuncu', 'source' => 'event', 'prior' => 'kaleci'],
-        'gec_gelen' => ['icon' => '⏰', 'name' => 'En geç gelen', 'kind' => 'oyuncu', 'source' => 'event'],
+        'gec_gelen' => ['icon' => '⏰', 'name' => 'En geç gelen', 'kind' => 'oyuncu', 'source' => 'event', 'no_self' => true],
     ];
 
     /** Takım seçenekleri market'e göre değişir. */

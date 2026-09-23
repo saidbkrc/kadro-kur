@@ -1621,6 +1621,13 @@ class KadroFlowTest extends TestCase
             ->assertSet('notice', fn ($v) => str_contains((string) $v, 'Kendinle'));
         $this->assertSame(0, \App\Models\Prediction::count());
 
+        // En geç gelen de aynı sebeple kapalı (bile bile geç gelip kazanılabilir)
+        $c->set("selection.{$match->id}-gec_gelen", (string) $ownPlayer->id)
+            ->set("stake.{$match->id}-gec_gelen", 20)
+            ->call('bet', $match->id, 'gec_gelen')
+            ->assertSet('notice', fn ($v) => str_contains((string) $v, 'Kendinle'));
+        $this->assertSame(0, \App\Models\Prediction::count());
+
         // Diğer bireysel market'lerde kendine kupon serbest
         $c->set("selection.{$match->id}-mvp", (string) $ownPlayer->id)
             ->set("stake.{$match->id}-mvp", 15)
