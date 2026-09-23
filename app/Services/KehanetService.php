@@ -496,14 +496,21 @@ class KehanetService
             ->get();
 
         foreach ($adaylar as $match) {
-            // MVP/performans market'leri maç biterken "beklemede" kalır (oylama sürüyor).
-            // Pencere kapandığında onları sonuçlandıracak tek yer burası.
-            if (Prediction::where('match_id', $match->id)->where('status', 'pending')->exists()) {
-                $this->settleMatch($match); // sonunda awardMatchBonuses'ı da çağırır
-                $match->refresh();
-            }
+            // Bir maçın bozuk verisi bütün kuyruğu kilitlemesin: hata log'a düşer,
+            // iş sıradaki maçla devam eder (yoksa her saat aynı maçta ölür ve
+            // arkasındaki yeni maçların kuponları hiç sonuçlanmaz).
+            try {
+                // MVP/performans market'leri maç biterken "beklemede" kalır (oylama sürüyor).
+                // Pencere kapandığında onları sonuçlandıracak tek yer burası.
+                if (Prediction::where('match_id', $match->id)->where('status', 'pending')->exists()) {
+                    $this->settleMatch($match); // sonunda awardMatchBonuses'ı da çağırır
+                    $match->refresh();
+                }
 
-            $toplam += $this->awardMatchBonuses($match);
+                $toplam += $this->awardMatchBonuses($match);
+            } catch (\Throwable $e) {
+                report(new \RuntimeException("Kehanet sonuçlandırma hatası (maç #{$match->id}): ".$e->getMessage(), 0, $e));
+            }
         }
 
         return $toplam;

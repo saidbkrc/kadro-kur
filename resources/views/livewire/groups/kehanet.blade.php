@@ -173,6 +173,9 @@
                                         <span class="text-[11px] text-pitch-muted ms-1">{{ $bet->odds }}×</span>
                                     </span>
                                 </div>
+                                @if ($not = $this->pendingNote($bet))
+                                    <p class="text-[11px] text-pitch-muted -mt-1">⏱️ {{ $not }}</p>
+                                @endif
                             @endforeach
                         </div>
                     </div>
@@ -730,6 +733,9 @@
                                             {{ $bet->stake }} Çim @ {{ $bet->odds }}×
                                         </span>
                                     </div>
+                                    @if ($not = $this->pendingNote($bet))
+                                        <p class="text-[11px] text-pitch-muted -mt-1 ps-4">⏱️ {{ $not }}</p>
+                                    @endif
                                 @endforeach
                             </div>
                         </div>

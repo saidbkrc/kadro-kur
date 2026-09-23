@@ -382,6 +382,37 @@ class Kehanet extends Component
     /** Oyuncu adları önbelleği (kupon etiketlerinde tekrar tekrar sorgu atmamak için). */
     protected ?array $playerNameCache = null;
 
+    /**
+     * Maç bittiği halde bekleyen kuponun neyi beklediği. Oylama/olay kaynaklı
+     * gecikme normaldir; "oylama kapandı" yazısı uzun süre kalıyorsa zamanlayıcı
+     * (cron) çalışmıyor demektir.
+     */
+    public function pendingNote(\App\Models\Prediction $bet): ?string
+    {
+        $mac = $bet->match;
+
+        if ($bet->status !== 'pending' || $mac?->status !== 'completed') {
+            return null;
+        }
+
+        $kalan = function (?\Illuminate\Support\Carbon $an): string {
+            $saat = (int) ceil(now()->diffInHours($an, true));
+
+            return $saat > 48 ? (int) ceil($saat / 24).' gün kaldı' : max(1, $saat).' saat kaldı';
+        };
+
+        return match (true) {
+            $bet->market_key === 'mvp' => $mac->mvpOpen()
+                ? 'MVP oylaması bitince sonuçlanır — '.(\App\Models\FootballMatch::ratingUnlimited() ? 'süre sınırsız' : $kalan($mac->mvp_closes_at))
+                : 'Oylama kapandı — en geç sonraki saat başında sonuçlanır',
+            $bet->market_key === 'top_perf' => $mac->perfOpen()
+                ? 'Performans puanlaması bitince sonuçlanır — '.$kalan($mac->perfClosesAt())
+                : 'Puanlama kapandı — en geç sonraki saat başında sonuçlanır',
+            (K::MARKETS[$bet->market_key]['source'] ?? '') === 'event' => 'Başkanın olayı işaretlemesi bekleniyor',
+            default => null,
+        };
+    }
+
     /** Kupon seçiminin okunabilir karşılığı: "Turuncu", "8.5 Üst", "Ahmet". */
     public function selectionText(string $market, string $selection): string
     {

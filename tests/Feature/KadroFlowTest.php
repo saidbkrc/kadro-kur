@@ -1664,6 +1664,101 @@ class KadroFlowTest extends TestCase
         $this->assertSame($oncekiBakiye + 20, $owner->refresh()->cim_balance);
     }
 
+    public function test_kehanet_mvp_kuponu_gercek_akista_zamanlayiciyla_sonuclanir(): void
+    {
+        Notification::fake();
+        \App\Models\Setting::query()->updateOrCreate(['key' => 'rating_window_hours'], ['value' => '24']);
+
+        $owner = User::factory()->create();
+        $group = $this->makeGroup($owner);
+        $ownPlayer = $group->playerFor($owner);
+        $friend = $this->addMember($group);
+        $ucuncu = $this->addMember($group);
+
+        $this->travelTo(now()->startOfHour()->addMinutes(10));
+
+        $match = $this->makeMatch($group);
+        foreach ([$ownPlayer, $friend, $ucuncu] as $p) {
+            $match->setRsvp($p, 'going');
+        }
+        $match->applySquad([$ownPlayer->id, $ucuncu->id], [$friend->id]);
+
+        // Maçtan önce: owner arkadaşının MVP olacağına oynar
+        Livewire::actingAs($owner)->test(Groups\Kehanet::class, ['group' => $group])
+            ->set("selection.{$match->id}-mvp", (string) $friend->id)
+            ->set("stake.{$match->id}-mvp", 50)
+            ->call('bet', $match->id, 'mvp');
+        $kupon = \App\Models\Prediction::where('market_key', 'mvp')->firstOrFail();
+
+        // Maç oynanır, başkan skoru girer → oylama 24 saat açılır, kupon bekler
+        $match->update(['starts_at' => now()->subHours(2)]);
+        Livewire::actingAs($owner)->test(\App\Livewire\Matches\Show::class, ['match' => $match])
+            ->set('teamAScore', 2)->set('teamBScore', 3)
+            ->call('saveResult');
+
+        $match->refresh();
+        $this->assertTrue($match->mvpOpen());
+        $this->assertSame('pending', $kupon->refresh()->status);
+
+        // Kuponlarım: neden beklediği ve kalan süre yazar
+        Livewire::actingAs($owner)->test(Groups\Kehanet::class, ['group' => $group])
+            ->call('setTab', 'kuponlarim')
+            ->assertSee('MVP oylaması bitince sonuçlanır')
+            ->assertSee('saat kaldı');
+
+        // Oylar: friend MVP
+        $match->mvpVotes()->create(['voter_id' => $owner->id, 'player_id' => $friend->id]);
+        $match->mvpVotes()->create(['voter_id' => $ucuncu->user_id, 'player_id' => $friend->id]);
+
+        // Oylama kapanmadan saat başı geçer: hâlâ bekler
+        $this->travelTo(now()->addHour()->startOfHour());
+        $this->artisan('schedule:run')->assertSuccessful();
+        $this->assertSame('pending', $kupon->refresh()->status);
+
+        // 24 saat dolduktan sonraki ilk saat başı: cron'un çalıştırdığı iş kuponu sonuçlandırır
+        $this->travelTo($match->mvp_closes_at->copy()->addHour()->startOfHour());
+        $this->assertFalse($match->fresh()->mvpOpen());
+        $this->artisan('schedule:run')->assertSuccessful();
+
+        $this->assertSame('won', $kupon->refresh()->status);
+        $this->travelBack();
+    }
+
+    public function test_kehanet_bozuk_mac_diger_maclarin_sonuclanmasini_engellemez(): void
+    {
+        Notification::fake();
+
+        $owner = User::factory()->create();
+        $group = $this->makeGroup($owner);
+        $friend = $this->addMember($group);
+
+        // İki maç: ilki (eski, düşük id) ödül dağıtırken hata verecek
+        $maclar = collect(['Bozuk maç', 'Sağlam maç'])->map(fn ($ad, $i) => $group->matches()->create([
+            'created_by' => $owner->id, 'title' => $ad, 'starts_at' => now()->subDays(3 - $i),
+            'capacity' => 14, 'status' => 'completed', 'team_a_score' => 1, 'team_b_score' => 0,
+            'mvp_closes_at' => now()->subHour(),
+        ]));
+        [$bozuk, $saglam] = [$maclar[0], $maclar[1]];
+
+        $kuponlar = $maclar->map(function ($m) use ($owner, $friend) {
+            $m->mvpVotes()->create(['voter_id' => $owner->id, 'player_id' => $friend->id]);
+
+            return \App\Models\Prediction::create([
+                'user_id' => $owner->id, 'match_id' => $m->id, 'market_key' => 'mvp',
+                'selection' => (string) $friend->id, 'odds' => 2.0, 'stake' => 10,
+            ]);
+        });
+
+        $this->mock(\App\Services\CimRewards::class, fn ($mock) => $mock
+            ->shouldReceive('awardForMatch')
+            ->andReturnUsing(fn ($m) => $m->id === $bozuk->id ? throw new \RuntimeException('bozuk veri') : []));
+
+        app(\App\Services\KehanetService::class)->settleDueMatches();
+
+        // Bozuk maçtan sonra gelen maçın kuponu yine de sonuçlanır
+        $this->assertSame('won', $kuponlar[1]->refresh()->status);
+    }
+
     public function test_kehanet_kombine_ve_mac_basina_limit(): void
     {
         $owner = User::factory()->create();
