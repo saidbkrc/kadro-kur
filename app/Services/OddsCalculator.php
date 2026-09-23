@@ -21,6 +21,9 @@ class OddsCalculator
     /** Grup başına önbellek: [group_id => ['played' => [...], 'goals' => [...], ...]] */
     protected array $cache = [];
 
+    /** Maç başına pozisyon ağırlıkları: [match_id => [kural => [player_id => ağırlık]]] */
+    protected array $priorCache = [];
+
     /** Bir seçim için ondalık oran (1.85 gibi). */
     public function odds(FootballMatch $match, string $market, string $selection): float
     {
@@ -185,7 +188,48 @@ class OddsCalculator
             default => $c['events'][$market][$playerId] ?? 0,
         };
 
-        return ($sayac + 1) / ($oynadi + $kadro);
+        $kural = Kehanet::MARKETS[$market]['prior'] ?? null;
+
+        if ($kural === null) {
+            return ($sayac + 1) / ($oynadi + $kadro);
+        }
+
+        // Aynı formül, tek fark ön varsayımın kadroya eşit değil ağırlıkla bölünmesi:
+        // eşit ağırlıkta pay = 1/kadro → yukarıdaki satıra denk. Veri biriktikçe
+        // gözlem (sayac/oynadi) baskın gelir, pozisyon varsayımı geri çekilir.
+        return ($sayac + $kadro * $this->priorShare($match, $kural, $playerId)) / ($oynadi + $kadro);
+    }
+
+    /** Oyuncunun kadro içindeki ön varsayım payı (0-1, kadro toplamı 1). */
+    protected function priorShare(FootballMatch $match, string $kural, int $playerId): float
+    {
+        // Maç başına bir kez: odds() her oyuncu × market için ayrı çağrılıyor
+        $agirliklar = $this->priorCache[$match->id][$kural] ??= $match->rsvps()->with('player')
+            ->where('status', 'going')->whereNull('waitlist_position')->get()
+            ->mapWithKeys(fn (Rsvp $r) => [$r->player_id => $this->priorWeight($kural, $r->player->positions ?? [])])
+            ->all();
+
+        $toplam = array_sum($agirliklar);
+
+        if ($toplam <= 0 || ! isset($agirliklar[$playerId])) {
+            return 1 / max(1, count($agirliklar));
+        }
+
+        return $agirliklar[$playerId] / $toplam;
+    }
+
+    /** Pozisyona göre ağırlık. Kadroda hiç kaleci yoksa herkes eşit kalır. */
+    protected function priorWeight(string $kural, array $pozisyonlar): float
+    {
+        return match ($kural) {
+            // Günün kurtarışı: asıl kaleci >> yedek kaleci >> kaleye hiç geçmeyen
+            'kaleci' => match (true) {
+                ($pozisyonlar[0] ?? null) === 'KL' => 8.0,
+                in_array('KL', $pozisyonlar, true) => 3.0,
+                default => 0.2,
+            },
+            default => 1.0,
+        };
     }
 
     /* ---------- veri toplama ---------- */

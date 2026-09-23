@@ -86,10 +86,12 @@ class Kehanet
         'macin_golu' => ['icon' => '🌟', 'name' => 'Maçın golünü atacak', 'kind' => 'oyuncu', 'source' => 'event'],
         'absurt_gol' => ['icon' => '🤪', 'name' => 'En absürt golü atacak', 'kind' => 'oyuncu', 'source' => 'event'],
         'asist' => ['icon' => '🎁', 'name' => 'Günün asistini yapacak', 'kind' => 'oyuncu', 'source' => 'event'],
-        'gerginlik' => ['icon' => '😤', 'name' => 'Gerginlik yaşayacak', 'kind' => 'oyuncu', 'source' => 'event'],
+        // no_self: kişi kendini seçemez — sonucu bilerek kendisi yaratabileceği olaylar
+        'gerginlik' => ['icon' => '😤', 'name' => 'Gerginlik yaşayacak', 'kind' => 'oyuncu', 'source' => 'event', 'no_self' => true],
         'calim' => ['icon' => '🪄', 'name' => 'Günün çalımı', 'kind' => 'oyuncu', 'source' => 'event'],
         'iska' => ['icon' => '🤦', 'name' => 'Günün ıskası', 'kind' => 'oyuncu', 'source' => 'event'],
-        'kurtaris' => ['icon' => '🧤', 'name' => 'Günün kurtarışı', 'kind' => 'oyuncu', 'source' => 'event'],
+        // prior: veri yokken olasılık kadroya eşit değil, pozisyona göre bölünür (bkz. OddsCalculator)
+        'kurtaris' => ['icon' => '🧤', 'name' => 'Günün kurtarışı', 'kind' => 'oyuncu', 'source' => 'event', 'prior' => 'kaleci'],
         'gec_gelen' => ['icon' => '⏰', 'name' => 'En geç gelen', 'kind' => 'oyuncu', 'source' => 'event'],
     ];
 
@@ -99,6 +101,12 @@ class Kehanet
         return $market === 'clean_sheet'
             ? ['A' => 'Turuncu', 'B' => 'Yeşil', 'N' => 'İkisi de yer']
             : ['A' => 'Turuncu', 'X' => 'Beraberlik', 'B' => 'Yeşil'];
+    }
+
+    /** Oyuncu kendi adına bu market'te tahmin yapabilir mi? */
+    public static function allowsSelf(string $market): bool
+    {
+        return empty(self::MARKETS[$market]['no_self']);
     }
 
     public static function label(string $market): string

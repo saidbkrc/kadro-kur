@@ -190,17 +190,21 @@ class KehanetService
         return ['ok' => true, 'message' => "Kombine yapıldı — toplam oran {$toplamOran}×"];
     }
 
-    /** Kendi hakkında tahmin kontrolü; sorun varsa mesaj döner. */
+    /**
+     * Kendi hakkında tahmin kontrolü; sorun varsa mesaj döner.
+     * Kendine tahmin serbest — yalnızca sonucu bilerek yaratabileceğin
+     * olaylar ('no_self', örn. gerginlik) kapalı.
+     */
     protected function selfBetError(User $user, FootballMatch $match, string $market, string $selection): ?string
     {
-        if ((Kehanet::MARKETS[$market]['kind'] ?? '') !== 'oyuncu') {
+        if ((Kehanet::MARKETS[$market]['kind'] ?? '') !== 'oyuncu' || Kehanet::allowsSelf($market)) {
             return null;
         }
 
         $kendi = $match->group->playerFor($user);
 
         return ($kendi && (int) $selection === $kendi->id)
-            ? 'Kendinle ilgili tahmin yapamazsın 🙂'
+            ? 'Kendinle ilgili bu tahmini yapamazsın 🙂'
             : null;
     }
 

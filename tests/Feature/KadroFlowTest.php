@@ -1599,7 +1599,7 @@ class KadroFlowTest extends TestCase
         $this->actingAs($yabanci)->get(route('groups.kehanet', $group))->assertForbidden();
     }
 
-    public function test_kehanet_kendine_kupon_yasak_ve_kadro_degisince_iade(): void
+    public function test_kehanet_kendine_kupon_serbest_gerginlikte_yasak_ve_kadro_degisince_iade(): void
     {
         $owner = User::factory()->create();
         $group = $this->makeGroup($owner);
@@ -1614,19 +1614,21 @@ class KadroFlowTest extends TestCase
 
         $c = Livewire::actingAs($owner)->test(Groups\Kehanet::class, ['group' => $group]);
 
-        // Kendi hakkında oyuncu tahmini yapılamaz
-        $c->set("selection.{$match->id}-scorer", (string) $ownPlayer->id)
-            ->set("stake.{$match->id}-scorer", 20)
-            ->call('bet', $match->id, 'scorer')
+        // Gerginlik: sonucu kendin yaratabileceğin için kendine kupon yapılamaz
+        $c->set("selection.{$match->id}-gerginlik", (string) $ownPlayer->id)
+            ->set("stake.{$match->id}-gerginlik", 20)
+            ->call('bet', $match->id, 'gerginlik')
             ->assertSet('notice', fn ($v) => str_contains((string) $v, 'Kendinle'));
         $this->assertSame(0, \App\Models\Prediction::count());
 
-        // Kendi adı seçenek listesinde de görünmez
-        $this->actingAs($owner)->get(route('groups.kehanet', $group))
-            ->assertOk()
-            ->assertSee($friend->name);
+        // Diğer bireysel market'lerde kendine kupon serbest
+        $c->set("selection.{$match->id}-mvp", (string) $ownPlayer->id)
+            ->set("stake.{$match->id}-mvp", 15)
+            ->call('bet', $match->id, 'mvp');
+        $this->assertSame(1, \App\Models\Prediction::where('market_key', 'mvp')
+            ->where('selection', (string) $ownPlayer->id)->count());
 
-        // Başkası hakkında serbest — ve bakiye ekranda anında düşer
+        // Başkası hakkında da serbest — ve bakiye ekranda anında düşer
         $baslangic = $owner->refresh()->cim_balance;
         $c->set("selection.{$match->id}-scorer", (string) $friend->id)
             ->set("stake.{$match->id}-scorer", 20)
@@ -1638,18 +1640,59 @@ class KadroFlowTest extends TestCase
         $c->set("selection.{$match->id}-winner", 'A')
             ->set("stake.{$match->id}-winner", 10)
             ->call('bet', $match->id, 'winner');
-        $this->assertSame(2, \App\Models\Prediction::where('status', 'pending')->count());
+        $this->assertSame(3, \App\Models\Prediction::where('status', 'pending')->count());
 
-        // Kadro değişir: friend gelmiyor → onun üzerine kupon iade edilir, takım kuponu kalır
+        // Kadro değişir: friend gelmiyor → onun üzerine kupon iade edilir, takım kuponu
+        // ve hâlâ kadroda olan kişinin (kendi) kuponu kalır
         $oncekiBakiye = $owner->refresh()->cim_balance;
         $match->setRsvp($friend, 'not_going');
 
         $oyuncuKuponu = \App\Models\Prediction::where('market_key', 'scorer')->firstOrFail();
         $takimKuponu = \App\Models\Prediction::where('market_key', 'winner')->firstOrFail();
+        $kendiKuponu = \App\Models\Prediction::where('market_key', 'mvp')->firstOrFail();
 
         $this->assertSame('void', $oyuncuKuponu->refresh()->status, 'Kadrodan çıkan oyuncunun kuponu iade edilmeli');
         $this->assertSame('pending', $takimKuponu->refresh()->status, 'Takım kuponu etkilenmemeli');
+        $this->assertSame('pending', $kendiKuponu->refresh()->status, 'Kadroda kalan oyuncunun kuponu etkilenmemeli');
         $this->assertSame($oncekiBakiye + 20, $owner->refresh()->cim_balance);
+    }
+
+    public function test_kehanet_kurtaris_orani_kaleciye_gore_hesaplanir(): void
+    {
+        $owner = User::factory()->create();
+        $group = $this->makeGroup($owner);
+        $ownPlayer = $group->playerFor($owner);
+        $ownPlayer->update(['positions' => ['FV']]);
+
+        // 2 asıl kaleci, 1 yedek kaleci (KL ikinci pozisyon), 7 kaleye hiç geçmeyen
+        $kaleciler = collect(range(1, 2))->map(fn () => tap($this->addMember($group))->update(['positions' => ['KL']]));
+        $yedekKaleci = tap($this->addMember($group))->update(['positions' => ['DEF', 'KL']]);
+        $sahaOyunculari = collect(range(1, 7))->map(fn () => tap($this->addMember($group))->update(['positions' => ['FV']]));
+
+        $match = $this->makeMatch($group);
+        foreach ([$ownPlayer, ...$kaleciler, $yedekKaleci, ...$sahaOyunculari] as $p) {
+            $match->setRsvp($p, 'going');
+        }
+
+        $odds = new \App\Services\OddsCalculator;
+        $oran = fn ($p) => $odds->odds($match->fresh(), 'kurtaris', (string) $p->id);
+
+        $kaleciOrani = $oran($kaleciler[0]);
+        $yedekOrani = $oran($yedekKaleci);
+        $sahaOrani = $oran($sahaOyunculari[0]);
+
+        // Asıl kaleci favori, yedek arada, kaleye geçmeyen tavanda
+        $this->assertLessThan($yedekOrani, $kaleciOrani);
+        $this->assertLessThan($sahaOrani, $yedekOrani);
+        $this->assertLessThan(3.5, $kaleciOrani, 'Asıl kaleci kısa oranlı olmalı');
+        $this->assertSame(\App\Support\Kehanet::maxOdds('kurtaris'), $sahaOrani);
+
+        // Pozisyon ağırlığı yalnızca 'prior' tanımlı market'lere uygulanır:
+        // diğer olaylarda (örn. günün çalımı) veri yokken herkes hâlâ eşit
+        $this->assertSame(
+            $odds->odds($match->fresh(), 'calim', (string) $kaleciler[0]->id),
+            $odds->odds($match->fresh(), 'calim', (string) $sahaOyunculari[0]->id),
+        );
     }
 
     public function test_kehanet_kombine_skor_nabiz_ve_hareket_gecmisi(): void

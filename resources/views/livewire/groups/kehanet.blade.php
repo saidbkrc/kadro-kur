@@ -170,7 +170,10 @@
         {{-- Açık maçlar: kupon yapma --}}
         @if ($tab === 'kupon')
         @forelse ($openMatches as $match)
-            @php $squad = $this->squadFor($match); @endphp
+            @php
+                $squad = $this->squadFor($match);
+                $benimOyuncuId = $squad->firstWhere('user_id', auth()->id())?->id;   // seçeneklerde "SEN" etiketi
+            @endphp
 
             <div class="bg-pitch-surface border border-pitch-line rounded-xl p-4 sm:p-6 space-y-4">
                 <div class="flex items-baseline justify-between gap-2 flex-wrap">
@@ -214,8 +217,10 @@
                                 ? K::teamOptions($key)
                                 : ($kind === 'altust'
                                     ? ['under' => $line.' Alt', 'over' => $line.' Üst']
-                                    // Kendi hakkında tahmin yapılamaz
-                                    : $squad->where('user_id', '!=', auth()->id())->pluck('name', 'id')->all());
+                                    // Kendine tahmin serbest; 'no_self' market'lerinde (gerginlik) kendi adın listede yok
+                                    : (K::allowsSelf($key)
+                                        ? $squad->pluck('name', 'id')->all()
+                                        : $squad->where('user_id', '!=', auth()->id())->pluck('name', 'id')->all()));
                             $anahtar = $match->id.'-'.$key;
                             $mevcut = $myBets->firstWhere(fn ($b) => $b->match_id === $match->id && $b->market_key === $key && $b->status === 'pending');
                         @endphp
@@ -291,6 +296,9 @@
                                                               : 'border-pitch-line hover:bg-pitch-surface2' }}">
                                                 <span class="truncate">
                                                     {{ $etiket }}
+                                                    @if ($kind === 'oyuncu' && (int) $deger === $benimOyuncuId)
+                                                        <span class="text-[10px] bg-bibB/15 text-bibB rounded px-1">SEN</span>
+                                                    @endif
                                                     @if ($oran !== null && $oran > 0)
                                                         <span class="text-[10px] text-pitch-muted">%{{ $oran }}</span>
                                                     @endif
