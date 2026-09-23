@@ -1664,6 +1664,83 @@ class KadroFlowTest extends TestCase
         $this->assertSame($oncekiBakiye + 20, $owner->refresh()->cim_balance);
     }
 
+    public function test_kehanet_kombine_ve_mac_basina_limit(): void
+    {
+        $owner = User::factory()->create();
+        $group = $this->makeGroup($owner);
+        $ownPlayer = $group->playerFor($owner);
+        $friend = $this->addMember($group);
+        $owner->forceFill(['cim_balance' => 5000, 'cim_granted_at' => now()])->save();
+
+        $match = $this->makeMatch($group);
+        $match->setRsvp($ownPlayer, 'going');
+        $match->setRsvp($friend, 'going');
+        $match->applySquad([$ownPlayer->id], [$friend->id]);
+
+        $c = Livewire::actingAs($owner)->test(Groups\Kehanet::class, ['group' => $group]);
+
+        // Kombine tutarı sınırı
+        $c->call('toggleParlay', $match->id, 'winner', 'A')
+            ->call('toggleParlay', $match->id, 'total_goals', 'under')
+            ->set('parlayStake', \App\Support\Kehanet::MAX_PARLAY_STAKE + 1)
+            ->call('placeParlay')
+            ->assertSet('notice', fn ($v) => str_contains((string) $v, 'Kombine tutarı'));
+        $this->assertSame(0, \App\Models\PredictionSlip::count());
+
+        // Sınır içinde kombine oynanır, oranı tavanı geçemez
+        $c->set('parlayStake', 100)->call('placeParlay');
+        $slip = \App\Models\PredictionSlip::firstOrFail();
+        $this->assertLessThanOrEqual(\App\Support\Kehanet::MAX_PARLAY_ODDS, (float) $slip->total_odds);
+
+        // Kombine tutarı maçın limitinden düşer: 100 kullanıldı, 900 kaldı
+        $servis = app(\App\Services\KehanetService::class);
+        $this->assertSame(100, $servis->matchStakeUsed($owner, $match));
+
+        // Tekliler: 500 + 400 = limit dolar (100 + 900 = 1000)
+        $c->set("selection.{$match->id}-scorer", (string) $friend->id)
+            ->set("stake.{$match->id}-scorer", 500)
+            ->call('bet', $match->id, 'scorer');
+        $c->set("selection.{$match->id}-mvp", (string) $friend->id)
+            ->set("stake.{$match->id}-mvp", 400)
+            ->call('bet', $match->id, 'mvp');
+        $this->assertSame(1000, $servis->matchStakeUsed($owner, $match));
+
+        // Limit dolunca yeni kupon reddedilir, bakiye değişmez
+        $bakiye = $owner->refresh()->cim_balance;
+        $c->set("selection.{$match->id}-forma", (string) $friend->id)
+            ->set("stake.{$match->id}-forma", 5)
+            ->call('bet', $match->id, 'forma')
+            ->assertSet('notice', fn ($v) => str_contains((string) $v, 'limitini doldurdun'));
+        $this->assertSame($bakiye, $owner->refresh()->cim_balance);
+
+        // İade edilen (void) kupon limitten düşmez: friend kadrodan çıkınca scorer/mvp iade
+        $match->setRsvp($friend, 'not_going');
+        $this->assertSame(100, $servis->matchStakeUsed($owner, $match));
+    }
+
+    public function test_duyuru_grupta_gorunur_ve_suresi_dolunca_kalkar(): void
+    {
+        $owner = User::factory()->create();
+        $group = $this->makeGroup($owner);
+
+        $this->travelTo(\Illuminate\Support\Carbon::parse('2026-09-23'));
+        $this->actingAs($owner)->get(route('groups.show', $group))
+            ->assertOk()
+            ->assertSee('Kehanet\'te yeni kurallar')
+            ->assertSee(number_format(\App\Support\Kehanet::MAX_MATCH_STAKE, 0, ',', '.'));
+
+        $this->actingAs($owner)->get(route('groups.kehanet', $group))
+            ->assertOk()
+            ->assertSee('Kehanet\'te yeni kurallar');
+
+        // Bitiş tarihinden sonra kendiliğinden kalkar
+        $this->travelTo(\Illuminate\Support\Carbon::parse('2026-10-08'));
+        $this->actingAs($owner)->get(route('groups.show', $group))
+            ->assertOk()
+            ->assertDontSee('Kehanet\'te yeni kurallar');
+        $this->travelBack();
+    }
+
     public function test_kehanet_kurtaris_orani_kaleciye_gore_hesaplanir(): void
     {
         $owner = User::factory()->create();

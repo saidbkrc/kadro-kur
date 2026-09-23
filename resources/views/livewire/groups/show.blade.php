@@ -8,6 +8,8 @@
 
         <x-group-nav :group="$group" active="group" />
 
+        <x-announcements :group="$group" />
+
         {{-- Başlık + davet linki + ayarlar --}}
         <div class="bg-pitch-surface border border-pitch-line rounded-xl p-6 space-y-4">
             <div class="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3 sm:gap-4">

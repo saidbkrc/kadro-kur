@@ -42,6 +42,21 @@ class Kehanet
     public const MAX_LEGS = 5;
 
     /**
+     * Kombine sınırları. Oranlar çarpıldığı için tek kombine mağazanın
+     * tamamını alabiliyordu (500 × 500× = 250.000) — hem tutar hem oran kırpılır.
+     * En yüksek kombine kazancı: 100 × 50× = 5.000 Çim.
+     */
+    public const MAX_PARLAY_STAKE = 100;
+
+    public const MAX_PARLAY_ODDS = 50.0;
+
+    /**
+     * Bir kullanıcının tek maça yatırabileceği toplam Çim (tekli + o maçı
+     * içeren kombineler). Bakiyeyi tek maçta eritmeyi engeller.
+     */
+    public const MAX_MATCH_STAKE = 1000;
+
+    /**
      * Maç başarı ödülleri (Çim). Kupondan bağımsız — sahadaki performansın karşılığı.
      * MVP oylaması kapanınca tek seferde dağıtılır; misafir oyuncular (hesapsız) alamaz.
      */

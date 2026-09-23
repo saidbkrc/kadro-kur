@@ -8,6 +8,8 @@
 
         <x-group-nav :group="$group" active="kehanet" />
 
+        <x-announcements :group="$group" />
+
         {{-- Başlık + bakiye --}}
         <div class="bg-pitch-surface border border-pitch-line rounded-xl p-4 sm:p-6">
             <div class="flex items-center justify-between gap-3 flex-wrap">
@@ -27,6 +29,11 @@
             </div>
             <p class="text-xs text-pitch-muted mt-3">
                 Her hafta <strong class="text-pitch-ink">{{ K::WEEKLY_GRANT }} Çim</strong> hesabına yüklenir. Kuponlar <strong class="text-pitch-ink">kesindir</strong> — yapıldıktan sonra değiştirilemez veya iptal edilemez. Çim tamamen sanaldır; eğlence amaçlıdır, gerçek parayla ilişkisi yoktur.
+            </p>
+            <p class="text-[11px] text-pitch-muted mt-1.5">
+                📏 Limitler: tekli kupon {{ K::MIN_STAKE }}–{{ K::MAX_STAKE }} Çim ·
+                kombine en fazla {{ K::MAX_PARLAY_STAKE }} Çim, oran tavanı {{ (int) K::MAX_PARLAY_ODDS }}× ·
+                maç başına toplam {{ number_format(K::MAX_MATCH_STAKE) }} Çim
             </p>
 
             {{-- Maç başarı ödülleri: kupon oynamadan da Çim kazanma yolu --}}
@@ -101,13 +108,19 @@
                 </div>
 
                 <div class="flex items-center justify-between gap-2 pt-2 border-t border-pitch-line flex-wrap">
-                    <span class="text-sm">Toplam oran: <strong class="font-display text-xl text-gold">{{ number_format(min(500, $toplamOran), 2) }}×</strong></span>
+                    <span class="text-sm">
+                        Toplam oran: <strong class="font-display text-xl text-gold">{{ number_format(min(K::MAX_PARLAY_ODDS, $toplamOran), 2) }}×</strong>
+                        @if ($toplamOran > K::MAX_PARLAY_ODDS)
+                            <span class="text-[11px] text-pitch-muted">(tavan {{ (int) K::MAX_PARLAY_ODDS }}×)</span>
+                        @endif
+                    </span>
                     <div class="flex items-center gap-2">
-                        <input type="number" min="{{ K::MIN_STAKE }}" max="{{ K::MAX_STAKE }}" wire:model="parlayStake"
+                        <input type="number" min="{{ K::MIN_STAKE }}" max="{{ K::MAX_PARLAY_STAKE }}" wire:model="parlayStake"
                                class="w-20 text-sm bg-pitch-bg border-pitch-line text-pitch-ink rounded-md focus:border-bibB focus:ring-bibB/40">
-                        <span class="text-xs text-pitch-muted">Çim → <strong class="text-gold">{{ number_format($parlayStake * min(500, $toplamOran)) }}</strong></span>
+                        <span class="text-xs text-pitch-muted">Çim → <strong class="text-gold">{{ number_format($parlayStake * min(K::MAX_PARLAY_ODDS, $toplamOran)) }}</strong></span>
                     </div>
                 </div>
+                <p class="text-[11px] text-pitch-muted">Kombinede en fazla {{ K::MAX_PARLAY_STAKE }} Çim · oran tavanı {{ (int) K::MAX_PARLAY_ODDS }}×</p>
 
                 <div class="grid grid-cols-2 gap-2 sm:flex">
                     <x-primary-button wire:click="placeParlay" class="w-full sm:w-auto"
@@ -179,6 +192,21 @@
                 <div class="flex items-baseline justify-between gap-2 flex-wrap">
                     <h3 class="font-display uppercase tracking-wider text-lg font-semibold">{{ $match->title }}</h3>
                     <span class="text-xs text-pitch-muted">{{ $match->starts_at->translatedFormat('d F, l H:i') }}</span>
+                </div>
+
+                {{-- Maç başına toplam limit: ne kadar kullanıldığı --}}
+                @php
+                    $kullanilan = app(\App\Services\KehanetService::class)->matchStakeUsed(auth()->user(), $match);
+                    $limitYuzde = min(100, (int) round($kullanilan / K::MAX_MATCH_STAKE * 100));
+                @endphp
+                <div>
+                    <div class="flex items-center justify-between text-[11px] text-pitch-muted mb-1">
+                        <span>Bu maçta oynadığın</span>
+                        <span><strong class="{{ $kullanilan >= K::MAX_MATCH_STAKE ? 'text-bibA' : 'text-pitch-ink' }}">{{ number_format($kullanilan) }}</strong> / {{ number_format(K::MAX_MATCH_STAKE) }} Çim</span>
+                    </div>
+                    <div class="h-1.5 rounded-full bg-pitch-bg overflow-hidden">
+                        <div class="h-full rounded-full {{ $kullanilan >= K::MAX_MATCH_STAKE ? 'bg-bibA' : 'bg-bibB' }}" style="width: {{ $limitYuzde }}%"></div>
+                    </div>
                 </div>
 
                 @php $takimlar = $this->teamsFor($match); @endphp

@@ -106,6 +106,10 @@ class KehanetService
             return ['ok' => false, 'message' => 'Yeterli Çim yok.'];
         }
 
+        if ($hata = $this->matchLimitError($user, $match, $stake)) {
+            return ['ok' => false, 'message' => $hata];
+        }
+
         $odds = app(OddsCalculator::class)->odds($match, $market, $selection);
 
         Prediction::create([
@@ -133,8 +137,8 @@ class KehanetService
             return ['ok' => false, 'message' => 'Kombine '.Kehanet::MIN_LEGS.'-'.Kehanet::MAX_LEGS.' tahmin içermeli.'];
         }
 
-        if ($stake < Kehanet::MIN_STAKE || $stake > Kehanet::MAX_STAKE) {
-            return ['ok' => false, 'message' => 'Tutar '.Kehanet::MIN_STAKE.'-'.Kehanet::MAX_STAKE.' Çim arasında olmalı.'];
+        if ($stake < Kehanet::MIN_STAKE || $stake > Kehanet::MAX_PARLAY_STAKE) {
+            return ['ok' => false, 'message' => 'Kombine tutarı '.Kehanet::MIN_STAKE.'-'.Kehanet::MAX_PARLAY_STAKE.' Çim arasında olmalı.'];
         }
 
         if ($user->cim_balance < $stake) {
@@ -144,6 +148,7 @@ class KehanetService
         $odds = app(OddsCalculator::class);
         $hazir = [];
         $toplamOran = 1.0;
+        $maclar = [];
 
         foreach ($legs as $leg) {
             $match = $group->matches()->find($leg['match_id']);
@@ -160,9 +165,17 @@ class KehanetService
             $toplamOran *= $o;
 
             $hazir[] = ['match' => $match, 'market' => $leg['market'], 'selection' => $leg['selection'], 'odds' => $o];
+            $maclar[$match->id] = $match;
         }
 
-        $toplamOran = round(min(500, $toplamOran), 2);
+        // Kombinenin tutarı, içerdiği her maçın limitinden düşer
+        foreach ($maclar as $match) {
+            if ($hata = $this->matchLimitError($user, $match, $stake)) {
+                return ['ok' => false, 'message' => $hata];
+            }
+        }
+
+        $toplamOran = round(min(Kehanet::MAX_PARLAY_ODDS, $toplamOran), 2);
 
         DB::transaction(function () use ($user, $group, $hazir, $stake, $toplamOran) {
             $slip = PredictionSlip::create([
@@ -188,6 +201,40 @@ class KehanetService
         $this->adjustBalance($user->id, -$stake, 'bet', count($hazir).'\'li kombine');
 
         return ['ok' => true, 'message' => "Kombine yapıldı — toplam oran {$toplamOran}×"];
+    }
+
+    /**
+     * Kullanıcının bu maça şimdiye kadar yatırdığı Çim: tekli kuponlar + o maçı
+     * içeren kombinelerin tutarı. İade edilen (void) kuponlar sayılmaz.
+     */
+    public function matchStakeUsed(User $user, FootballMatch $match): int
+    {
+        $tekli = Prediction::where('user_id', $user->id)
+            ->where('match_id', $match->id)
+            ->whereNull('slip_id')
+            ->where('status', '!=', 'void')
+            ->sum('stake');
+
+        $kombine = PredictionSlip::where('user_id', $user->id)
+            ->where('status', '!=', 'void')
+            ->whereHas('legs', fn ($q) => $q->where('match_id', $match->id))
+            ->sum('stake');
+
+        return (int) $tekli + (int) $kombine;
+    }
+
+    /** Maç başına toplam limit aşılıyorsa mesaj döner. */
+    protected function matchLimitError(User $user, FootballMatch $match, int $stake): ?string
+    {
+        $kalan = Kehanet::MAX_MATCH_STAKE - $this->matchStakeUsed($user, $match);
+
+        if ($stake <= $kalan) {
+            return null;
+        }
+
+        return $kalan <= 0
+            ? 'Bu maç için '.number_format(Kehanet::MAX_MATCH_STAKE).' Çim limitini doldurdun.'
+            : 'Bu maçta en fazla '.number_format($kalan).' Çim daha oynayabilirsin (maç başına limit '.number_format(Kehanet::MAX_MATCH_STAKE).').';
     }
 
     /**
