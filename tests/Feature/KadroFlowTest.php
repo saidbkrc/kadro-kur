@@ -1834,6 +1834,71 @@ class KadroFlowTest extends TestCase
             ->assertSee('gönderen: '.$owner->name);
     }
 
+    public function test_herkese_performans_puani_odulu_ayri_verilir(): void
+    {
+        Notification::fake();
+
+        $owner = User::factory()->create();
+        $group = $this->makeGroup($owner);
+        $sahip = $group->playerFor($owner);
+        [$ali, $veli, $can] = [$this->addMember($group), $this->addMember($group), $this->addMember($group)];
+        $misafir = $group->players()->create(['name' => 'Misafir', 'positions' => []]);
+
+        $this->travelTo(\Illuminate\Support\Carbon::parse('2026-10-01 20:00'));
+        $mac = $group->matches()->create([
+            'created_by' => $owner->id, 'title' => 'Puan maçı', 'starts_at' => now()->subHours(2),
+            'capacity' => 14, 'status' => 'completed', 'team_a_score' => 2, 'team_b_score' => 2,
+            'mvp_closes_at' => now()->addHours(24),
+        ]);
+        foreach ([$sahip, $ali, $veli, $can, $misafir] as $p) {
+            $mac->rsvps()->create(['player_id' => $p->id, 'status' => 'going', 'team' => 'A']);
+        }
+
+        $puanla = function ($kim, array $kimleri) use ($mac) {
+            foreach ($kimleri as $p) {
+                $mac->performanceRatings()->create(['rater_id' => $kim->id, 'player_id' => $p->id, 'score' => 7]);
+            }
+        };
+
+        // Owner: misafir hariç herkesi puanlar, MVP oyu vermez
+        $puanla($owner, [$ali, $veli, $can]);
+        // Ali: eksik puanlar ama MVP oyu verir
+        $puanla($ali->user, [$sahip, $veli]);
+        $mac->mvpVotes()->create(['voter_id' => $ali->user_id, 'player_id' => $veli->id]);
+
+        // Veli: herkesi puanlar ama süre dolduktan SONRA
+        $this->travelTo(now()->addHours(25));
+        $puanla($veli->user, [$sahip, $ali, $can]);
+
+        app(\App\Services\CimRewards::class)->awardForMatch($mac->fresh());
+
+        $aldi = fn ($user, $key) => \App\Models\CimAward::where('user_id', $user->id)->where('award_key', $key)->exists();
+
+        $this->assertTrue($aldi($owner, 'perf_vote'), 'Herkesi zamanında puanlayan ödülü alır (misafir şart değil)');
+        $this->assertFalse($aldi($owner, 'rating_vote'), 'MVP oyu vermeyen MVP oyu ödülünü almaz');
+        $this->assertFalse($aldi($ali->user, 'perf_vote'), 'Eksik puanlayan almaz');
+        $this->assertTrue($aldi($ali->user, 'rating_vote'), 'MVP oyu veren MVP oyu ödülünü alır');
+        $this->assertFalse($aldi($veli->user, 'perf_vote'), 'Süre dolduktan sonraki puanlar sayılmaz');
+
+        // Başlangıç tarihinden önce kapanan maçlara geriye dönük ödenmez
+        $eski = $group->matches()->create([
+            'created_by' => $owner->id, 'title' => 'Eski maç', 'starts_at' => '2026-09-10 20:00',
+            'capacity' => 14, 'status' => 'completed', 'team_a_score' => 1, 'team_b_score' => 0,
+            'mvp_closes_at' => '2026-09-11 22:00',
+        ]);
+        foreach ([$sahip, $ali] as $p) {
+            $eski->rsvps()->create(['player_id' => $p->id, 'status' => 'going', 'team' => 'A']);
+        }
+        \App\Models\MatchPerformanceRating::create(['match_id' => $eski->id, 'rater_id' => $owner->id, 'player_id' => $ali->id, 'score' => 8])
+            ->forceFill(['created_at' => '2026-09-11 10:00'])->save();
+
+        app(\App\Services\CimRewards::class)->awardForMatch($eski->fresh());
+        $this->assertFalse(\App\Models\CimAward::where('user_id', $owner->id)->where('award_key', 'perf_vote')
+            ->where('ref', 'match:'.$eski->id)->exists(), 'Eski maçlara geriye dönük ödeme yapılmaz');
+
+        $this->travelBack();
+    }
+
     public function test_kehanet_performans_kuponu_24_saatte_o_anki_puanlarla_sonuclanir(): void
     {
         Notification::fake();
@@ -2179,12 +2244,15 @@ class KadroFlowTest extends TestCase
 
         $adet = app(\App\Services\KehanetService::class)->awardMatchBonuses($match);
 
-        // golcü: en çok gol 100 + MVP 50 + hat-trick 50 + galibiyet 15 + katılım 10 = 225
-        // owner: forma 25 + galibiyet 15 + oylamaya katıldı 10 + katılım 10 = 60
+        // Tutarlar katalogdan — ödül miktarları değişince test kırılmasın
+        $odul = fn (string ...$k) => array_sum(array_map(fn ($x) => \App\Services\CimRewards::AWARDS[$x]['amount'], $k));
+
+        // golcü: en çok gol + MVP + hat-trick + galibiyet + katılım
+        // owner: forma + galibiyet + MVP oyu + katılım
         // misafir: hesapsız → hiç ödül yok
         $this->assertSame(2, $adet);
-        $this->assertSame($golcuOnce + 225, $golcu->user->refresh()->cim_balance);
-        $this->assertSame($ownerOnce + 60, $owner->refresh()->cim_balance);
+        $this->assertSame($golcuOnce + $odul('top_scorer', 'mvp', 'hat_trick', 'win', 'attendance'), $golcu->user->refresh()->cim_balance);
+        $this->assertSame($ownerOnce + $odul('forma', 'win', 'rating_vote', 'attendance'), $owner->refresh()->cim_balance);
 
         // Misafirin hesabı yok — ödül kaydı da oluşmaz
         $this->assertSame(0, \App\Models\CimTransaction::where('type', 'bonus')
@@ -2248,7 +2316,7 @@ class KadroFlowTest extends TestCase
         Notification::fake();
         app(\App\Services\KehanetService::class)->awardMatchBonuses($katilimMaci);
 
-        $this->assertSame($oncekiBakiye + 10, $sadeceKatilan->user->refresh()->cim_balance);
+        $this->assertSame($oncekiBakiye + $odul('attendance'), $sadeceKatilan->user->refresh()->cim_balance);
         Notification::assertNothingSent();
     }
 
@@ -2291,9 +2359,9 @@ class KadroFlowTest extends TestCase
         $this->assertSame('won', $kupon->refresh()->status);
         $this->assertSame(100, $kupon->payout);                       // 40 × 2.5
 
-        // Kupon ödemesi 100 + aynı iş maç ödüllerini de dağıtır
-        // (galibiyet 15 + oylamaya katıldı 10 + katılım 10 = 35)
-        $this->assertSame($bakiyeOnce + 135, $owner->refresh()->cim_balance);
+        // Kupon ödemesi 100 + aynı iş maç ödüllerini de dağıtır (galibiyet + MVP oyu + katılım)
+        $odul = fn (string ...$k) => array_sum(array_map(fn ($x) => \App\Services\CimRewards::AWARDS[$x]['amount'], $k));
+        $this->assertSame($bakiyeOnce + 100 + $odul('win', 'rating_vote', 'attendance'), $owner->refresh()->cim_balance);
     }
 
     public function test_kehanet_mac_iptalinde_cim_iade_edilir(): void

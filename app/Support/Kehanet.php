@@ -56,17 +56,6 @@ class Kehanet
      */
     public const MAX_MATCH_STAKE = 1000;
 
-    /**
-     * Maç başarı ödülleri (Çim). Kupondan bağımsız — sahadaki performansın karşılığı.
-     * MVP oylaması kapanınca tek seferde dağıtılır; misafir oyuncular (hesapsız) alamaz.
-     */
-    public const BONUS = [
-        'top_scorer' => ['amount' => 100, 'icon' => '⚽', 'name' => 'En çok gol atan'],
-        'mvp' => ['amount' => 50, 'icon' => '🏆', 'name' => 'Maçın adamı'],
-        'forma' => ['amount' => 25, 'icon' => '👕', 'name' => 'Forma golü'],
-        'attendance' => ['amount' => 10, 'icon' => '🏟️', 'name' => 'Maça katılım'],
-    ];
-
     /** Başkanın maç sonrası işaretlediği olaylar — manuel market'lerin kaynağı. */
     public const EVENTS = [
         'macin_golu' => ['icon' => '🌟', 'name' => 'Maçın golü', 'hint' => 'Maçın en güzel golünü atan'],

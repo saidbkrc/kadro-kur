@@ -20,25 +20,40 @@ use Illuminate\Support\Facades\DB;
  */
 class CimRewards
 {
+    /*
+     * Tutarlar 2026-09-25'te mağaza zammına karşılık ×1,5 artırıldı. Verilmiş ödüller
+     * cim_awards'ta kilitli olduğu için zam geriye dönük fark ödemez — yeni tutar
+     * yalnızca bundan sonra verilenlere uygulanır. Kehanet başlığındaki etiketler de
+     * buradan okur; tutarın tek kaynağı burası.
+     */
     public const AWARDS = [
-        'top_scorer' => ['amount' => 100, 'icon' => '⚽', 'name' => 'En çok gol atan', 'desc' => 'Maçın en golcüsü ol', 'scope' => 'match'],
-        'mvp' => ['amount' => 50, 'icon' => '🏆', 'name' => 'Maçın adamı', 'desc' => 'MVP oylamasını kazan', 'scope' => 'match'],
-        'hat_trick' => ['amount' => 50, 'icon' => '⚡', 'name' => 'Hat-trick', 'desc' => 'Tek maçta 3+ gol at', 'scope' => 'match'],
-        'clean_sheet' => ['amount' => 50, 'icon' => '🧱', 'name' => 'Gol yemeyen kaleci', 'desc' => 'Kalede maçı gol yemeden bitir', 'scope' => 'match'],
-        'forma' => ['amount' => 25, 'icon' => '👕', 'name' => 'Forma golü', 'desc' => 'Forma golünü sen at', 'scope' => 'match'],
-        'win' => ['amount' => 15, 'icon' => '🥇', 'name' => 'Galibiyet', 'desc' => 'Takımınla maçı kazan', 'scope' => 'match'],
-        'rating_vote' => ['amount' => 10, 'icon' => '🗳️', 'name' => 'Oylamaya katıldın', 'desc' => 'Maç sonrası MVP veya performans puanı ver', 'scope' => 'match'],
-        'attendance' => ['amount' => 10, 'icon' => '🏟️', 'name' => 'Maça katılım', 'desc' => 'Asıl kadroda sahaya çık', 'scope' => 'match'],
-        'squad_vote' => ['amount' => 5, 'icon' => '✅', 'name' => 'Kadro oylaması', 'desc' => 'Kurulan kadroya oy ver', 'scope' => 'match'],
-        'early_rsvp' => ['amount' => 5, 'icon' => '⏱️', 'name' => 'Erken cevap', 'desc' => 'Maçtan en az 48 saat önce katılımını bildir', 'scope' => 'match'],
+        'top_scorer' => ['amount' => 150, 'icon' => '⚽', 'name' => 'En çok gol atan', 'desc' => 'Maçın en golcüsü ol', 'scope' => 'match'],
+        'mvp' => ['amount' => 75, 'icon' => '🏆', 'name' => 'Maçın adamı', 'desc' => 'MVP oylamasını kazan', 'scope' => 'match'],
+        'hat_trick' => ['amount' => 75, 'icon' => '⚡', 'name' => 'Hat-trick', 'desc' => 'Tek maçta 3+ gol at', 'scope' => 'match'],
+        'clean_sheet' => ['amount' => 75, 'icon' => '🧱', 'name' => 'Gol yemeyen kaleci', 'desc' => 'Kalede maçı gol yemeden bitir', 'scope' => 'match'],
+        'perf_vote' => ['amount' => 45, 'icon' => '📊', 'name' => 'Herkese performans puanı', 'desc' => 'Skor girildikten sonraki 24 saat içinde maçtaki herkesi puanla', 'scope' => 'match'],
+        'forma' => ['amount' => 40, 'icon' => '👕', 'name' => 'Forma golü', 'desc' => 'Forma golünü sen at', 'scope' => 'match'],
+        'win' => ['amount' => 25, 'icon' => '🥇', 'name' => 'Galibiyet', 'desc' => 'Takımınla maçı kazan', 'scope' => 'match'],
+        'attendance' => ['amount' => 15, 'icon' => '🏟️', 'name' => 'Maça katılım', 'desc' => 'Asıl kadroda sahaya çık', 'scope' => 'match'],
+        // Anahtar eski ('rating_vote') — geçmiş kayıtlar bozulmasın diye korundu; artık yalnızca MVP oyu
+        'rating_vote' => ['amount' => 10, 'icon' => '🗳️', 'name' => 'MVP oyu verdin', 'desc' => 'Maç sonu MVP oylamasına katıl', 'scope' => 'match'],
+        'squad_vote' => ['amount' => 10, 'icon' => '✅', 'name' => 'Kadro oylaması', 'desc' => 'Kurulan kadroya oy ver', 'scope' => 'match'],
+        'early_rsvp' => ['amount' => 10, 'icon' => '⏱️', 'name' => 'Erken cevap', 'desc' => 'Maçtan en az 48 saat önce katılımını bildir', 'scope' => 'match'],
 
-        'streak_5' => ['amount' => 50, 'icon' => '🔥', 'name' => '5 maç serisi', 'desc' => 'Üst üste 5 maça çık', 'scope' => 'period'],
-        'monthly_full' => ['amount' => 100, 'icon' => '📅', 'name' => 'Aylık tam katılım', 'desc' => 'Bir ayın bütün maçlarına çık', 'scope' => 'period'],
+        'streak_5' => ['amount' => 75, 'icon' => '🔥', 'name' => '5 maç serisi', 'desc' => 'Üst üste 5 maça çık', 'scope' => 'period'],
+        'monthly_full' => ['amount' => 150, 'icon' => '📅', 'name' => 'Aylık tam katılım', 'desc' => 'Bir ayın bütün maçlarına çık', 'scope' => 'period'],
 
-        'profile_complete' => ['amount' => 50, 'icon' => '🎯', 'name' => 'Profilini tamamla', 'desc' => 'Fotoğraf, pozisyon ve forma numarası ekle', 'scope' => 'once'],
-        'rate_player' => ['amount' => 20, 'icon' => '⭐', 'name' => 'Oyuncu puanlama', 'desc' => 'Bir takım arkadaşını puanla (kişi başına bir kez)', 'scope' => 'repeat'],
-        'badge_earned' => ['amount' => 25, 'icon' => '🏅', 'name' => 'Yeni rozet', 'desc' => 'Kazandığın her rozet için', 'scope' => 'repeat'],
+        'profile_complete' => ['amount' => 75, 'icon' => '🎯', 'name' => 'Profilini tamamla', 'desc' => 'Fotoğraf, pozisyon ve forma numarası ekle', 'scope' => 'once'],
+        'rate_player' => ['amount' => 30, 'icon' => '⭐', 'name' => 'Oyuncu puanlama', 'desc' => 'Bir takım arkadaşını puanla (kişi başına bir kez)', 'scope' => 'repeat'],
+        'badge_earned' => ['amount' => 40, 'icon' => '🏅', 'name' => 'Yeni rozet', 'desc' => 'Kazandığın her rozet için', 'scope' => 'repeat'],
     ];
+
+    /**
+     * "Herkese performans puanı" ödülü bu tarihten sonra oylaması kapanan maçlara
+     * uygulanır. Ödül işi son 2 ayın maçlarını her saat yeniden taradığı için sınır
+     * olmasa geçmiş maçlar için toplu ödeme + maç başına ayrı push giderdi.
+     */
+    public const PERF_VOTE_SINCE = '2026-09-25';
 
     /** Ödülü verir (zaten verilmişse hiçbir şey yapmaz). Verilen miktarı döndürür. */
     public function grant(int $userId, Group $group, string $key, string $ref = ''): int
@@ -140,10 +155,10 @@ class CimRewards
             $ekle($match->forma_goal_player_id, 'forma');
         }
 
-        // Katılım ödülleri kullanıcı bazlı: kadro oylaması ve maç sonu oylaması
+        // Katılım ödülleri kullanıcı bazlı: kadro oylaması, MVP oyu, eksiksiz performans puanlaması
         $oyVerenler = $match->squadVotes()->pluck('user_id');
-        $puanlayanlar = $match->performanceRatings()->pluck('rater_id')
-            ->merge($match->mvpVotes()->pluck('voter_id'))->unique();
+        $mvpOyVerenler = $match->mvpVotes()->pluck('voter_id');
+        $tamPuanlayanlar = $this->fullPerformanceRaters($match, $rsvps);
 
         $ozet = [];
 
@@ -153,8 +168,11 @@ class CimRewards
             if ($oyVerenler->contains($userId)) {
                 $anahtarlar[] = 'squad_vote';
             }
-            if ($puanlayanlar->contains($userId)) {
+            if ($mvpOyVerenler->contains($userId)) {
                 $anahtarlar[] = 'rating_vote';
+            }
+            if ($tamPuanlayanlar->contains($userId)) {
+                $anahtarlar[] = 'perf_vote';
             }
 
             $toplam = 0;
@@ -189,6 +207,35 @@ class CimRewards
         $match->update(['bonus_awarded_at' => now()]);
 
         return $ozet;
+    }
+
+    /**
+     * Maçtaki puanlanabilir herkesi (asıl kadro; kendisi ve misafirler hariç) oylama
+     * penceresi içinde puanlamış kullanıcılar. Pencere dışındaki puanlar sayılmaz —
+     * kupon da o ana kadarki puanlarla sonuçlanıyor, ödül zamanında puanı teşvik eder.
+     */
+    protected function fullPerformanceRaters(FootballMatch $match, $rsvps): \Illuminate\Support\Collection
+    {
+        if ($match->mvp_closes_at === null || $match->mvp_closes_at->lt(\Illuminate\Support\Carbon::parse(self::PERF_VOTE_SINCE))) {
+            return collect();
+        }
+
+        // Puanlanabilir oyuncular: hesabı olan (misafir değil) asıl kadro
+        $puanlanabilir = $rsvps->filter(fn ($r) => $r->player && ! $r->player->isGuest())
+            ->mapWithKeys(fn ($r) => [$r->player_id => $r->player->user_id]);
+
+        return $match->performanceRatings()
+            ->where('created_at', '<=', $match->mvp_closes_at)
+            ->get(['rater_id', 'player_id'])
+            ->groupBy('rater_id')
+            ->filter(function ($puanlar, $raterId) use ($puanlanabilir) {
+                // Kendisi hariç herkes: puanlanabilir kümede kendisi varsa o düşülür
+                $hedef = $puanlanabilir->reject(fn ($userId) => (int) $userId === (int) $raterId)->keys();
+
+                return $hedef->isNotEmpty() && $hedef->diff($puanlar->pluck('player_id'))->isEmpty();
+            })
+            ->keys()
+            ->map(fn ($id) => (int) $id);
     }
 
     /** 5 maç serisi ve aylık tam katılım. */

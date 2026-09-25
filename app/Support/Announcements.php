@@ -19,7 +19,8 @@ class Announcements
     {
         return [
             [
-                'id' => 'kehanet-limitler-2026-09',
+                // v2: ödül değişiklikleri eklendi — kimlik değişince kapatmış olanlara da tekrar görünür
+                'id' => 'kehanet-limitler-2026-09-v2',
                 'title' => '📢 Kehanet\'te yeni kurallar',
                 'until' => '2026-10-07',
                 'link' => 'kehanet',
@@ -28,6 +29,9 @@ class Announcements
                     '📏 Maç başına toplam limit: '.number_format(K::MAX_MATCH_STAKE, 0, ',', '.').' Çim (tekli + o maçı içeren kombineler)',
                     '🙋 Kendine kupon artık serbest — gerginlik ve en geç gelen hariç',
                     '🧤 Günün kurtarışı oranı artık kalecilere göre hesaplanıyor',
+                    '📈 En yüksek performans kuponu da MVP gibi 24 saatte, o ana kadarki puanlarla sonuçlanıyor',
+                    '🎁 Maç ödülleri ×1,5 arttı; yeni: skor girildikten sonraki 24 saat içinde maçtaki herkesi puanlayana +'
+                        .\App\Services\CimRewards::AWARDS['perf_vote']['amount'].' Çim',
                     '🛒 Mağaza fiyatları güncellendi; yeni: forma desenleri, gol sevinçleri, avatar halkaları, rozet vitrini ve hediye etme',
                 ],
             ],

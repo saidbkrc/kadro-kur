@@ -36,9 +36,10 @@
                 maç başına toplam {{ number_format(K::MAX_MATCH_STAKE) }} Çim
             </p>
 
-            {{-- Maç başarı ödülleri: kupon oynamadan da Çim kazanma yolu --}}
+            {{-- Maç başarı ödülleri: kupon oynamadan da Çim kazanma yolu.
+                 Tutarlar tek kaynaktan (CimRewards::AWARDS) — burada yalnızca öne çıkanlar seçilir. --}}
             <div class="mt-3 flex flex-wrap gap-2">
-                @foreach (K::BONUS as $odul)
+                @foreach (\Illuminate\Support\Arr::only(\App\Services\CimRewards::AWARDS, ['top_scorer', 'mvp', 'forma', 'attendance']) as $odul)
                     <span class="inline-flex items-center gap-1.5 text-[11px] px-2.5 py-1 rounded-full bg-pitch-bg border border-pitch-line">
                         {{ $odul['icon'] }} {{ $odul['name'] }}
                         <strong class="text-gold">+{{ $odul['amount'] }}</strong>

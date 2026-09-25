@@ -331,6 +331,16 @@
 
                 @if ($perfOpen && $isParticipant)
                     <p class="text-sm text-pitch-muted">Bu maçta takım arkadaşlarının performansını 1-10 puanla (anonim). Son 5 maçın ortalaması oyuncunun puanına <strong class="text-pitch-ink">%20</strong> oranında ▲/▼ olarak yansır.</p>
+                    @if ($match->mvpOpen())
+                        {{-- Ödül teşviki: tutar tek kaynaktan (CimRewards) --}}
+                        <p class="text-xs text-gold bg-gold/10 border border-gold/30 rounded-md px-3 py-2">
+                            📊 Oylama kapanmadan maçtaki <strong>herkesi</strong> puanlarsan
+                            <strong>+{{ \App\Services\CimRewards::AWARDS['perf_vote']['amount'] }} Çim</strong>
+                            @if ($match->mvp_closes_at && ! \App\Models\FootballMatch::ratingUnlimited())
+                                — {{ (int) ceil(now()->diffInHours($match->mvp_closes_at, true)) }} saat kaldı
+                            @endif
+                        </p>
+                    @endif
                     <div class="space-y-1.5">
                         @foreach ($going as $rsvp)
                             @if ((! $myPlayer || $rsvp->player_id !== $myPlayer->id) && ! $rsvp->player->isGuest())
