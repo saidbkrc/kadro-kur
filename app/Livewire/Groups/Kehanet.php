@@ -438,9 +438,10 @@ class Kehanet extends Component
             $bet->market_key === 'mvp' => $mac->mvpOpen()
                 ? 'MVP oylaması bitince sonuçlanır — '.(\App\Models\FootballMatch::ratingUnlimited() ? 'süre sınırsız' : $kalan($mac->mvp_closes_at))
                 : 'Oylama kapandı — en geç sonraki saat başında sonuçlanır',
-            $bet->market_key === 'top_perf' => $mac->perfOpen()
-                ? 'Performans puanlaması bitince sonuçlanır — '.$kalan($mac->perfClosesAt())
-                : 'Puanlama kapandı — en geç sonraki saat başında sonuçlanır',
+            // MVP ile aynı pencere: skor + 24 saat, o ana kadarki puanlara göre
+            $bet->market_key === 'top_perf' => $mac->mvpOpen()
+                ? 'O ana kadarki performans puanlarına göre sonuçlanır — '.(\App\Models\FootballMatch::ratingUnlimited() ? 'süre sınırsız' : $kalan($mac->mvp_closes_at))
+                : 'Süre doldu — en geç sonraki saat başında sonuçlanır',
             (K::MARKETS[$bet->market_key]['source'] ?? '') === 'event' => 'Başkanın olayı işaretlemesi bekleniyor',
             default => null,
         };

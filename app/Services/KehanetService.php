@@ -629,10 +629,15 @@ class KehanetService
                 ! $match->mvpOpen(),
             ),
 
+            // Kupon MVP ile aynı anda kapanır (skor + 24 saat), o ana kadar verilmiş
+            // puanlara göre. Performans puanlaması reyting için 1 hafta açık kalır ama
+            // sonradan gelen puanlar sonuçlanmış kuponu değiştirmez.
             'top_perf' => $this->compareTop(
-                $match->performanceRatings()->selectRaw('player_id, avg(score) as agirlik')->groupBy('player_id')->get(),
+                $match->performanceRatings()
+                    ->when($match->mvp_closes_at, fn ($q, $kapanis) => $q->where('created_at', '<=', $kapanis))
+                    ->selectRaw('player_id, avg(score) as agirlik')->groupBy('player_id')->get(),
                 $selection,
-                ! $match->perfOpen(),
+                ! $match->mvpOpen(),
             ),
 
             default => null,
@@ -642,6 +647,8 @@ class KehanetService
     /**
      * Oylamayla belirlenen market'ler: oylama sürerken sonuç kesinleşmez.
      * Pencere kapandığında hiç oy yoksa kupon kaybeder.
+     * Beraberlikte zirvedeki herkes kazanmış sayılır (maç ödülleriyle aynı kural) —
+     * yoksa kazananı veritabanının satır sırası belirlerdi.
      */
     protected function compareTop($rows, string $selection, bool $pencereKapandi): ?bool
     {
@@ -653,6 +660,10 @@ class KehanetService
             return null; // oylama sürüyor, lider değişebilir
         }
 
-        return (string) ($rows->sortByDesc('agirlik')->first()->player_id) === $selection;
+        $zirve = round((float) $rows->max('agirlik'), 2);
+
+        return $rows
+            ->filter(fn ($r) => round((float) $r->agirlik, 2) === $zirve)
+            ->contains(fn ($r) => (string) $r->player_id === $selection);
     }
 }

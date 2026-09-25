@@ -1834,6 +1834,54 @@ class KadroFlowTest extends TestCase
             ->assertSee('gönderen: '.$owner->name);
     }
 
+    public function test_kehanet_performans_kuponu_24_saatte_o_anki_puanlarla_sonuclanir(): void
+    {
+        Notification::fake();
+
+        $owner = User::factory()->create();
+        $group = $this->makeGroup($owner);
+        [$ali, $veli, $can] = [$this->addMember($group), $this->addMember($group), $this->addMember($group)];
+
+        $this->travelTo(now()->startOfHour());
+        $mac = $group->matches()->create([
+            'created_by' => $owner->id, 'title' => 'Performans maçı', 'starts_at' => now()->subHours(2),
+            'capacity' => 14, 'status' => 'completed', 'team_a_score' => 2, 'team_b_score' => 2,
+            'mvp_closes_at' => now()->addHours(24),
+        ]);
+
+        $kupon = fn (string $kim, $oyuncu) => \App\Models\Prediction::create([
+            'user_id' => $owner->id, 'match_id' => $mac->id, 'market_key' => 'top_perf',
+            'selection' => (string) $oyuncu->id, 'odds' => 3.0, 'stake' => 10,
+        ]);
+        $aliKuponu = $kupon('ali', $ali);
+        $veliKuponu = $kupon('veli', $veli);
+        $canKuponu = $kupon('can', $can);
+
+        // 24 saat içinde verilen puanlar: Ali ve Veli 8.0 ile berabere, Can 6.0
+        $mac->performanceRatings()->create(['rater_id' => $owner->id, 'player_id' => $ali->id, 'score' => 8]);
+        $mac->performanceRatings()->create(['rater_id' => $owner->id, 'player_id' => $veli->id, 'score' => 8]);
+        $mac->performanceRatings()->create(['rater_id' => $owner->id, 'player_id' => $can->id, 'score' => 6]);
+
+        // 24 saat dolmadan: bekler
+        app(\App\Services\KehanetService::class)->settleMatch($mac->fresh());
+        $this->assertSame('pending', $aliKuponu->refresh()->status);
+
+        // Süre dolduktan sonra gelen puan (Can'a 10) sonucu değiştirmez
+        $this->travelTo(now()->addHours(25));
+        $mac->performanceRatings()->create(['rater_id' => $ali->user_id, 'player_id' => $can->id, 'score' => 10]);
+        $mac->performanceRatings()->create(['rater_id' => $veli->user_id, 'player_id' => $can->id, 'score' => 10]);
+
+        // Performans puanlaması (1 hafta) hâlâ açık — kupon onu beklemez
+        $this->assertTrue($mac->fresh()->perfOpen());
+        app(\App\Services\KehanetService::class)->settleDueMatches();
+
+        // Beraberlikte zirvedeki ikisi de kazanır; geç puanlarla öne geçen Can kaybeder
+        $this->assertSame('won', $aliKuponu->refresh()->status);
+        $this->assertSame('won', $veliKuponu->refresh()->status);
+        $this->assertSame('lost', $canKuponu->refresh()->status);
+        $this->travelBack();
+    }
+
     public function test_kuponlarim_rozeti_listeyle_ayni_sayar(): void
     {
         Notification::fake();
