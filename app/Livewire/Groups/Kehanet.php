@@ -247,15 +247,23 @@ class Kehanet extends Component
         $macIdler = $this->group->matches()->pluck('id');
         $isAdmin = $this->group->isAdmin($user);
 
-        // Bekleyen kupon sayısı (sekme rozeti) — her sekmede lazım, ucuz
+        // Bekleyen kupon sayısı (sekme rozeti) — her sekmede lazım, ucuz.
+        // Kullanıcının gördüğü birimle sayar: tekli kupon + kombine (kombine başına 1).
+        // Kombine bacakları ayrıca sayılmaz: bir bacak kaybedince kombine anında
+        // biter ama kalan bacaklar (MVP/olay) "pending" durabilir — onlar kupon değil.
         $bekleyenSayisi = Prediction::where('user_id', $user->id)
             ->whereIn('match_id', $macIdler)
+            ->whereNull('slip_id')
             ->where('status', 'pending')
-            ->count();
+            ->count()
+            + \App\Models\PredictionSlip::where('user_id', $user->id)
+                ->where('group_id', $this->group->id)
+                ->where('status', 'pending')
+                ->count();
 
         // Sekme bazlı veri: sadece görünen sekmenin sorguları çalışır
         $veri = [
-            'openMatches' => collect(), 'pendingMatches' => collect(), 'myBets' => collect(),
+            'openMatches' => collect(), 'pendingMatches' => collect(), 'myBets' => collect(), 'pendingBets' => collect(),
             'mySlips' => collect(), 'transactions' => collect(), 'leaders' => collect(),
             'streaks' => collect(), 'pulse' => collect(), 'line' => 8.5, 'awardStatus' => [],
             'owned' => [],
@@ -290,6 +298,17 @@ class Kehanet extends Component
                 ->sortByDesc(fn ($b) => $b->match?->starts_at)
                 ->groupBy('match_id')
                 ->take(10);
+
+            // Bekleyenler geçmiş listesinin 10 maç sınırına takılmaz: eski bir maçta
+            // bekleyen kupon da görünmeli (yoksa rozet sayar ama liste göstermez)
+            $veri['pendingBets'] = Prediction::where('user_id', $user->id)
+                ->whereIn('match_id', $macIdler)
+                ->whereNull('slip_id')
+                ->where('status', 'pending')
+                ->with('match')
+                ->get()
+                ->sortByDesc(fn ($b) => $b->match?->starts_at)
+                ->groupBy('match_id');
 
             $veri['mySlips'] = \App\Models\PredictionSlip::where('user_id', $user->id)
                 ->where('group_id', $this->group->id)

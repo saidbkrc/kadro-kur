@@ -138,10 +138,8 @@
 
         {{-- Bekleyen tahminler — maça göre gruplu, en yeni maç üstte --}}
         @php
-            // $myBets sekmeye göre farklı gelir: 'kuponlarim'da maça göre gruplu
-            $bekleyenGruplar = $tab === 'kuponlarim'
-                ? $myBets->map(fn ($g) => $g->where('status', 'pending'))->filter(fn ($g) => $g->isNotEmpty())
-                : collect();
+            // Ayrı sorgudan gelir (pendingBets): geçmiş listesinin 10 maç sınırına takılmaz
+            $bekleyenGruplar = $tab === 'kuponlarim' ? $pendingBets : collect();
             $bekleyenAdet = $bekleyenGruplar->flatten()->count();
         @endphp
         @if ($bekleyenAdet > 0)

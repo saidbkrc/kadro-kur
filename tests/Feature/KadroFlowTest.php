@@ -1834,6 +1834,68 @@ class KadroFlowTest extends TestCase
             ->assertSee('gönderen: '.$owner->name);
     }
 
+    public function test_kuponlarim_rozeti_listeyle_ayni_sayar(): void
+    {
+        Notification::fake();
+
+        $owner = User::factory()->create();
+        $group = $this->makeGroup($owner);
+        $friend = $this->addMember($group);
+
+        // 1) Kombine: "maç sonucu" bacağı kaybeder → kombine anında biter,
+        //    MVP bacağı oylama sürdüğü için hâlâ "pending" durur
+        $mac = $group->matches()->create([
+            'created_by' => $owner->id, 'title' => 'Kombine maçı', 'starts_at' => now()->subHours(3),
+            'capacity' => 14, 'status' => 'completed', 'team_a_score' => 3, 'team_b_score' => 1,
+            'mvp_closes_at' => now()->addHours(20),
+        ]);
+        $slip = \App\Models\PredictionSlip::create([
+            'user_id' => $owner->id, 'group_id' => $group->id, 'stake' => 20, 'total_odds' => 6.0,
+        ]);
+        foreach ([['winner', 'B'], ['mvp', (string) $friend->id]] as [$market, $secim]) {
+            \App\Models\Prediction::create([
+                'user_id' => $owner->id, 'match_id' => $mac->id, 'slip_id' => $slip->id,
+                'market_key' => $market, 'selection' => $secim, 'odds' => 2.0, 'stake' => 0,
+            ]);
+        }
+        app(\App\Services\KehanetService::class)->settleMatch($mac);
+
+        $this->assertSame('lost', $slip->refresh()->status);
+        $this->assertSame(1, \App\Models\Prediction::where('slip_id', $slip->id)->where('status', 'pending')->count());
+
+        // Biten kombinenin artık bacağı "bekleyen kupon" sayılmaz
+        Livewire::actingAs($owner)->test(Groups\Kehanet::class, ['group' => $group])
+            ->assertViewHas('pendingCount', 0);
+
+        // 2) 10 maçtan eski bir maçta bekleyen tekli kupon: rozet sayar, liste de gösterir
+        $eski = $group->matches()->create([
+            'created_by' => $owner->id, 'title' => 'Çok eski maç', 'starts_at' => now()->subDays(40),
+            'capacity' => 14, 'status' => 'completed', 'team_a_score' => 1, 'team_b_score' => 1,
+            'mvp_closes_at' => now()->subDays(39),
+        ]);
+        \App\Models\Prediction::create([
+            'user_id' => $owner->id, 'match_id' => $eski->id, 'market_key' => 'asist',
+            'selection' => (string) $friend->id, 'odds' => 5.0, 'stake' => 10,
+        ]);
+        foreach (range(1, 11) as $i) {
+            $m = $group->matches()->create([
+                'created_by' => $owner->id, 'title' => "Maç {$i}", 'starts_at' => now()->subDays(30 - $i),
+                'capacity' => 14, 'status' => 'completed', 'team_a_score' => 1, 'team_b_score' => 0,
+                'mvp_closes_at' => now()->subDays(29 - $i),
+            ]);
+            \App\Models\Prediction::create([
+                'user_id' => $owner->id, 'match_id' => $m->id, 'market_key' => 'winner',
+                'selection' => 'A', 'odds' => 2.0, 'stake' => 10, 'status' => 'won', 'payout' => 20,
+            ]);
+        }
+
+        Livewire::actingAs($owner)->test(Groups\Kehanet::class, ['group' => $group])
+            ->call('setTab', 'kuponlarim')
+            ->assertViewHas('pendingCount', 1)
+            ->assertSee('Bekleyen Tahminlerin')
+            ->assertSee('Çok eski maç');
+    }
+
     public function test_kehanet_kombine_ve_mac_basina_limit(): void
     {
         $owner = User::factory()->create();
