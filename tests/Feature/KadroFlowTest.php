@@ -1759,6 +1759,81 @@ class KadroFlowTest extends TestCase
         $this->assertSame('won', $kuponlar[1]->refresh()->status);
     }
 
+    /**
+     * Livewire wire:click="ad(...)" ifadesini $wire.ad(...) olarak çalıştırır; $wire
+     * aynı adlı public property'nin DEĞERİNİ döndürür → tarayıcıda "is not a function",
+     * aksiyon sunucuya hiç gitmez. ->call() kullanan testler bunu göremez, bu yüzden
+     * çakışmayı yapısal olarak yasaklıyoruz. (Hediye etme bu yüzden çalışmıyordu.)
+     */
+    public function test_livewire_componentlerinde_property_ve_metot_adi_cakismaz(): void
+    {
+        $cakismalar = [];
+
+        foreach (\Illuminate\Support\Facades\File::allFiles(app_path('Livewire')) as $dosya) {
+            $sinif = 'App\\Livewire\\'.str_replace(['/', '.php'], ['\\', ''], $dosya->getRelativePathname());
+
+            if (! class_exists($sinif)) {
+                continue;
+            }
+
+            $r = new \ReflectionClass($sinif);
+            $kendi = fn ($uye) => $uye->getDeclaringClass()->getName() === $sinif;
+
+            $propertyler = collect($r->getProperties(\ReflectionProperty::IS_PUBLIC))->filter($kendi)->map->getName();
+            $metotlar = collect($r->getMethods(\ReflectionMethod::IS_PUBLIC))->filter($kendi)->map->getName();
+
+            foreach ($propertyler->intersect($metotlar) as $ad) {
+                $cakismalar[] = "{$sinif}::{$ad}";
+            }
+        }
+
+        $this->assertSame([], $cakismalar, 'Public property ile metot aynı adı taşıyor: '.implode(', ', $cakismalar));
+    }
+
+    public function test_hediye_sahip_olunan_urunden_gonderilir_ve_iki_tarafta_gorunur(): void
+    {
+        Notification::fake();
+
+        $owner = User::factory()->create();
+        $group = $this->makeGroup($owner);
+        $friend = $this->addMember($group);
+        $owner->forceFill(['cim_balance' => 5000, 'cim_granted_at' => now()])->save();
+
+        // Owner ürünü zaten almış
+        Livewire::actingAs($owner)->test(Groups\Kehanet::class, ['group' => $group])
+            ->call('buyItem', 'frame_ates');
+
+        // Sahip olunan üründe de 🎁 düğmesi var
+        $c = Livewire::actingAs($owner)->test(Groups\Kehanet::class, ['group' => $group])
+            ->call('setTab', 'magaza')
+            ->assertSee("openGift('frame_ates')", false);
+
+        // Kendi sahip olduğu ürünü arkadaşına hediye eder
+        $c->call('openGift', 'frame_ates')
+            ->assertSee("sendGift({$friend->user_id})", false)   // alıcı düğmesi yeni metodu çağırır
+            ->call('sendGift', $friend->user_id)
+            ->assertSet('notice', fn ($v) => str_contains((string) $v, 'gönderildi'));
+
+        $this->assertTrue(\App\Models\CimPurchase::where('user_id', $friend->user_id)
+            ->where('item_key', 'frame_ates')->where('gifted_by', $owner->id)->exists());
+
+        // Bildirim alıcıya gider ve doğrudan mağaza sekmesini açar
+        Notification::assertSentTo($friend->user, MatchPushNotification::class,
+            fn ($n) => str_contains($n->title, 'hediye') && str_contains($n->url, 'sekme=magaza'));
+
+        // Gönderen: "Gönderdiğin" listesinde görür
+        Livewire::actingAs($owner)->test(Groups\Kehanet::class, ['group' => $group])
+            ->call('setTab', 'magaza')
+            ->assertSee('GÖNDERDİĞİN')
+            ->assertSee('→ '.$friend->user->name);
+
+        // Alıcı: "Gelen" listesinde ve ürünün üstünde kimden geldiğini görür
+        Livewire::actingAs($friend->user)->test(Groups\Kehanet::class, ['group' => $group])
+            ->call('setTab', 'magaza')
+            ->assertSee('← '.$owner->name)
+            ->assertSee('gönderen: '.$owner->name);
+    }
+
     public function test_kehanet_kombine_ve_mac_basina_limit(): void
     {
         $owner = User::factory()->create();
@@ -2401,13 +2476,13 @@ class KadroFlowTest extends TestCase
         $bakiyeOnce = $owner->cim_balance;
         $c = Livewire::actingAs($owner)->test(Groups\Kehanet::class, ['group' => $group]);
         $c->call('openGift', 'title_simsek')
-            ->call('giftItem', $friend->user_id)
+            ->call('sendGift', $friend->user_id)
             ->assertSet('notice', fn ($v) => str_contains((string) $v, 'şartını sağlamıyor'));
         $this->assertSame($bakiyeOnce, $owner->refresh()->cim_balance);
 
         // Normal ürün hediye edilir: Çim gönderenden düşer, ürün alıcıya yazılır
         $c->call('openGift', 'frame_buz')
-            ->call('giftItem', $friend->user_id);
+            ->call('sendGift', $friend->user_id);
 
         $this->assertSame(
             $bakiyeOnce - \App\Support\CimShop::ITEMS['frame_buz']['price'],
@@ -2425,7 +2500,7 @@ class KadroFlowTest extends TestCase
 
         // Aynı ürün ikinci kez hediye edilemez
         $c->call('openGift', 'frame_buz')
-            ->call('giftItem', $friend->user_id)
+            ->call('sendGift', $friend->user_id)
             ->assertSet('notice', fn ($v) => str_contains((string) $v, 'zaten sahip'));
     }
 

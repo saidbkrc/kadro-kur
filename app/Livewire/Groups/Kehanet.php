@@ -69,8 +69,14 @@ class Kehanet extends Component
         $this->giftItem = $itemKey;
     }
 
-    /** Ürünü gruptaki bir üyeye hediye eder. */
-    public function giftItem(int $userId): void
+    /**
+     * Ürünü gruptaki bir üyeye hediye eder.
+     *
+     * ⚠️ Adı $giftItem property'siyle aynı OLMAMALI: Livewire wire:click'i
+     * $wire.<ad>(...) olarak çalıştırır ve $wire aynı adlı public property'nin
+     * değerini döndürür — tarayıcıda "is not a function" olur, hediye gitmez.
+     */
+    public function sendGift(int $userId): void
     {
         if ($this->giftItem === null) {
             return;
@@ -323,6 +329,14 @@ class Kehanet extends Component
             $magaza = app(\App\Services\CimShopService::class);
             $veri['owned'] = $magaza->owned($user);
             $veri['locked'] = $magaza->lockedFor($this->group->playerFor($user));
+
+            // Hediye geçmişi: gelen (kimden) + giden (kime)
+            $veri['giftsReceived'] = \App\Models\CimPurchase::with('gifter:id,name')
+                ->where('user_id', $user->id)->whereNotNull('gifted_by')
+                ->latest()->limit(20)->get();
+            $veri['giftsSent'] = \App\Models\CimPurchase::with('user:id,name')
+                ->where('gifted_by', $user->id)
+                ->latest()->limit(20)->get();
 
             // Hediye alıcı listesi yalnızca panel açıkken çekilir
             $veri['giftTargets'] = $this->giftItem === null

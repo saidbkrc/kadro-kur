@@ -440,6 +440,41 @@
                 </div>
             </div>
 
+            {{-- Hediye geçmişi: gelenler ve gönderdiklerin --}}
+            @if ($giftsReceived->isNotEmpty() || $giftsSent->isNotEmpty())
+                <div class="bg-pitch-surface border border-gold/40 rounded-xl p-4 sm:p-6">
+                    <h3 class="font-display uppercase tracking-wider text-lg font-semibold text-gold mb-3">🎁 Hediyeler</h3>
+                    <div class="grid sm:grid-cols-2 gap-4">
+                        <div>
+                            <div class="text-[11px] tracking-[.14em] text-pitch-muted mb-1.5">GELEN</div>
+                            @forelse ($giftsReceived as $h)
+                                <div class="text-sm py-1 border-b border-pitch-line last:border-b-0">
+                                    {{ CimShop::ITEMS[$h->item_key]['icon'] ?? '🎁' }}
+                                    <strong>{{ CimShop::ITEMS[$h->item_key]['name'] ?? $h->item_key }}</strong>
+                                    <span class="text-pitch-muted">← {{ $h->gifter?->name ?? 'Bilinmiyor' }}</span>
+                                    <span class="text-[11px] text-pitch-muted">· {{ $h->created_at->diffForHumans() }}</span>
+                                </div>
+                            @empty
+                                <p class="text-xs text-pitch-muted">Henüz hediye gelmedi.</p>
+                            @endforelse
+                        </div>
+                        <div>
+                            <div class="text-[11px] tracking-[.14em] text-pitch-muted mb-1.5">GÖNDERDİĞİN</div>
+                            @forelse ($giftsSent as $h)
+                                <div class="text-sm py-1 border-b border-pitch-line last:border-b-0">
+                                    {{ CimShop::ITEMS[$h->item_key]['icon'] ?? '🎁' }}
+                                    <strong>{{ CimShop::ITEMS[$h->item_key]['name'] ?? $h->item_key }}</strong>
+                                    <span class="text-pitch-muted">→ {{ $h->user?->name ?? 'Bilinmiyor' }}</span>
+                                    <span class="text-[11px] text-pitch-muted">· {{ $h->created_at->diffForHumans() }}</span>
+                                </div>
+                            @empty
+                                <p class="text-xs text-pitch-muted">Henüz hediye göndermedin.</p>
+                            @endforelse
+                        </div>
+                    </div>
+                </div>
+            @endif
+
             @foreach (CimShop::grouped() as $tur => $urunler)
                 @php $turBilgi = CimShop::TYPES[$tur]; @endphp
                 <div class="bg-pitch-surface border border-pitch-line rounded-xl p-4 sm:p-6">
@@ -475,6 +510,9 @@
                                         <span class="text-[9px] tracking-[.14em] uppercase px-1.5 py-0.5 rounded-full border {{ $kademe['class'] }}">{{ $kademe['name'] }}</span>
                                     </div>
                                     <div class="text-[11px] text-pitch-muted leading-snug">{{ $urun['desc'] }}</div>
+                                    @if ($sahip && ($hediyeEden = $giftsReceived->firstWhere('item_key', $key)?->gifter?->name))
+                                        <div class="text-[11px] text-gold mt-0.5">🎁 Hediye · gönderen: {{ $hediyeEden }}</div>
+                                    @endif
                                     @if ($kosul && ! $sahip)
                                         <div class="text-[11px] mt-0.5 {{ $kilitli ? 'text-bibA' : 'text-bibB' }}">
                                             {{ $kilitli ? '🔒 '.$kosul['label'] : '✓ Şartı sağlıyorsun' }}
@@ -486,17 +524,17 @@
                                 </div>
 
                                 <div class="shrink-0">
-                                    @if ($kusanili)
-                                        <span class="text-xs text-bibB font-semibold">✓ Kuşanılı</span>
-                                    @elseif ($sahip)
-                                        <button wire:click="equipItem('{{ $key }}')"
-                                                class="text-xs px-3 py-1.5 rounded-md border border-pitch-line hover:bg-pitch-surface2">Kuşan</button>
-                                    @elseif (! $satista)
-                                        <span class="text-xs text-pitch-muted">Satışta değil</span>
-                                    @elseif ($kilitli)
-                                        <span class="text-xs text-pitch-muted">Kilitli</span>
-                                    @else
-                                        <div class="flex items-center gap-1">
+                                    <div class="flex items-center gap-1">
+                                        @if ($kusanili)
+                                            <span class="text-xs text-bibB font-semibold">✓ Kuşanılı</span>
+                                        @elseif ($sahip)
+                                            <button wire:click="equipItem('{{ $key }}')"
+                                                    class="text-xs px-3 py-1.5 rounded-md border border-pitch-line hover:bg-pitch-surface2">Kuşan</button>
+                                        @elseif (! $satista)
+                                            <span class="text-xs text-pitch-muted">Satışta değil</span>
+                                        @elseif ($kilitli)
+                                            <span class="text-xs text-pitch-muted">Kilitli</span>
+                                        @else
                                             <button wire:click="buyItem('{{ $key }}')"
                                                     data-confirm="{{ $urun['name'] }} — {{ number_format($urun['price']) }} Çim. Satın alınsın mı?"
                                                     data-confirm-danger="false"
@@ -506,10 +544,15 @@
                                                               : 'border-pitch-line text-pitch-muted opacity-60' }}">
                                                 {{ number_format($urun['price']) }} Çim
                                             </button>
+                                        @endif
+
+                                        {{-- Hediye: satıştaki her üründe. Senin sahip olman ya da senin
+                                             kilidin önemsiz — yeni kopya alınır, şart alıcıya bakılır. --}}
+                                        @if ($satista)
                                             <button wire:click="openGift('{{ $key }}')" title="Birine hediye et"
                                                     class="text-xs px-2 py-1.5 rounded-md border border-pitch-line hover:bg-pitch-surface2">🎁</button>
-                                        </div>
-                                    @endif
+                                        @endif
+                                    </div>
                                 </div>
                             </div>
 
@@ -528,7 +571,7 @@
                                     @else
                                         <div class="flex flex-wrap gap-1.5">
                                             @foreach ($giftTargets as $uye)
-                                                <button wire:click="giftItem({{ $uye->id }})"
+                                                <button wire:click="sendGift({{ $uye->id }})"
                                                         data-confirm="{{ $urun['name'] }} → {{ $uye->name }}. {{ number_format($urun['price']) }} Çim senden düşecek. Gönderilsin mi?"
                                                         data-confirm-danger="false"
                                                         class="text-xs px-3 py-1.5 rounded-md border border-pitch-line hover:bg-pitch-surface2 hover:border-gold transition">

@@ -216,7 +216,7 @@ class PushNotifier
             collect([$alici]),
             '🎁 Sana hediye var!',
             $gonderen->name.' sana "'.$itemName.'" gönderdi — mağazadan kuşanabilirsin.',
-            route('groups.kehanet', $groupId),
+            route('groups.kehanet', ['group' => $groupId, 'sekme' => 'magaza']),   // doğrudan mağaza sekmesi
             'hediye-'.$groupId.'-'.$alici->id.'-'.$itemName,
         );
     }

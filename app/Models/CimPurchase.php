@@ -14,4 +14,10 @@ class CimPurchase extends Model
     {
         return $this->belongsTo(User::class);
     }
+
+    /** Hediye edildiyse gönderen (satın alındıysa null). */
+    public function gifter(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'gifted_by');
+    }
 }
