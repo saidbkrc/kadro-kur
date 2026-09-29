@@ -8,6 +8,7 @@ use App\Models\Rule;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\View\View;
 use Livewire\Attributes\Layout;
+use Livewire\Attributes\Url;
 use Livewire\Component;
 
 #[Layout('layouts.app')]
@@ -25,6 +26,18 @@ class Show extends Component
     public string $starts_at = '';
 
     public int $capacity = 14;
+
+    /** Oyuncu havuzu sıralaması (URL'de tutulur, sayfa yenilenince korunur). */
+    public const SORTS = [
+        'puan' => 'Puan',
+        'pozisyon' => 'Pozisyon',
+        'isim' => 'İsim (A-Z)',
+        'mac' => 'Maç sayısı',
+        'forma' => 'Forma no',
+    ];
+
+    #[Url(as: 'sirala', except: 'puan')]
+    public string $sort = 'puan';
 
     // Misafir oyuncu formu
     public bool $showGuestForm = false;
@@ -380,19 +393,70 @@ class Show extends Component
         $this->showSettings = false;
     }
 
+    /**
+     * Havuzu seçilen ölçüte göre sıralar. Her ölçütte eşitlik isimle (Türkçe alfabe) bozulur.
+     *
+     * Puan sırasında gizli puanlar (eşik oylama sayısına ulaşmamış) en sona, kendi
+     * aralarında isimle dizilir — gizli puana göre sıralamak, rozette "?" görünen
+     * puanı listedeki yerinden ele verirdi.
+     */
+    protected function sortPlayers(\Illuminate\Support\Collection $players, \Illuminate\Support\Collection $stats): \Illuminate\Support\Collection
+    {
+        $sort = array_key_exists($this->sort, self::SORTS) ? $this->sort : 'puan';
+        $isim = $this->nameComparator();
+        $sira = array_flip(array_keys(\App\Support\Attributes::POSITIONS)); // KL, DEF, OS, FV
+
+        $anahtar = fn (Player $p) => match ($sort) {
+            // Yüksek puan önce; gizliler en sonda
+            'puan' => [$p->overallIsPublic() ? 0 : 1, $p->overallIsPublic() ? -$p->displayRating() : 0],
+            // Birinci pozisyona göre (pozisyonsuzlar en sonda), sonra yüksek puan
+            'pozisyon' => [$sira[$p->positions[0] ?? ''] ?? 99, $p->overallIsPublic() ? -$p->displayRating() : 0],
+            'mac' => [-($stats->get($p->id)['played'] ?? 0)],
+            // Forma numarası olmayanlar en sonda
+            'forma' => [$p->shirt_number === null ? 1 : 0, $p->shirt_number ?? 0],
+            default => [],
+        };
+
+        return $players->sort(function (Player $a, Player $b) use ($anahtar, $isim) {
+            return ($anahtar($a) <=> $anahtar($b)) ?: $isim($a->name, $b->name);
+        })->values();
+    }
+
+    /** Türkçe alfabeyle isim karşılaştırıcı (Ç, Ğ, İ, Ö, Ş, Ü doğru yerde). */
+    protected function nameComparator(): \Closure
+    {
+        if (class_exists(\Collator::class)) {
+            $collator = new \Collator('tr_TR');
+
+            return fn (string $a, string $b) => $collator->compare($a, $b);
+        }
+
+        // intl eklentisi olmayan sunucu için yedek: harfleri Türkçe sıraya eşle
+        $harfler = 'aâbcçdefgğhıiîjklmnoöprsştuûüvyz';
+        $kod = function (string $s) use ($harfler) {
+            $s = mb_strtolower(str_replace(['I', 'İ'], ['ı', 'i'], $s), 'UTF-8');
+
+            return implode('', array_map(
+                fn ($ch) => ($i = mb_strpos($harfler, $ch)) === false ? $ch : chr(65 + $i),
+                mb_str_split($s),
+            ));
+        };
+
+        return fn (string $a, string $b) => strcmp($kod($a), $kod($b));
+    }
+
     public function render(): View
     {
-        $players = $this->group->players()
-            ->with('attributeRatings')
-            ->orderBy('name')
-            ->get()
-            ->sortByDesc(fn (Player $p) => $p->overall())
-            ->values();
-
         // Havuz satırları için: kazanılan rozet ikonları + en çok onaylanan nitelikler
         $badgeService = app(\App\Services\PlayerBadges::class);
-        $earnedIcons = $badgeService->statsForGroup($this->group)->map(
+        $groupStats = $badgeService->statsForGroup($this->group);
+        $earnedIcons = $groupStats->map(
             fn (array $s) => collect($badgeService->evaluate($s))->where('earned', true)->pluck('icon')->all()
+        );
+
+        $players = $this->sortPlayers(
+            $this->group->players()->with('attributeRatings')->get(),
+            $groupStats,
         );
 
         $topTraits = \App\Models\PlayerTraitEndorsement::whereIn('player_id', $players->pluck('id'))

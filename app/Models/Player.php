@@ -24,7 +24,7 @@ class Player extends Model
 
     public const GUEST_RATING_MAX = 9.5;
 
-    public const GUEST_RATING_STEP = 0.5;
+    public const GUEST_RATING_STEP = 0.1;
 
     protected $fillable = ['group_id', 'user_id', 'name', 'shirt_number', 'positions', 'foot', 'photo_path'];
 

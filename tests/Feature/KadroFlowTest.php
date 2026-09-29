@@ -1349,23 +1349,23 @@ class KadroFlowTest extends TestCase
         $uye = $this->addMember($group);
         $guest = $group->players()->create(['name' => 'Misafir Ali', 'positions' => ['OS']]);
 
-        // Başkan +/− ile ayarlar (adım 0.5); kadro dengesi de bu puanı kullanır
+        // Başkan +/− ile ayarlar (adım 0.1); kadro dengesi de bu puanı kullanır
         $c = Livewire::actingAs($owner)->test(Groups\Show::class, ['group' => $group]);
         $c->assertSee('Misafir puanı:')
             ->call('adjustGuestRating', $guest->id, 1)
             ->call('adjustGuestRating', $guest->id, 1);
-        $this->assertSame(7.5, $guest->fresh()->overall());
-        $this->assertSame(7.5, $guest->fresh()->displayRating());
+        $this->assertSame(6.7, $guest->fresh()->overall());
+        $this->assertSame(6.7, $guest->fresh()->displayRating());
 
         $c->call('adjustGuestRating', $guest->id, -1);
-        $this->assertSame(7.0, $guest->fresh()->overall());
+        $this->assertSame(6.6, $guest->fresh()->overall());
 
-        // Sınırlar: 3.0 – 9.5 arasında kalır
-        foreach (range(1, 20) as $_) {
+        // Sınırlar: 3.0 – 9.5 arasında kalır (ondalık birikim hatası da olmamalı)
+        foreach (range(1, 40) as $_) {
             $c->call('adjustGuestRating', $guest->id, 1);
         }
         $this->assertSame(\App\Models\Player::GUEST_RATING_MAX, $guest->fresh()->overall());
-        foreach (range(1, 20) as $_) {
+        foreach (range(1, 80) as $_) {
             $c->call('adjustGuestRating', $guest->id, -1);
         }
         $this->assertSame(\App\Models\Player::GUEST_RATING_MIN, $guest->fresh()->overall());
@@ -1396,6 +1396,45 @@ class KadroFlowTest extends TestCase
             \Illuminate\Database\Eloquent\ModelNotFoundException::class,
         );
         $this->assertSame(\App\Models\Player::GUEST_RATING, $yabanci->fresh()->overall());
+    }
+
+    public function test_oyuncu_havuzu_siralanir(): void
+    {
+        $owner = User::factory()->create(['name' => 'Zeki']);
+        $group = $this->makeGroup($owner);
+        $group->playerFor($owner)->update(['positions' => ['FV'], 'shirt_number' => 9]);
+
+        // Misafirlerin puanı her zaman görünür → puan sırası deterministik
+        // guest_rating toplu atamaya kapalı (yalnızca başkan aksiyonu yazar) → forceFill
+        $mk = fn ($ad, $puan, $poz, $no) => tap($group->players()->create([
+            'name' => $ad, 'positions' => [$poz], 'shirt_number' => $no,
+        ]))->forceFill(['guest_rating' => $puan])->save();
+        $mk('Çağrı', 8.0, 'DEF', 4);
+        $mk('Ahmet', 5.0, 'KL', 1);
+        $mk('Burak', 7.0, 'OS', null);
+
+        $sira = fn ($sort) => Livewire::actingAs($owner)
+            ->test(Groups\Show::class, ['group' => $group])
+            ->set('sort', $sort)
+            ->viewData('players')->pluck('name')->all();
+
+        // Puan: yüksekten düşüğe; puanı henüz gizli olan üye (Zeki, 0 oylama) en sonda
+        $this->assertSame(['Çağrı', 'Burak', 'Ahmet', 'Zeki'], $sira('puan'));
+
+        // İsim: Türkçe alfabe (Ç, C'den sonra ama D'den önce)
+        $this->assertSame(['Ahmet', 'Burak', 'Çağrı', 'Zeki'], $sira('isim'));
+
+        // Pozisyon: KL → DEF → OS → FV
+        $this->assertSame(['Ahmet', 'Çağrı', 'Burak', 'Zeki'], $sira('pozisyon'));
+
+        // Forma no: küçükten büyüğe, numarasızlar sonda
+        $this->assertSame(['Ahmet', 'Çağrı', 'Zeki', 'Burak'], $sira('forma'));
+
+        // Geçersiz değer puana düşer; seçim URL'de tutulur
+        $this->assertSame($sira('puan'), $sira('uydurma'));
+        $this->actingAs($owner)->get(route('groups.show', $group).'?sirala=isim')
+            ->assertOk()
+            ->assertSeeInOrder(['Ahmet', 'Burak', 'Çağrı', 'Zeki']);
     }
 
     public function test_push_bildirimleri_dogru_olaylarda_gider(): void

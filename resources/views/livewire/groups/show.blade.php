@@ -200,6 +200,18 @@
                 </form>
             @endif
 
+            {{-- Sıralama: seçim URL'de (?sirala=) tutulur --}}
+            <div class="flex items-center gap-1.5 flex-wrap">
+                <span class="text-[11px] tracking-[.14em] text-pitch-muted me-1">SIRALA</span>
+                @foreach (\App\Livewire\Groups\Show::SORTS as $anahtar => $etiket)
+                    <button type="button" wire:click="$set('sort', '{{ $anahtar }}')"
+                            class="text-xs px-3 py-1.5 rounded-full border transition
+                                   {{ $sort === $anahtar ? 'border-bibB bg-bibB/10 text-bibB font-semibold' : 'border-pitch-line text-pitch-muted hover:bg-pitch-surface2' }}">
+                        {{ $etiket }}
+                    </button>
+                @endforeach
+            </div>
+
             <div class="divide-y divide-pitch-line">
                 @foreach ($players as $player)
                     @php
