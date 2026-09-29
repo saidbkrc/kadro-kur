@@ -26,6 +26,7 @@ Route::middleware(['auth'])->group(function () {
     Route::get('gruplar/{group}/istatistik', Groups\Stats::class)->name('groups.stats');
     Route::get('gruplar/{group}/oyuncu/{player}', Groups\PlayerProfile::class)->name('groups.player');
     Route::get('gruplar/{group}/kehanet', Groups\Kehanet::class)->name('groups.kehanet');
+    Route::get('gruplar/{group}/sezon-oylamasi', Groups\SeasonVote::class)->name('groups.season-vote');
 
     Route::get('maclar/{match}', Matches\Show::class)->name('matches.show');
 

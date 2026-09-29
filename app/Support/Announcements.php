@@ -28,6 +28,8 @@ class Announcements
                     '📊 İstatistikler ve rozetler her sezon sıfırlanır; oyuncu puanları (OVR) sıfırlanmaz',
                     '🏆 Sezon sonunda Gol Kralı, Sezonun MVP\'si ve Demirbaş belli olur — İstatistikler sayfasından eski sezonlara da bakabilirsin',
                     '🏟️ Sezonda en çok maça çıkan(lar) çıktığı her maç için '.\App\Services\CimRewards::AWARDS['season_attendance']['amount'].' Çim kazanır',
+                    '🗳️ Sezon bitince 7 gün oylama: en iyi oyuncu, takım oyuncusu, en çok gelişen, centilmen — kazananlara '
+                        .\App\Services\CimRewards::AWARDS['season_vote_win']['amount'].' Çim ve profilde kalıcı unvan',
                 ],
             ],
             [

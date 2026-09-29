@@ -53,7 +53,10 @@
                     @endforeach
                 </div>
 
-                <p class="text-[11px] text-pitch-muted mt-3">
+                <a href="{{ route('groups.season-vote', $group) }}" wire:navigate class="inline-block mt-3 text-xs text-bibB hover:underline">
+                    🗳️ Oyuncuların seçimi: en iyi oyuncu, takım oyuncusu, en çok gelişen, centilmen →
+                </a>
+                <p class="text-[11px] text-pitch-muted mt-2">
                     🏟️ Sezon sonunda en çok maça çıkan(lar) çıktığı her maç için
                     <strong class="text-pitch-ink">{{ \App\Services\CimRewards::AWARDS['season_attendance']['amount'] }} Çim</strong> kazanır.
                     İstatistik ve rozetler her sezon sıfırlanır; oyuncu puanları (OVR) sıfırlanmaz.

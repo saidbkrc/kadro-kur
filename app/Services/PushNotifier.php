@@ -209,6 +209,42 @@ class PushNotifier
         );
     }
 
+    /** Sezon sonu oylaması açıldı. */
+    public function seasonVoteOpened(Collection $users, Group $group, \App\Support\Season $season): void
+    {
+        $this->send(
+            $users,
+            '🗳️ '.$season->name().' oylaması açıldı',
+            'Sezonun en iyisi, takım oyuncusu, en çok gelişen ve centilmeni seç — '.\App\Support\Season::VOTING_DAYS.' gün açık.',
+            route('groups.season-vote', $group),
+            'sezon-oylama-'.$group->id.'-'.$season->key(),
+        );
+    }
+
+    /** Sezon oylamasında son gün (tüm kategorilerde oy vermemişlere). */
+    public function seasonVoteLastDay(Collection $users, Group $group, \App\Support\Season $season): void
+    {
+        $this->send(
+            $users,
+            '⏰ Sezon oylamasında son gün',
+            $season->name().' oylaması yarın kapanıyor — oyunu henüz tamamlamadın.',
+            route('groups.season-vote', $group),
+            'sezon-oylama-son-'.$group->id.'-'.$season->key(),
+        );
+    }
+
+    /** Sezon oylamasında bir kategoriyi kazandı. */
+    public function seasonVoteWon(User $user, Group $group, \App\Support\Season $season, array $kategori, int $tutar): void
+    {
+        $this->send(
+            collect([$user]),
+            $kategori['icon'].' '.$kategori['name'].' sensin!',
+            'Takım arkadaşların seni '.$season->name().' için seçti — +'.number_format($tutar, 0, ',', '.').' Çim.',
+            route('groups.season-vote', $group),
+            'sezon-kazandi-'.$season->key().'-'.$user->id.'-'.$kategori['name'],
+        );
+    }
+
     /** Sezon sonu: sezonun demirbaşı ödülü. */
     public function seasonAward(User $user, Group $group, \App\Support\Season $season, int $tutar): void
     {

@@ -1566,6 +1566,78 @@ class KadroFlowTest extends TestCase
         $this->travelBack();
     }
 
+    public function test_sezon_sonu_oylamasi_akisi(): void
+    {
+        Notification::fake();
+
+        $owner = User::factory()->create();
+        $group = $this->makeGroup($owner);
+        $ben = $group->playerFor($owner);
+        [$ali, $veli, $can] = [$this->addMember($group), $this->addMember($group), $this->addMember($group)];
+        $seyirci = $this->addMember($group);   // hiç maça çıkmadı
+
+        // Sonbahar 2026: ben/Ali/Veli 3 maç (aday), Can 1 maç (oy verir ama aday değil)
+        foreach (['2026-09-05', '2026-10-05', '2026-11-05'] as $i => $gun) {
+            $this->playedMatch($group, $owner, $gun.' 20:00', $i === 0 ? [$ben, $ali, $veli, $can] : [$ben, $ali, $veli]);
+        }
+
+        $test = fn ($user) => Livewire::actingAs($user)->test(Groups\SeasonVote::class, ['group' => $group]);
+
+        // Sezon sürerken oylama kapalı
+        $this->travelTo(\Illuminate\Support\Carbon::parse('2026-11-20 12:00'));
+        $test($owner)->assertSee('Şu an açık oylama yok')
+            ->call('vote', 'best', $ali->id)->assertSet('notice', fn ($v) => str_contains($v, 'açık bir sezon oylaması yok'));
+
+        // Sezon bitti → 7 gün oylama; açılış bildirimi bir kez, oy verebilenlere
+        $this->travelTo(\Illuminate\Support\Carbon::parse('2026-12-01 09:00'));
+        app(\App\Services\SeasonVoting::class)->runDue();
+        app(\App\Services\SeasonVoting::class)->runDue();
+        Notification::assertSentToTimes($can->user, MatchPushNotification::class, 1);
+        Notification::assertNotSentTo($seyirci->user, MatchPushNotification::class);
+        $this->actingAs($owner)->get(route('groups.show', $group))->assertSee('Sonbahar 2026 oylaması açık');
+
+        // Adaylar: yalnızca 3+ maç; kendine oy yok; aday olmayana oy yok
+        $test($owner)->assertSee($ali->name)->assertDontSee("vote('best', {$ben->id})", false)
+            ->assertDontSee("vote('best', {$can->id})", false);
+        $test($owner)->call('vote', 'best', $ben->id)->assertSet('notice', fn ($v) => str_contains($v, 'Kendine'));
+        $test($owner)->call('vote', 'best', $can->id)->assertSet('notice', fn ($v) => str_contains($v, 'aday değil'));
+
+        // Başka grubun oyuncusu aday olamaz (izolasyon)
+        $yabanci = $this->makeGroup(User::factory()->create())->players()->create(['name' => 'Yabancı', 'positions' => []]);
+        $test($owner)->call('vote', 'best', $yabanci->id)->assertSet('notice', fn ($v) => str_contains($v, 'aday değil'));
+
+        // Maça çıkmayan oy veremez
+        $test($seyirci->user)->assertSee('oy veremezsin')
+            ->call('vote', 'best', $ali->id)->assertSet('notice', fn ($v) => str_contains($v, 'oy veremezsin'));
+
+        // Oylar: best → Ali 2 (ben + Can), Veli 1 (Ali). team → Veli (ben). Oy değiştirilebilir.
+        $test($owner)->call('vote', 'best', $veli->id)->call('vote', 'best', $ali->id);
+        $test($can->user)->call('vote', 'best', $ali->id);
+        $test($ali->user)->call('vote', 'best', $veli->id);
+        $test($owner)->call('vote', 'team', $veli->id)->call('vote', 'improved', $ali->id)->call('vote', 'fairplay', $veli->id);
+        $this->assertSame(2, \App\Models\SeasonVote::where('category', 'best')->where('player_id', $ali->id)->count());
+
+        // Açıkken sonuç görünmez
+        $this->assertSame([], app(\App\Services\SeasonVoting::class)->results($group, \App\Support\Season::fromKey('2026-09')));
+
+        // Kapanış: kazananlara 500, dört kategoride oy verene 50 Çim — bir kez
+        $this->travelTo(\Illuminate\Support\Carbon::parse('2026-12-08 01:00'));
+        $once = [$ali->user->refresh()->cim_balance, $veli->user->refresh()->cim_balance, $owner->refresh()->cim_balance];
+        app(\App\Services\SeasonVoting::class)->runDue();
+        app(\App\Services\SeasonVoting::class)->runDue();
+
+        $this->assertSame($once[0] + 500 + 500, $ali->user->refresh()->cim_balance);   // best + improved
+        $this->assertSame($once[1] + 500 + 500, $veli->user->refresh()->cim_balance);  // team + fairplay
+        $this->assertSame($once[2] + 50, $owner->refresh()->cim_balance);              // 4/4 kategori
+        Notification::assertSentTo($ali->user, MatchPushNotification::class, fn ($n) => str_contains($n->title, 'Sezonun En İyi Oyuncusu'));
+
+        // Sonuç sayfası ve profilde kalıcı unvan
+        $test($owner)->assertSee('Sonbahar 2026 — Oyuncuların Seçimi')->assertSee('2 oy');
+        Livewire::actingAs($owner)->test(Groups\PlayerProfile::class, ['group' => $group, 'player' => $ali])
+            ->assertSee('Sezon Ödülleri')->assertSee('Sonbahar 2026 · Sezonun En İyi Oyuncusu');
+        $this->travelBack();
+    }
+
     public function test_oyuncu_havuzu_siralanir(): void
     {
         $owner = User::factory()->create(['name' => 'Zeki']);

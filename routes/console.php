@@ -36,6 +36,12 @@ Schedule::call(fn () => app(App\Services\CimRewards::class)->awardDueSeasons())
     ->name('season-awards')
     ->withoutOverlapping();
 
+// Sezon sonu oylaması: açılış/son gün bildirimi, kapanınca kazananlara Çim (her şey bir kez).
+Schedule::call(fn () => app(App\Services\SeasonVoting::class)->runDue())
+    ->hourly()
+    ->name('season-voting')
+    ->withoutOverlapping();
+
 // Başkanın işaretlemediği olay kuponları iade edilir (Çim kilitli kalmasın).
 Schedule::call(fn () => app(App\Services\KehanetService::class)->voidStaleEventBets())
     ->daily()

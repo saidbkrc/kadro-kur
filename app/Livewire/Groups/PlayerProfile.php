@@ -258,6 +258,8 @@ class PlayerProfile extends Component
             'badges' => $badges->forPlayer($this->player, $sezon),
             'allTimeBadges' => $badges->evaluate($stats),
             'pastSeasonBadges' => $badges->pastSeasonsForPlayer($this->player),
+            // Sezon sonu oylamasında kazandığı kalıcı unvanlar
+            'seasonTitles' => $this->player->isGuest() ? [] : app(\App\Services\SeasonVoting::class)->titlesFor($this->player),
             'otherPlayers' => $this->group->players()->whereKeyNot($this->player->id)->orderBy('name')->get(),
             'compare' => $compare,
             'compareStats' => $compareStats,

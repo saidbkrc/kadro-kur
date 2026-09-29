@@ -133,6 +133,33 @@ final class Season
             : $ad.' '.$this->start->year;
     }
 
+    /** Sezon sonu oylaması: sezon bitince bu kadar gün açık kalır. */
+    public const VOTING_DAYS = 7;
+
+    /** Sezon sonu oylamasının kapandığı an (bitişten VOTING_DAYS gün sonra, gün sonu). */
+    public function votingClosesAt(): Carbon
+    {
+        return $this->end()->copy()->addDays(self::VOTING_DAYS);
+    }
+
+    public function isVotingOpen(): bool
+    {
+        return now()->gt($this->end()) && now()->lte($this->votingClosesAt());
+    }
+
+    public function isVotingClosed(): bool
+    {
+        return now()->gt($this->votingClosesAt());
+    }
+
+    /** Şu an oylaması açık olan sezon (yeni sezonun ilk günleri), yoksa null. */
+    public static function votingNow(): ?self
+    {
+        $onceki = self::current()->previous();
+
+        return $onceki->isVotingOpen() ? $onceki : null;
+    }
+
     /** Sezon bitene kadar kalan gün (bitmişse 0). */
     public function daysLeft(): int
     {

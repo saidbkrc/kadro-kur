@@ -10,6 +10,18 @@
 
         <x-announcements :group="$group" />
 
+        {{-- Sezon sonu oylaması açıkken davet kartı --}}
+        @if ($oylamaSezonu = \App\Support\Season::votingNow())
+            <a href="{{ route('groups.season-vote', $group) }}" wire:navigate
+               class="block bg-gold/5 border border-gold/40 rounded-xl p-4 sm:p-5 hover:bg-gold/10 transition">
+                <div class="font-display uppercase tracking-wider text-base font-semibold text-gold">🗳️ {{ $oylamaSezonu->name() }} oylaması açık</div>
+                <p class="text-sm text-pitch-ink mt-1">
+                    Sezonun en iyisini, takım oyuncusunu, en çok gelişeni ve centilmeni seç.
+                    Son gün: {{ $oylamaSezonu->votingClosesAt()->translatedFormat('j F') }}. Oy ver →
+                </p>
+            </a>
+        @endif
+
         {{-- Başlık + davet linki + ayarlar --}}
         <div class="bg-pitch-surface border border-pitch-line rounded-xl p-6 space-y-4">
             <div class="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3 sm:gap-4">

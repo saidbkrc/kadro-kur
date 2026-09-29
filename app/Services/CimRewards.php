@@ -45,6 +45,8 @@ class CimRewards
 
         // Tutar değişken: sezonda çıkılan maç × 'amount'. Yalnızca sezonun en çok maça
         // çıkan(lar)ına — eşitlikte hepsine (bkz. awardSeason).
+        'season_vote_win' => ['amount' => 500, 'icon' => '🗳️', 'name' => 'Sezon oylaması kazananı', 'desc' => 'Sezon sonu oylamasında bir kategoriyi kazan (kategori başına)', 'scope' => 'season'],
+        'season_vote_cast' => ['amount' => 50, 'icon' => '✍️', 'name' => 'Sezon oylamasına katıldın', 'desc' => 'Sezon sonu oylamasında dört kategoride de oy ver', 'scope' => 'season'],
         'season_attendance' => ['amount' => 100, 'amount_label' => '100 × maç', 'icon' => '🏟️', 'name' => 'Sezonun demirbaşı', 'desc' => 'Sezonda en çok maça çıkan ol — çıktığın her maç için 100 Çim', 'scope' => 'season'],
 
         'profile_complete' => ['amount' => 75, 'icon' => '🎯', 'name' => 'Profilini tamamla', 'desc' => 'Fotoğraf, pozisyon ve forma numarası ekle', 'scope' => 'once'],

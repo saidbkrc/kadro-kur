@@ -379,6 +379,22 @@
             </div>
         @endif
 
+        {{-- Sezon sonu oylamasında takım arkadaşlarının verdiği kalıcı unvanlar --}}
+        @if ($seasonTitles !== [])
+            <div class="bg-pitch-surface border border-gold/40 rounded-xl p-4 sm:p-6">
+                <h3 class="font-display uppercase tracking-wider text-lg font-semibold text-gold mb-3">🗳️ Sezon Ödülleri</h3>
+                <div class="flex flex-wrap gap-2">
+                    @foreach ($seasonTitles as $t)
+                        @php $k = \App\Services\SeasonVoting::CATEGORIES[$t['category']]; @endphp
+                        <span class="inline-flex items-center gap-1.5 text-sm px-3 py-1.5 rounded-full bg-gold/10 border border-gold/40 text-gold font-semibold">
+                            {{ $k['icon'] }} {{ $t['season']->name() }} · {{ $k['name'] }}
+                        </span>
+                    @endforeach
+                </div>
+                <p class="text-[11px] text-pitch-muted mt-2">Takım arkadaşlarının sezon sonu oylamasıyla verildi.</p>
+            </div>
+        @endif
+
         {{-- Rozetler --}}
         @php
             $earnedCount = collect($badges)->where('earned', true)->count();
