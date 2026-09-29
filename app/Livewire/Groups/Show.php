@@ -144,6 +144,23 @@ class Show extends Component
         $this->reset('guestName', 'guestNumber', 'guestFoot', 'showGuestForm');
     }
 
+    /**
+     * Misafir puanını adım adım artırır/azaltır (yön: +1 / -1). Misafir puanlanamadığı
+     * için birkaç kez gelmiş misafirin seviyesini başkan elle yansıtır.
+     */
+    public function adjustGuestRating(int $playerId, int $yon): void
+    {
+        abort_unless($this->group->isAdmin(Auth::user()), 403);
+
+        // İzolasyon: yalnızca bu grubun misafiri
+        $guest = $this->group->players()->whereNull('user_id')->findOrFail($playerId);
+
+        $yeni = $guest->overall() + ($yon >= 0 ? 1 : -1) * \App\Models\Player::GUEST_RATING_STEP;
+        $yeni = max(\App\Models\Player::GUEST_RATING_MIN, min(\App\Models\Player::GUEST_RATING_MAX, $yeni));
+
+        $guest->forceFill(['guest_rating' => round($yeni, 1)])->save();
+    }
+
     /** Misafir kaydını kayıtlı bir üyeyle eşleştirir; üyenin otomatik açılmış boş kaydı silinir. */
     public function linkGuest(int $playerId, int $userId): void
     {

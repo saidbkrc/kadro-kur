@@ -234,8 +234,25 @@
                                         </span>
                                     </div>
                                     <div class="text-xs text-pitch-muted mt-1">
-                                        @if ($player->isGuest())
-                                            Sabit puan · puanlanmaz
+                                        @if ($player->isGuest() && $isAdmin)
+                                            {{-- Başkan misafir puanını elle ayarlar (misafir oylanamaz) --}}
+                                            <span class="inline-flex items-center gap-1.5">
+                                                <span>Misafir puanı:</span>
+                                                <button type="button" wire:click="adjustGuestRating({{ $player->id }}, -1)"
+                                                        @disabled($ovr <= \App\Models\Player::GUEST_RATING_MIN)
+                                                        class="w-6 h-6 rounded border border-pitch-line bg-pitch-bg text-pitch-ink leading-none hover:border-[#FF8A8A] disabled:opacity-30"
+                                                        title="Puanı düşür">−</button>
+                                                <strong class="text-pitch-ink font-display text-sm w-7 text-center">{{ number_format($ovr, 1) }}</strong>
+                                                <button type="button" wire:click="adjustGuestRating({{ $player->id }}, 1)"
+                                                        @disabled($ovr >= \App\Models\Player::GUEST_RATING_MAX)
+                                                        class="w-6 h-6 rounded border border-pitch-line bg-pitch-bg text-pitch-ink leading-none hover:border-bibB disabled:opacity-30"
+                                                        title="Puanı artır">+</button>
+                                                @if ($player->guest_rating === null)
+                                                    <span class="text-pitch-muted/70">(varsayılan)</span>
+                                                @endif
+                                            </span>
+                                        @elseif ($player->isGuest())
+                                            Misafir puanı · başkan belirler
                                         @else
                                             {{ $ovrPublic ? $player->ratingCount().' oylama' : $player->ratingCount().'/'.$minRatings.' oylama' }}
                                         @endif

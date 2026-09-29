@@ -1342,6 +1342,62 @@ class KadroFlowTest extends TestCase
             ->assertStatus(403);
     }
 
+    public function test_baskan_misafir_puanini_ayarlar(): void
+    {
+        $owner = User::factory()->create();
+        $group = $this->makeGroup($owner);
+        $uye = $this->addMember($group);
+        $guest = $group->players()->create(['name' => 'Misafir Ali', 'positions' => ['OS']]);
+
+        // Başkan +/− ile ayarlar (adım 0.5); kadro dengesi de bu puanı kullanır
+        $c = Livewire::actingAs($owner)->test(Groups\Show::class, ['group' => $group]);
+        $c->assertSee('Misafir puanı:')
+            ->call('adjustGuestRating', $guest->id, 1)
+            ->call('adjustGuestRating', $guest->id, 1);
+        $this->assertSame(7.5, $guest->fresh()->overall());
+        $this->assertSame(7.5, $guest->fresh()->displayRating());
+
+        $c->call('adjustGuestRating', $guest->id, -1);
+        $this->assertSame(7.0, $guest->fresh()->overall());
+
+        // Sınırlar: 3.0 – 9.5 arasında kalır
+        foreach (range(1, 20) as $_) {
+            $c->call('adjustGuestRating', $guest->id, 1);
+        }
+        $this->assertSame(\App\Models\Player::GUEST_RATING_MAX, $guest->fresh()->overall());
+        foreach (range(1, 20) as $_) {
+            $c->call('adjustGuestRating', $guest->id, -1);
+        }
+        $this->assertSame(\App\Models\Player::GUEST_RATING_MIN, $guest->fresh()->overall());
+
+        // Ayarlanmamış misafir hâlâ varsayılanla gelir
+        $yeni = $group->players()->create(['name' => 'Misafir Veli', 'positions' => ['OS']]);
+        $this->assertSame(\App\Models\Player::GUEST_RATING, $yeni->overall());
+
+        // Üye (başkan değil) ayarlayamaz
+        Livewire::actingAs($uye->user)->test(Groups\Show::class, ['group' => $group])
+            ->assertDontSee('Misafir puanı:')
+            ->call('adjustGuestRating', $yeni->id, 1)
+            ->assertStatus(403);
+
+        // Kayıtlı üyenin puanı bu yolla değiştirilemez (misafir değil → 404)
+        $this->assertThrows(
+            fn () => Livewire::actingAs($owner)->test(Groups\Show::class, ['group' => $group])
+                ->call('adjustGuestRating', $uye->id, 1),
+            \Illuminate\Database\Eloquent\ModelNotFoundException::class,
+        );
+
+        // Başka grubun misafiri → 404 (izolasyon)
+        $baskaGrup = $this->makeGroup(User::factory()->create());
+        $yabanci = $baskaGrup->players()->create(['name' => 'Yabancı', 'positions' => ['OS']]);
+        $this->assertThrows(
+            fn () => Livewire::actingAs($owner)->test(Groups\Show::class, ['group' => $group])
+                ->call('adjustGuestRating', $yabanci->id, 1),
+            \Illuminate\Database\Eloquent\ModelNotFoundException::class,
+        );
+        $this->assertSame(\App\Models\Player::GUEST_RATING, $yabanci->fresh()->overall());
+    }
+
     public function test_push_bildirimleri_dogru_olaylarda_gider(): void
     {
         Notification::fake();

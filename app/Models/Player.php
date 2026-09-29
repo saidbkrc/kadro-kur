@@ -16,8 +16,15 @@ class Player extends Model
     /** Ortalama puanın görünür olması için gereken en az oylama sayısı (varsayılan; panelden değişebilir). */
     public const MIN_RATINGS_FOR_VISIBILITY = 5;
 
-    /** Misafir oyuncu (hesapsız) puanlanmaz; sabit varsayılan puanla gelir. */
+    /** Misafir oyuncu (hesapsız) puanlanmaz; başkan ayarlamadıysa bu varsayılanla gelir. */
     public const GUEST_RATING = 6.5;
+
+    /** Başkanın misafir puanını ayarlayabildiği aralık ve adım. */
+    public const GUEST_RATING_MIN = 3.0;
+
+    public const GUEST_RATING_MAX = 9.5;
+
+    public const GUEST_RATING_STEP = 0.5;
 
     protected $fillable = ['group_id', 'user_id', 'name', 'shirt_number', 'positions', 'foot', 'photo_path'];
 
@@ -31,6 +38,7 @@ class Player extends Model
     {
         return [
             'positions' => 'array',
+            'guest_rating' => 'float',
         ];
     }
 
@@ -219,11 +227,11 @@ class Player extends Model
         return $averages;
     }
 
-    /** Genel puan (OVR) — puanlanmamış özellikler 5 (orta) kabul edilir. Misafir: sabit 6.5. */
+    /** Genel puan (OVR) — puanlanmamış özellikler 5 (orta) kabul edilir. Misafir: başkanın ayarladığı puan, yoksa 6.5. */
     public function overall(): float
     {
         if ($this->isGuest()) {
-            return self::GUEST_RATING;
+            return $this->guest_rating ?? self::GUEST_RATING;
         }
 
         return round(Attributes::overall($this->averageAttributes(), $this->positions ?? []), 1);
