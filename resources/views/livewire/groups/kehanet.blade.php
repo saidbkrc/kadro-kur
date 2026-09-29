@@ -594,6 +594,7 @@
                 $gruplar = [
                     'match' => ['⚽ MAÇ BAŞINA', 'Her maç sonrası oylamalar kapanınca verilir'],
                     'period' => ['📆 SÜREKLİLİK', 'Düzenli gelenlere'],
+                    'season' => ['🏁 SEZON SONU', \App\Support\Season::current()->name().' · '.\App\Support\Season::current()->daysLeft().' gün kaldı'],
                     'repeat' => ['🔁 TEKRARLI', 'Her yeni nesne için bir kez'],
                     'once' => ['⭐ TEK SEFERLİK', 'Bir kez alınır'],
                 ];
@@ -627,7 +628,7 @@
                                     <div class="min-w-0 flex-1">
                                         <div class="text-sm font-semibold {{ $alindi ? 'text-pitch-ink' : 'text-pitch-muted' }}">
                                             {{ $odul['name'] }}
-                                            <span class="text-gold font-display">+{{ $odul['amount'] }}</span>
+                                            <span class="text-gold font-display">+{{ $odul['amount_label'] ?? $odul['amount'] }}</span>
                                         </div>
                                         <div class="text-[11px] text-pitch-muted leading-snug">{{ $odul['desc'] }}</div>
                                     </div>

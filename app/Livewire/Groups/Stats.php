@@ -8,7 +8,9 @@ use App\Services\PlayerBadges;
 use App\Services\TeamChemistry;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\View\View;
+use App\Support\Season;
 use Livewire\Attributes\Layout;
+use Livewire\Attributes\Url;
 use Livewire\Component;
 
 /** Grup istatistikleri: oyuncu tablosu, gol krallığı, maç geçmişi. */
@@ -22,6 +24,15 @@ class Stats extends Component
 
     /** Maç geçmişinde gösterilen maç sayısı ("daha fazla" ile artar) */
     public int $matchLimit = 10;
+
+    /** Seçili sezon anahtarı ("2026-09"), "tum" = tüm zamanlar, boş = içinde bulunulan sezon. */
+    #[Url(as: 'sezon', except: '')]
+    public string $sezon = '';
+
+    public function updatedSezon(): void
+    {
+        $this->matchLimit = 10;
+    }
 
     public function loadMoreMatches(): void
     {
@@ -37,13 +48,19 @@ class Stats extends Component
 
     public function render(PlayerBadges $badges): View
     {
-        // Her oyuncunun kazandığı rozet ikonları (oyuncu tablosunda gösterilir)
-        $earnedIcons = $badges->statsForGroup($this->group)->map(
+        // Seçili sezon: null = tüm zamanlar; geçersiz/boş anahtar içinde bulunulan sezona düşer
+        $secili = $this->sezon === 'tum'
+            ? null
+            : (Season::fromKey($this->sezon) ?? Season::current());
+
+        // Her oyuncunun kazandığı rozet ikonları (oyuncu tablosunda gösterilir) — seçili sezonun
+        $earnedIcons = $badges->statsForGroup($this->group, $secili)->map(
             fn (array $s) => collect($badges->evaluate($s))->where('earned', true)->pluck('icon')->all()
         );
 
         $matches = $this->group->matches()
             ->where('status', 'completed')
+            ->when($secili, fn ($q) => $q->whereBetween('starts_at', [$secili->start, $secili->end()]))
             ->with(['rsvps.player', 'goals.player', 'mvpVotes.player'])
             ->orderByDesc('starts_at')
             ->get();
@@ -123,7 +140,30 @@ class Stats extends Component
             ? $liste
             : $liste->filter(fn (array $s) => mb_stripos($s['player']->name, $ara) !== false)->values();
 
+        // Bitmiş sezonun şampiyonları (eşitlikte hepsi) — sezon devam ederken "şu an önde"
+        $lider = function (string $alan) use ($stats) {
+            $zirve = collect($stats)->max($alan);
+
+            return $zirve > 0
+                ? ['value' => $zirve, 'players' => collect($stats)->where($alan, $zirve)->pluck('player')->values()]
+                : null;
+        };
+
+        // Sezon seçenekleri: bu sezon + maçı olan geçmiş sezonlar
+        $macOlanSezonlar = $this->group->matches()->where('status', 'completed')->pluck('starts_at')
+            ->map(fn ($t) => Season::forDate($t)->key())->unique()->flip();
+        $sezonlar = collect([Season::current(), ...Season::pastForGroup($this->group)])
+            ->filter(fn (Season $s) => $s->isCurrent() || $macOlanSezonlar->has($s->key()))
+            ->values();
+
         return view('livewire.groups.stats', [
+            'season' => $secili,
+            'seasons' => $sezonlar,
+            'leaders' => $secili === null ? null : [
+                'goals' => $lider('goals'),
+                'mvp' => $lider('mvp'),
+                'played' => $lider('played'),
+            ],
             'matches' => $matches->take($this->matchLimit),
             'totalMatches' => $matches->count(),
             'playerStats' => $filtrele($playerStats),

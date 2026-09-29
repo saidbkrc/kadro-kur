@@ -30,6 +30,12 @@ Schedule::call(fn () => app(App\Services\KehanetService::class)->settleDueMatche
     ->name('kehanet-bonuses')
     ->withoutOverlapping();
 
+// Sezon sonu: biten sezonun en çok maça çıkanlarına maç × 100 Çim (sezon başına bir kez).
+Schedule::call(fn () => app(App\Services\CimRewards::class)->awardDueSeasons())
+    ->hourly()
+    ->name('season-awards')
+    ->withoutOverlapping();
+
 // Başkanın işaretlemediği olay kuponları iade edilir (Çim kilitli kalmasın).
 Schedule::call(fn () => app(App\Services\KehanetService::class)->voidStaleEventBets())
     ->daily()

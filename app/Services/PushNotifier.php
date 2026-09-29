@@ -209,6 +209,18 @@ class PushNotifier
         );
     }
 
+    /** Sezon sonu: sezonun demirbaşı ödülü. */
+    public function seasonAward(User $user, Group $group, \App\Support\Season $season, int $tutar): void
+    {
+        $this->send(
+            collect([$user]),
+            '🏟️ Sezonun demirbaşı sensin!',
+            $season->name().' sezonunda en çok maça sen çıktın — +'.number_format($tutar, 0, ',', '.').' Çim hesabında.',
+            route('groups.stats', ['group' => $group, 'sezon' => $season->key()]),
+            'sezon-'.$season->key().'-'.$user->id,
+        );
+    }
+
     /** Mağazadan hediye gelen kozmetik. */
     public function shopGift(User $alici, User $gonderen, string $itemName, int $groupId): void
     {

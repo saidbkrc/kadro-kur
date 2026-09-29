@@ -313,9 +313,10 @@
         @php
             $slots = $player->showcaseSlots();
             $vitrinKeys = $player->showcaseBadgeKeys();
-            $vitrin = collect($badges)->whereIn('key', $vitrinKeys);
+            // Vitrin tüm zamanlardan: geçmiş sezonun rozeti de sergilenebilir
+            $vitrin = collect($allTimeBadges)->whereIn('key', $vitrinKeys);
             $benimProfilim = $player->user_id === auth()->id();
-            $kazanilan = collect($badges)->where('earned', true);
+            $kazanilan = collect($allTimeBadges)->where('earned', true);
         @endphp
         @if ($slots > 0 && ($vitrin->isNotEmpty() || $benimProfilim))
             <div class="bg-pitch-surface border border-pitch-line rounded-xl p-4 sm:p-6">
@@ -384,10 +385,13 @@
             $byGroup = collect($badges)->groupBy('group');
         @endphp
         <div class="bg-pitch-surface border border-pitch-line rounded-xl p-4 sm:p-6">
-            <div class="flex items-baseline justify-between mb-4">
+            <div class="flex items-baseline justify-between gap-2 flex-wrap mb-1">
                 <h3 class="font-display uppercase tracking-wider text-lg font-semibold">🏅 Rozetler</h3>
                 <span class="text-sm font-bold text-gold">{{ $earnedCount }}<span class="text-pitch-muted font-normal">/{{ count($badges) }}</span></span>
             </div>
+            <p class="text-[11px] text-pitch-muted mb-4">
+                {{ $season->name() }} sezonu · {{ $season->daysLeft() }} gün kaldı — rozetler her sezon yeniden kazanılır
+            </p>
 
             <div class="space-y-5">
                 @foreach ($byGroup as $groupName => $groupBadges)
@@ -401,6 +405,23 @@
                     </div>
                 @endforeach
             </div>
+
+            {{-- Geçmiş sezonlarda kazanılanlar (arşiv) --}}
+            @if ($pastSeasonBadges !== [])
+                <div class="mt-6 pt-4 border-t border-pitch-line space-y-3">
+                    <div class="text-[11px] tracking-[.14em] text-pitch-muted">GEÇMİŞ SEZONLAR</div>
+                    @foreach ($pastSeasonBadges as $arsiv)
+                        <div class="flex items-start gap-3">
+                            <span class="text-xs font-semibold text-pitch-ink w-28 shrink-0 pt-0.5">{{ $arsiv['season']->name() }}</span>
+                            <div class="flex flex-wrap gap-1.5 min-w-0">
+                                @foreach ($arsiv['badges'] as $b)
+                                    <span class="text-[11px] px-2 py-0.5 rounded-full bg-pitch-bg border border-pitch-line" title="{{ $b['desc'] }}">{{ $b['icon'] }} {{ $b['name'] }}</span>
+                                @endforeach
+                            </div>
+                        </div>
+                    @endforeach
+                </div>
+            @endif
         </div>
 
     </div>

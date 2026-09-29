@@ -249,9 +249,15 @@ class PlayerProfile extends Component
             ->orderByDesc('c')
             ->pluck('c', 'trait_key');
 
+        $sezon = \App\Support\Season::current();
+
         return view('livewire.groups.player-profile', [
             'stats' => $stats,
-            'badges' => $badges->evaluate($stats),
+            // Rozetler sezonluk; vitrin ise tüm zamanlardan seçer (kazanılmış başarı sergilenir)
+            'season' => $sezon,
+            'badges' => $badges->forPlayer($this->player, $sezon),
+            'allTimeBadges' => $badges->evaluate($stats),
+            'pastSeasonBadges' => $badges->pastSeasonsForPlayer($this->player),
             'otherPlayers' => $this->group->players()->whereKeyNot($this->player->id)->orderBy('name')->get(),
             'compare' => $compare,
             'compareStats' => $compareStats,

@@ -1398,6 +1398,174 @@ class KadroFlowTest extends TestCase
         $this->assertSame(\App\Models\Player::GUEST_RATING, $yabanci->fresh()->overall());
     }
 
+    /** Belirli bir tarihte oynanmış, sonuçlanmış maç (sezon testleri için). */
+    private function playedMatch(Group $group, User $owner, string $tarih, array $kadro, array $goller = []): FootballMatch
+    {
+        $m = $group->matches()->create([
+            'created_by' => $owner->id, 'title' => 'Maç '.$tarih, 'starts_at' => $tarih,
+            'capacity' => 14, 'status' => 'completed', 'team_a_score' => 1, 'team_b_score' => 0,
+            'mvp_closes_at' => \Illuminate\Support\Carbon::parse($tarih)->addDay(),
+        ]);
+        foreach ($kadro as $p) {
+            $m->rsvps()->create(['player_id' => $p->id, 'status' => 'going', 'team' => 'A']);
+        }
+        foreach ($goller as [$p, $adet]) {
+            $m->goals()->create(['player_id' => $p->id, 'count' => $adet]);
+        }
+
+        return $m;
+    }
+
+    public function test_sezon_sinirlari_sabit_takvimle_hesaplanir(): void
+    {
+        $s = \App\Support\Season::class;
+        $this->assertSame('2026-09', $s::forDate(\Illuminate\Support\Carbon::parse('2026-11-30 23:59'))->key());
+        $this->assertSame('2026-12', $s::forDate(\Illuminate\Support\Carbon::parse('2026-12-01'))->key());
+        $this->assertSame('2026-12', $s::forDate(\Illuminate\Support\Carbon::parse('2027-02-28'))->key());
+        $this->assertSame('Kış 2026/27', $s::fromKey('2026-12')->name());
+        $this->assertSame('Sonbahar 2026', $s::fromKey('2026-09')->name());
+        $this->assertSame('2026-06', $s::fromKey('2026-09')->previous()->key());
+        $this->assertNull($s::fromKey('2026-10'));   // dönem başı olmayan ay
+    }
+
+    public function test_istatistikler_sezona_gore_filtrelenir(): void
+    {
+        $owner = User::factory()->create();
+        $group = $this->makeGroup($owner);
+        $ben = $group->playerFor($owner);
+        $ali = $this->addMember($group);
+        $this->travelTo(\Illuminate\Support\Carbon::parse('2026-10-15 12:00'));
+
+        // Yaz sezonu: Ali 5 gol. Sonbahar (bu sezon): ben 2 gol
+        $this->playedMatch($group, $owner, '2026-08-10 20:00', [$ben, $ali], [[$ali, 5]]);
+        $this->playedMatch($group, $owner, '2026-10-01 20:00', [$ben, $ali], [[$ben, 2]]);
+
+        $stats = fn (string $sezon) => Livewire::actingAs($owner)
+            ->test(Groups\Stats::class, ['group' => $group])->set('sezon', $sezon);
+
+        // Varsayılan: bu sezon — yaz golleri sayılmaz
+        $bu = $stats('');
+        $this->assertSame([$ben->id], $bu->viewData('topScorers')->pluck('player.id')->all());
+        $bu->assertSee('Sonbahar 2026 — Önde Gidenler')->assertSee('gün kaldı');
+
+        // Geçmiş sezon: şampiyon kartı
+        $stats('2026-06')->assertSee('Yaz 2026 Şampiyonları')
+            ->assertViewHas('leaders', fn ($l) => $l['goals']['players']->pluck('id')->all() === [$ali->id]);
+
+        // Tüm zamanlar: ikisi de
+        $this->assertSame([$ali->id, $ben->id], $stats('tum')->viewData('topScorers')->pluck('player.id')->all());
+        $this->travelBack();
+    }
+
+    public function test_rozetler_sezonluk_sartli_urun_ve_vitrin_tum_zamanlar(): void
+    {
+        $owner = User::factory()->create();
+        $group = $this->makeGroup($owner);
+        $ben = $group->playerFor($owner);
+        $this->travelTo(\Illuminate\Support\Carbon::parse('2026-10-15 12:00'));
+
+        // Hat-trick geçen sezon (yaz)
+        $this->playedMatch($group, $owner, '2026-07-05 20:00', [$ben], [[$ben, 3]]);
+        $servis = app(\App\Services\PlayerBadges::class);
+
+        $kazanildi = fn (array $rozetler) => collect($rozetler)->firstWhere('key', 'hat_trick')['earned'];
+
+        // Bu sezon kazanılmamış, tüm zamanlarda kazanılmış, arşivde görünür
+        $this->assertFalse($kazanildi($servis->forPlayer($ben, \App\Support\Season::current())));
+        $this->assertTrue($kazanildi($servis->forPlayer($ben)));
+        $arsiv = $servis->pastSeasonsForPlayer($ben);
+        $this->assertSame('2026-06', $arsiv[0]['season']->key());
+        $this->assertContains('hat_trick', collect($arsiv[0]['badges'])->pluck('key')->all());
+
+        // Şartlı ürün (hat-trick şartı) geçen sezonun rozetiyle hâlâ alınabilir
+        $this->assertTrue(app(\App\Services\CimShopService::class)->meetsRequirement($ben, 'hat_trick'));
+
+        // Profil: bu sezonun rozet bölümü + geçmiş sezonlar arşivi
+        Livewire::actingAs($owner)->test(Groups\PlayerProfile::class, ['group' => $group, 'player' => $ben])
+            ->assertSee('Sonbahar 2026 sezonu')
+            ->assertSee('GEÇMİŞ SEZONLAR')
+            ->assertSee('Yaz 2026');
+        $this->travelBack();
+    }
+
+    public function test_sezon_gecisinde_rozet_bildirimi_ve_odulu_tekrarlanmaz_yeni_sezonda_yeniden_kazanilir(): void
+    {
+        Notification::fake();
+
+        $owner = User::factory()->create();
+        $group = $this->makeGroup($owner);
+        $ben = $group->playerFor($owner);
+
+        // Sezon sistemi öncesi kazanılmış ve ödenmiş rozet: eski (sezonsuz) kayıt + eski ref
+        $this->travelTo(\Illuminate\Support\Carbon::parse('2026-09-20 12:00'));
+        $this->playedMatch($group, $owner, '2026-09-10 20:00', [$ben]);
+        \App\Models\PlayerBadge::create(['player_id' => $ben->id, 'badge_key' => 'first_match']);
+        app(\App\Services\CimRewards::class)->syncStandingAwards($owner, $group);
+        $odenen = \App\Models\CimAward::where('award_key', 'badge_earned')->count();
+
+        // Açılış sezonunda senkron: zaten kazanılmış rozet için bildirim/Çim yok
+        app(\App\Services\PushNotifier::class)->syncBadgesAndNotify($group);
+        app(\App\Services\CimRewards::class)->syncStandingAwards($owner, $group);
+        Notification::assertNothingSent();
+        $this->assertSame($odenen, \App\Models\CimAward::where('award_key', 'badge_earned')->count());
+
+        // Yeni sezon (Kış): ilk maçla rozet yeniden kazanılır → bildirim + yeni sezon ödülü
+        $this->travelTo(\Illuminate\Support\Carbon::parse('2026-12-10 12:00'));
+        $this->playedMatch($group, $owner, '2026-12-05 20:00', [$ben]);
+        app(\App\Services\PushNotifier::class)->syncBadgesAndNotify($group);
+        app(\App\Services\CimRewards::class)->syncStandingAwards($owner, $group);
+
+        $this->assertTrue(\App\Models\PlayerBadge::where('player_id', $ben->id)
+            ->where('badge_key', 'first_match')->where('season', '2026-12')->exists());
+        Notification::assertSentTo($owner, MatchPushNotification::class, fn ($n) => str_contains($n->title, 'rozet'));
+        $this->assertTrue(\App\Models\CimAward::where('ref', 'badge:2026-12:first_match')->exists());
+        $this->travelBack();
+    }
+
+    public function test_sezon_sonunda_en_cok_maca_cikana_mac_basi_100_cim(): void
+    {
+        Notification::fake();
+
+        $owner = User::factory()->create();
+        $group = $this->makeGroup($owner);
+        $ben = $group->playerFor($owner);
+        [$ali, $veli] = [$this->addMember($group), $this->addMember($group)];
+        $misafir = $group->players()->create(['name' => 'Misafir', 'positions' => ['OS']]);
+
+        // Sonbahar 2026: ben 3 maç, Ali 3 maç (eşit zirve), Veli 1, misafir 3 (hesapsız → almaz)
+        foreach (['2026-09-05', '2026-10-05', '2026-11-05'] as $i => $gun) {
+            $this->playedMatch($group, $owner, $gun.' 20:00', $i === 0 ? [$ben, $ali, $veli, $misafir] : [$ben, $ali, $misafir]);
+        }
+        // Başka sezonun maçı sayılmaz
+        $this->playedMatch($group, $owner, '2026-12-03 20:00', [$veli]);
+
+        $cim = \App\Services\CimRewards::class;
+
+        // Sezon bitmeden verilmez
+        $this->travelTo(\Illuminate\Support\Carbon::parse('2026-11-30 22:00'));
+        $this->assertSame(0, app($cim)->awardDueSeasons());
+
+        // Sezon bitti: sonraki ilk çalıştırma dağıtır
+        $this->travelTo(\Illuminate\Support\Carbon::parse('2026-12-01 01:00'));
+        $once = [$owner->refresh()->cim_balance, $ali->user->refresh()->cim_balance, $veli->user->refresh()->cim_balance];
+        $this->assertSame(2, app($cim)->awardDueSeasons());
+
+        $this->assertSame($once[0] + 300, $owner->refresh()->cim_balance);
+        $this->assertSame($once[1] + 300, $ali->user->refresh()->cim_balance);
+        $this->assertSame($once[2], $veli->user->refresh()->cim_balance);
+        Notification::assertSentTo($owner, MatchPushNotification::class, fn ($n) => str_contains($n->title, 'demirbaşı'));
+
+        // Tek seferlik
+        $this->assertSame(0, app($cim)->awardDueSeasons());
+        $this->assertSame($once[0] + 300, $owner->refresh()->cim_balance);
+
+        // Açılıştan önce biten sezona (Yaz 2026) geriye dönük ödeme yok
+        $this->travelTo(\Illuminate\Support\Carbon::parse('2026-09-02 01:00'));
+        $this->playedMatch($group, $owner, '2026-07-01 20:00', [$veli]);
+        $this->assertSame(0, app($cim)->awardDueSeasons());
+        $this->travelBack();
+    }
+
     public function test_oyuncu_havuzu_siralanir(): void
     {
         $owner = User::factory()->create(['name' => 'Zeki']);

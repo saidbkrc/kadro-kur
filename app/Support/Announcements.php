@@ -19,6 +19,18 @@ class Announcements
     {
         return [
             [
+                'id' => 'sezon-sistemi-2026-09',
+                'title' => '🏁 Sezonlar başladı',
+                'until' => '2026-10-20',
+                'link' => null,
+                'lines' => [
+                    '📅 Yıl 3 aylık sezonlara bölündü — şu an '.Season::current()->name().' ('.Season::current()->daysLeft().' gün kaldı)',
+                    '📊 İstatistikler ve rozetler her sezon sıfırlanır; oyuncu puanları (OVR) sıfırlanmaz',
+                    '🏆 Sezon sonunda Gol Kralı, Sezonun MVP\'si ve Demirbaş belli olur — İstatistikler sayfasından eski sezonlara da bakabilirsin',
+                    '🏟️ Sezonda en çok maça çıkan(lar) çıktığı her maç için '.\App\Services\CimRewards::AWARDS['season_attendance']['amount'].' Çim kazanır',
+                ],
+            ],
+            [
                 // v2: ödül değişiklikleri eklendi — kimlik değişince kapatmış olanlara da tekrar görünür
                 'id' => 'kehanet-limitler-2026-09-v2',
                 'title' => '📢 Kehanet\'te yeni kurallar',

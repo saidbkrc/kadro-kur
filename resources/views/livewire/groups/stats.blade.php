@@ -2,10 +2,64 @@
     <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 space-y-6">
         <x-group-nav :group="$group" active="stats" />
 
-        <div>
-            <a href="{{ route('groups.show', $group) }}" wire:navigate class="text-sm text-bibB hover:underline">← {{ $group->name }}</a>
-            <h2 class="font-display uppercase tracking-wider text-2xl font-bold mt-1">İstatistikler</h2>
+        <div class="flex items-end justify-between gap-3 flex-wrap">
+            <div>
+                <a href="{{ route('groups.show', $group) }}" wire:navigate class="text-sm text-bibB hover:underline">← {{ $group->name }}</a>
+                <h2 class="font-display uppercase tracking-wider text-2xl font-bold mt-1">İstatistikler</h2>
+            </div>
+
+            {{-- Sezon seçimi: varsayılan içinde bulunulan sezon --}}
+            <select wire:model.live="sezon"
+                    class="w-full sm:w-auto bg-pitch-bg border-pitch-line text-pitch-ink rounded-md text-sm focus:border-bibB focus:ring-bibB/40">
+                @foreach ($seasons as $s)
+                    <option value="{{ $s->isCurrent() ? '' : $s->key() }}">{{ $s->isCurrent() ? '🟢 ' : '' }}{{ $s->name() }}</option>
+                @endforeach
+                <option value="tum">♾️ Tüm zamanlar</option>
+            </select>
         </div>
+
+        {{-- Sezon başlığı + önde gidenler / şampiyonlar --}}
+        @if ($season)
+            @php $bitti = ! $season->isCurrent(); @endphp
+            <div class="bg-pitch-surface border {{ $bitti ? 'border-gold/40' : 'border-pitch-line' }} rounded-xl p-4 sm:p-6">
+                <div class="flex items-baseline justify-between gap-2 flex-wrap mb-3">
+                    <h3 class="font-display uppercase tracking-wider text-lg font-semibold {{ $bitti ? 'text-gold' : '' }}">
+                        {{ $bitti ? '🏆 '.$season->name().' Şampiyonları' : '🏁 '.$season->name().' — Önde Gidenler' }}
+                    </h3>
+                    <span class="text-xs text-pitch-muted">
+                        {{ $season->start->translatedFormat('j M') }} – {{ $season->end()->translatedFormat('j M Y') }}
+                        @unless ($bitti) · <strong class="text-pitch-ink">{{ $season->daysLeft() }} gün kaldı</strong> @endunless
+                    </span>
+                </div>
+
+                <div class="grid sm:grid-cols-3 gap-3">
+                    @foreach ([
+                        ['goals', '👑', 'Gol Kralı', 'gol'],
+                        ['mvp', '🌟', 'Sezonun MVP\'si', 'MVP'],
+                        ['played', '🏟️', 'Demirbaş', 'maç'],
+                    ] as [$alan, $ikon, $unvan, $birim])
+                        @php $l = $leaders[$alan] ?? null; @endphp
+                        <div class="rounded-lg border border-pitch-line bg-pitch-bg px-3 py-3">
+                            <div class="text-[11px] tracking-[.14em] text-pitch-muted">{{ $ikon }} {{ mb_strtoupper($unvan, 'UTF-8') }}</div>
+                            @if ($l)
+                                <div class="text-sm font-semibold mt-1 truncate">
+                                    {{ $l['players']->pluck('name')->implode(', ') }}
+                                </div>
+                                <div class="text-xs text-gold font-display">{{ $l['value'] }} {{ $birim }}</div>
+                            @else
+                                <div class="text-sm text-pitch-muted mt-1">—</div>
+                            @endif
+                        </div>
+                    @endforeach
+                </div>
+
+                <p class="text-[11px] text-pitch-muted mt-3">
+                    🏟️ Sezon sonunda en çok maça çıkan(lar) çıktığı her maç için
+                    <strong class="text-pitch-ink">{{ \App\Services\CimRewards::AWARDS['season_attendance']['amount'] }} Çim</strong> kazanır.
+                    İstatistik ve rozetler her sezon sıfırlanır; oyuncu puanları (OVR) sıfırlanmaz.
+                </p>
+            </div>
+        @endif
 
         {{-- Oyuncu arama --}}
         <div class="bg-pitch-surface border border-pitch-line rounded-xl p-3">

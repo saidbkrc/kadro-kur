@@ -5,6 +5,7 @@ namespace App\Services;
 use App\Models\Group;
 use App\Models\Player;
 use App\Models\PlayerBadge;
+use App\Support\Season;
 use Illuminate\Support\Collection;
 
 /**
@@ -60,12 +61,17 @@ class PlayerBadges
      * Grubun tüm oyuncuları için ham istatistik toplar.
      * Maçlar kronolojik (eski→yeni) gezilir ki katılım serisi doğru hesaplansın.
      *
+     * $season verilirse yalnızca o sezonun maçları sayılır (rozetler sezonluk);
+     * null = tüm zamanlar (şartlı mağaza ürünleri ve vitrin bunu kullanır — bir kez
+     * kazanılan hak sezon değişince geri alınmaz).
+     *
      * @return Collection<int, array<string, int|float>>
      */
-    public function statsForGroup(Group $group): Collection
+    public function statsForGroup(Group $group, ?Season $season = null): Collection
     {
         $matches = $group->matches()
             ->where('status', 'completed')
+            ->when($season, fn ($q) => $q->whereBetween('starts_at', [$season->start, $season->end()]))
             ->with(['rsvps', 'goals', 'mvpVotes', 'performanceRatings'])
             ->orderBy('starts_at')
             ->get();
@@ -166,7 +172,7 @@ class PlayerBadges
         }
 
         // Kehanet istatistikleri kullanıcı bazlı — grubun oyuncularına eşlenir
-        $kehanet = $this->kehanetStats($group);
+        $kehanet = $this->kehanetStats($group, $season);
 
         return collect($stats)->map(function (array $s, int $playerId) use ($kehanet) {
             unset($s['_run'], $s['_win_run']);
@@ -185,14 +191,21 @@ class PlayerBadges
      */
     public function syncGroup(Group $group): array
     {
+        // Rozetler sezonluk: her sezon yeniden kazanılır (bildirim + Çim ödülü yeniden).
+        $sezon = Season::current();
+
         $existing = PlayerBadge::whereIn('player_id', $group->players()->pluck('id'))
+            ->where(fn ($q) => $q->where('season', $sezon->key())
+                // Açılış sezonu eski (sezonsuz) kayıtları sahiplenir: yayına alınınca
+                // zaten kazanılmış rozetler için tekrar bildirim/Çim gitmez
+                ->when($sezon->isLaunch(), fn ($q) => $q->orWhereNull('season')))
             ->get()
             ->groupBy('player_id')
             ->map(fn ($rows) => $rows->pluck('badge_key'));
 
         $new = [];
 
-        foreach ($this->statsForGroup($group) as $playerId => $stats) {
+        foreach ($this->statsForGroup($group, $sezon) as $playerId => $stats) {
             $have = $existing->get($playerId) ?? collect();
 
             $fresh = collect($this->evaluate($stats))
@@ -201,7 +214,7 @@ class PlayerBadges
                 ->values();
 
             foreach ($fresh as $badge) {
-                PlayerBadge::firstOrCreate(['player_id' => $playerId, 'badge_key' => $badge['key']]);
+                PlayerBadge::firstOrCreate(['player_id' => $playerId, 'badge_key' => $badge['key'], 'season' => $sezon->key()]);
             }
 
             if ($fresh->isNotEmpty()) {
@@ -217,7 +230,7 @@ class PlayerBadges
      *
      * @return array<int, array<string, int>> [player_id => sayaçlar]
      */
-    protected function kehanetStats(Group $group): array
+    protected function kehanetStats(Group $group, ?Season $season = null): array
     {
         $oyuncular = $group->players()->whereNotNull('user_id')->pluck('id', 'user_id');
 
@@ -226,11 +239,18 @@ class PlayerBadges
         }
 
         $kuponlar = \App\Models\Prediction::whereIn('user_id', $oyuncular->keys())
-            ->whereIn('match_id', $group->matches()->pluck('id'))
+            ->whereIn('match_id', $group->matches()
+                ->when($season, fn ($q) => $q->whereBetween('starts_at', [$season->start, $season->end()]))
+                ->pluck('id'))
             ->orderBy('settled_at')
             ->get(['user_id', 'status', 'odds', 'slip_id', 'settled_at']);
 
-        $sampiyonlar = app(\App\Services\KehanetService::class)->pastMonthlyChampions($group);
+        // Ayın Kâhini unvanları: sezon verildiyse yalnızca o sezonun ayları
+        $sampiyonlar = collect(app(\App\Services\KehanetService::class)->pastMonthlyChampions($group))
+            ->map(fn (array $aylar) => $season === null
+                ? $aylar
+                : array_values(array_filter($aylar, fn ($ay) => $season->contains(\Illuminate\Support\Carbon::parse($ay.'-01')))))
+            ->all();
 
         $sonuc = [];
 
@@ -269,20 +289,41 @@ class PlayerBadges
         ];
     }
 
-    /** Tek oyuncunun ham istatistiği (grup içinden). */
-    public function statsForPlayer(Player $player): array
+    /** Tek oyuncunun ham istatistiği (grup içinden). null sezon = tüm zamanlar. */
+    public function statsForPlayer(Player $player, ?Season $season = null): array
     {
-        return $this->statsForGroup($player->group)->get($player->id, self::emptyStats());
+        return $this->statsForGroup($player->group, $season)->get($player->id, self::emptyStats());
     }
 
     /**
      * Tek oyuncunun rozet durumu: her rozet için kazanıldı mı + ilerleme.
+     * null sezon = tüm zamanlar (şartlı ürün kilidi ve vitrin için).
      *
      * @return list<array{key:string,icon:string,name:string,desc:string,group:string,goal:int,value:int|float,earned:bool,progress:float}>
      */
-    public function forPlayer(Player $player): array
+    public function forPlayer(Player $player, ?Season $season = null): array
     {
-        return $this->evaluate($this->statsForPlayer($player));
+        return $this->evaluate($this->statsForPlayer($player, $season));
+    }
+
+    /**
+     * Oyuncunun geçmiş sezonlarda kazandığı rozetler (yeniden eskiye, boş sezonlar atlanır).
+     *
+     * @return list<array{season:Season, badges:list<array>}>
+     */
+    public function pastSeasonsForPlayer(Player $player): array
+    {
+        $arsiv = [];
+
+        foreach (Season::pastForGroup($player->group) as $sezon) {
+            $kazanilan = collect($this->forPlayer($player, $sezon))->where('earned', true)->values()->all();
+
+            if ($kazanilan !== []) {
+                $arsiv[] = ['season' => $sezon, 'badges' => $kazanilan];
+            }
+        }
+
+        return $arsiv;
     }
 
     /**

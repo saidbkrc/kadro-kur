@@ -43,6 +43,10 @@ class CimRewards
         'streak_5' => ['amount' => 75, 'icon' => '🔥', 'name' => '5 maç serisi', 'desc' => 'Üst üste 5 maça çık', 'scope' => 'period'],
         'monthly_full' => ['amount' => 150, 'icon' => '📅', 'name' => 'Aylık tam katılım', 'desc' => 'Bir ayın bütün maçlarına çık', 'scope' => 'period'],
 
+        // Tutar değişken: sezonda çıkılan maç × 'amount'. Yalnızca sezonun en çok maça
+        // çıkan(lar)ına — eşitlikte hepsine (bkz. awardSeason).
+        'season_attendance' => ['amount' => 100, 'amount_label' => '100 × maç', 'icon' => '🏟️', 'name' => 'Sezonun demirbaşı', 'desc' => 'Sezonda en çok maça çıkan ol — çıktığın her maç için 100 Çim', 'scope' => 'season'],
+
         'profile_complete' => ['amount' => 75, 'icon' => '🎯', 'name' => 'Profilini tamamla', 'desc' => 'Fotoğraf, pozisyon ve forma numarası ekle', 'scope' => 'once'],
         'rate_player' => ['amount' => 30, 'icon' => '⭐', 'name' => 'Oyuncu puanlama', 'desc' => 'Bir takım arkadaşını puanla (kişi başına bir kez)', 'scope' => 'repeat'],
         'badge_earned' => ['amount' => 40, 'icon' => '🏅', 'name' => 'Yeni rozet', 'desc' => 'Kazandığın her rozet için', 'scope' => 'repeat'],
@@ -55,8 +59,11 @@ class CimRewards
      */
     public const PERF_VOTE_SINCE = '2026-09-25';
 
-    /** Ödülü verir (zaten verilmişse hiçbir şey yapmaz). Verilen miktarı döndürür. */
-    public function grant(int $userId, Group $group, string $key, string $ref = ''): int
+    /**
+     * Ödülü verir (zaten verilmişse hiçbir şey yapmaz). Verilen miktarı döndürür.
+     * $amount: değişken tutarlı ödüller için (örn. sezon demirbaşı = maç × 100).
+     */
+    public function grant(int $userId, Group $group, string $key, string $ref = '', ?int $amount = null): int
     {
         $odul = self::AWARDS[$key] ?? null;
 
@@ -64,18 +71,99 @@ class CimRewards
             return 0;
         }
 
+        $tutar = $amount ?? $odul['amount'];
+
         $kayit = CimAward::firstOrCreate(
             ['user_id' => $userId, 'group_id' => $group->id, 'award_key' => $key, 'ref' => $ref],
-            ['amount' => $odul['amount']],
+            ['amount' => $tutar],
         );
 
         if (! $kayit->wasRecentlyCreated) {
             return 0; // daha önce verilmiş
         }
 
-        app(KehanetService::class)->adjustBalance($userId, $odul['amount'], 'bonus', $odul['name']);
+        app(KehanetService::class)->adjustBalance($userId, $tutar, 'bonus', $odul['name']);
 
-        return $odul['amount'];
+        return $tutar;
+    }
+
+    /**
+     * Saatlik: az önce biten sezonun ödüllerini her grupta dağıtır ve bildirir.
+     * Sezon sistemi açılmadan önce bitmiş sezonlara geriye dönük ödeme yapılmaz.
+     */
+    public function awardDueSeasons(): int
+    {
+        $sezon = \App\Support\Season::current()->previous();
+
+        if ($sezon->key() < \App\Support\Season::LAUNCH_KEY) {
+            return 0;
+        }
+
+        $adet = 0;
+
+        foreach (Group::all() as $group) {
+            try {
+                foreach ($this->awardSeason($group, $sezon) as $userId => $tutar) {
+                    if ($u = User::find($userId)) {
+                        app(PushNotifier::class)->seasonAward($u, $group, $sezon, $tutar);
+                    }
+                    $adet++;
+                }
+            } catch (\Throwable $e) {
+                report($e); // bir grubun sorunu diğerlerini engellemesin
+            }
+        }
+
+        return $adet;
+    }
+
+    /**
+     * Biten sezonun ödülü: sezonda en çok maça çıkan(lar)a çıktığı maç × 100 Çim.
+     * Tek seferliktir (ref = season:<anahtar>); tekrar çalıştırmak bir şey vermez.
+     *
+     * @return array<int, int> [user_id => verilen Çim]
+     */
+    public function awardSeason(Group $group, \App\Support\Season $season): array
+    {
+        if ($season->end()->isFuture()) {
+            return []; // sezon bitmeden verilmez
+        }
+
+        $macIdler = $group->matches()->where('status', 'completed')
+            ->whereBetween('starts_at', [$season->start, $season->end()])
+            ->pluck('id');
+
+        // Hesabı olan oyuncuların sezondaki (asıl listede) maç sayıları
+        $sayilar = DB::table('rsvps')
+            ->join('players', 'players.id', '=', 'rsvps.player_id')
+            ->whereIn('rsvps.match_id', $macIdler)
+            ->where('rsvps.status', 'going')->whereNull('rsvps.waitlist_position')
+            ->whereNotNull('players.user_id')
+            ->where('players.group_id', $group->id)
+            ->selectRaw('players.user_id, count(*) as c')
+            ->groupBy('players.user_id')
+            ->pluck('c', 'user_id');
+
+        $zirve = (int) $sayilar->max();
+
+        if ($zirve === 0) {
+            return [];
+        }
+
+        $verilen = [];
+
+        foreach ($sayilar->filter(fn ($c) => (int) $c === $zirve) as $userId => $c) {
+            $tutar = $this->grant(
+                (int) $userId, $group, 'season_attendance', 'season:'.$season->key(),
+                $zirve * self::AWARDS['season_attendance']['amount'],
+            );
+
+            if ($tutar > 0) {
+                $verilen[(int) $userId] = $tutar;
+            }
+        }
+
+        return $verilen;
     }
 
     /**
@@ -313,9 +401,14 @@ class CimRewards
             $toplam += $this->grant($user->id, $group, 'rate_player', 'player:'.$pid);
         }
 
-        // Kazandığı her rozet için
-        foreach ($player->badges()->pluck('badge_key') as $rozet) {
-            $toplam += $this->grant($user->id, $group, 'badge_earned', 'badge:'.$rozet);
+        // Kazandığı her rozet için — rozetler sezonluk, her sezon yeniden ödüllenir.
+        // Sezonsuz (eski) kayıtlar eski ref'i korur ki önceden ödenmiş rozet tekrar ödenmesin.
+        foreach ($player->badges()->get(['badge_key', 'season']) as $rozet) {
+            $ref = $rozet->season === null
+                ? 'badge:'.$rozet->badge_key
+                : 'badge:'.$rozet->season.':'.$rozet->badge_key;
+
+            $toplam += $this->grant($user->id, $group, 'badge_earned', $ref);
         }
 
         return $toplam;

@@ -449,8 +449,9 @@ class Show extends Component
     {
         // Havuz satırları için: kazanılan rozet ikonları + en çok onaylanan nitelikler
         $badgeService = app(\App\Services\PlayerBadges::class);
-        $groupStats = $badgeService->statsForGroup($this->group);
-        $earnedIcons = $groupStats->map(
+        $groupStats = $badgeService->statsForGroup($this->group);   // tüm zamanlar (maç sayısı sırası)
+        // Rozetler sezonluk: satırda yalnızca bu sezon kazanılanlar
+        $earnedIcons = $badgeService->statsForGroup($this->group, \App\Support\Season::current())->map(
             fn (array $s) => collect($badgeService->evaluate($s))->where('earned', true)->pluck('icon')->all()
         );
 
