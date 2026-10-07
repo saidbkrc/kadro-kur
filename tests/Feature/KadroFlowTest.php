@@ -1761,6 +1761,33 @@ class KadroFlowTest extends TestCase
         $this->travelBack();
     }
 
+    public function test_mac_sayfasi_bolum_sirasi(): void
+    {
+        $owner = User::factory()->create();
+        $group = $this->makeGroup($owner);
+        $ben = $group->playerFor($owner);
+        $digerleri = collect(range(1, 3))->map(fn () => $this->addMember($group));
+
+        $match = $this->makeMatch($group);
+        foreach ([$ben, ...$digerleri] as $p) {
+            $match->setRsvp($p, 'going');
+        }
+        $match->applySquad([$ben->id, $digerleri[0]->id], [$digerleri[1]->id, $digerleri[2]->id]);
+
+        // Kadroları Kur → saha → takım listeleri (takas) → kadro oylaması → katılım → gelen/belki listeleri
+        $this->actingAs($owner)->get(route('matches.show', $match))
+            ->assertOk()
+            ->assertSeeInOrder([
+                'Kadroları Kur',
+                'Saha Dizilişi',
+                'Elle değişiklik',
+                'Kadro Oylaması',
+                'Katılımı yönet',
+                '✅ Kadro (',
+                '🤔 Belki (',
+            ]);
+    }
+
     public function test_oyuncu_havuzu_siralanir(): void
     {
         $owner = User::factory()->create(['name' => 'Zeki']);

@@ -389,211 +389,8 @@
             </div>
         @endif
 
-        {{-- Başkan: hazır hatırlatma bildirimleri --}}
-        @if ($canManage && $match->status !== 'cancelled')
-            @php
-                $reminderTypes = [];
-                if ($match->status === 'scheduled') {
-                    $reminderTypes['rsvp'] = '📋 Katılım hatırlat';
-                    if ($match->squad_status === 'voting') $reminderTypes['squad_vote'] = '🗳️ Kadro oylaması hatırlat';
-                    if ($match->squad_status === 'approved') $reminderTypes['squad_announce'] = '📣 Kadroyu duyur';
-                } else {
-                    if ($match->mvpOpen()) $reminderTypes['mvp'] = '🏆 MVP hatırlat';
-                    if ($match->perfOpen()) $reminderTypes['perf'] = '📈 Performans hatırlat';
-                }
-            @endphp
-            @if ($reminderTypes)
-                <div class="bg-pitch-surface border border-pitch-line rounded-xl p-4 sm:p-6 space-y-3">
-                    <div class="flex items-center justify-between flex-wrap gap-2">
-                        <h3 class="font-display uppercase tracking-wider text-lg font-semibold">📣 Hatırlatma Gönder <span class="text-xs text-pitch-muted font-normal tracking-normal">(başkan)</span></h3>
-                        <span class="text-xs text-pitch-muted bg-pitch-bg border border-pitch-line rounded-full px-3 py-1">30 dk'da 1 bildirim</span>
-                    </div>
-                    <div class="grid grid-cols-2 gap-2 sm:flex sm:flex-wrap">
-                        @foreach ($reminderTypes as $type => $label)
-                            <x-secondary-button wire:click="sendReminder('{{ $type }}')" class="w-full sm:w-auto {{ count($reminderTypes) % 2 === 1 && $loop->last ? 'col-span-2' : '' }}">
-                                {{ $label }}
-                            </x-secondary-button>
-                        @endforeach
-                    </div>
-                    @if ($reminderNotice)
-                        <p class="text-sm text-bibB">{{ $reminderNotice }}</p>
-                    @endif
-                    <p class="text-xs text-pitch-muted">Hatırlatma yalnızca işini henüz yapmamış kişilere gider (katılım bildirmeyenler, oy kullanmayanlar vb.).</p>
-                </div>
-            @endif
-        @endif
-
-        {{-- RSVP — kadro kurulduktan sonra kişisel "geliyor musun?" sorusu gizlenir --}}
-        @if ($match->status === 'scheduled' && ($match->squad_status === 'none' || $canManage))
-            <div class="bg-pitch-surface border border-pitch-line rounded-xl p-6 space-y-3">
-                @if ($match->squad_status === 'none')
-                    <h3 class="font-display uppercase tracking-wider text-lg font-semibold">Geliyor musun?</h3>
-                    <div class="grid gap-2 sm:flex sm:flex-wrap">
-                        <button wire:click="rsvp('going')"
-                                class="w-full sm:w-auto px-5 py-2.5 rounded-md font-semibold text-sm border transition
-                                       {{ $myRsvp?->status === 'going' ? 'bg-pitch-green text-pitch-ink border-pitch-green2' : 'bg-transparent text-bibB border-pitch-line hover:bg-pitch-surface2' }}">
-                            ✅ Geliyorum
-                        </button>
-                        <button wire:click="rsvp('maybe')"
-                                class="w-full sm:w-auto px-5 py-2.5 rounded-md font-semibold text-sm border transition
-                                       {{ $myRsvp?->status === 'maybe' ? 'bg-gold text-pitch-bg border-gold' : 'bg-transparent text-gold border-pitch-line hover:bg-pitch-surface2' }}">
-                            🤔 Belki
-                        </button>
-                        <button wire:click="rsvp('not_going')"
-                                class="w-full sm:w-auto px-5 py-2.5 rounded-md font-semibold text-sm border transition
-                                       {{ $myRsvp?->status === 'not_going' ? 'bg-red-700 text-pitch-ink border-red-600' : 'bg-transparent text-[#FF8A8A] border-pitch-line hover:bg-pitch-surface2' }}">
-                            ❌ Gelmiyorum
-                        </button>
-                    </div>
-                    @if ($myRsvp?->status === 'going' && $myRsvp->waitlist_position !== null)
-                        <p class="text-sm text-gold bg-gold/10 border border-gold/30 rounded-md p-3">
-                            Kadro dolu — <strong>yedek listesinde {{ $myRsvp->waitlist_position }}. sıradasın.</strong>
-                            Biri çekilirse otomatik olarak kadroya geçersin.
-                        </p>
-                    @endif
-                @else
-                    <h3 class="font-display uppercase tracking-wider text-lg font-semibold">Katılım</h3>
-                    <p class="text-sm text-pitch-muted">Kadro kuruldu. Katılımı aşağıdan yönetebilir, gerekirse kadroyu yeniden kurabilirsin.</p>
-                @endif
-
-                @if ($canManage)
-                    <div class="border-t border-pitch-line pt-4">
-                        <x-secondary-button wire:click="$toggle('showManageRsvp')">
-                            👥 {{ $showManageRsvp ? 'Katılım yönetimini kapat' : 'Katılımı yönet (başkan)' }}
-                        </x-secondary-button>
-                        <p class="text-xs text-pitch-muted mt-2">Gelemeyenler adına da işaretleyebilirsin — WhatsApp'tan toplayıp tek tek girme derdi bitsin.</p>
-
-                        @if ($showManageRsvp)
-                            <div class="mt-3 space-y-1.5">
-                                @foreach ($roster as $player)
-                                    @php $st = $rsvpByPlayer[$player->id]->status ?? null; @endphp
-                                    <div class="flex items-center justify-between gap-3 bg-pitch-bg border border-pitch-line rounded-lg px-3 py-2">
-                                        <span class="text-sm min-w-0 truncate">
-                                            {{ $player->name }}
-                                            @if ($player->isGuest())<span class="text-xs text-gold">(misafir)</span>@endif
-                                        </span>
-                                        <div class="flex gap-1 shrink-0">
-                                            <button wire:click="setPlayerRsvp({{ $player->id }}, 'going')"
-                                                    class="text-xs px-2.5 py-1.5 rounded-md border transition {{ $st === 'going' ? 'bg-pitch-green border-pitch-green2 text-pitch-ink' : 'border-pitch-line text-bibB hover:bg-pitch-surface2' }}">Geliyor</button>
-                                            <button wire:click="setPlayerRsvp({{ $player->id }}, 'maybe')"
-                                                    class="text-xs px-2.5 py-1.5 rounded-md border transition {{ $st === 'maybe' ? 'bg-gold border-gold text-pitch-bg' : 'border-pitch-line text-gold hover:bg-pitch-surface2' }}">Belki</button>
-                                            <button wire:click="setPlayerRsvp({{ $player->id }}, 'not_going')"
-                                                    class="text-xs px-2.5 py-1.5 rounded-md border transition {{ $st === 'not_going' ? 'bg-red-700 border-red-600 text-pitch-ink' : 'border-pitch-line text-[#FF8A8A] hover:bg-pitch-surface2' }}">Gelmiyor</button>
-                                        </div>
-                                    </div>
-                                @endforeach
-                            </div>
-                        @endif
-                    </div>
-                @endif
-            </div>
-        @endif
-
-        {{-- Kadro + oylama + saha --}}
+        {{-- Kadro: saha dizilişi → takım listeleri (takas) → onay oylaması --}}
         @if ($teamA->isNotEmpty() || $teamB->isNotEmpty())
-            {{-- Onay oylaması --}}
-            @if ($voteSummary)
-                <div class="bg-pitch-surface border {{ $match->squad_status === 'approved' ? 'border-pitch-green2' : 'border-gold/40' }} rounded-xl p-6 space-y-3">
-                    @if ($match->squad_status === 'approved')
-                        <div class="flex items-center gap-3">
-                            <span class="text-2xl">✅</span>
-                            <div>
-                                <h3 class="font-display uppercase tracking-wider text-lg font-semibold text-bibB">Kadro Onaylandı</h3>
-                                <p class="text-sm text-pitch-muted">{{ $voteSummary['yes'] }} evet oyu ile %60 çoğunluk sağlandı.</p>
-                            </div>
-                        </div>
-                    @else
-                        <h3 class="font-display uppercase tracking-wider text-lg font-semibold">🗳️ Kadro Oylaması</h3>
-                        <p class="text-sm text-pitch-muted">
-                            Kadronun kesinleşmesi için kadrodaki oyuncuların <strong class="text-pitch-ink">%60'ının</strong> onayı gerekiyor:
-                            <strong class="text-pitch-ink">{{ $voteSummary['yes'] }}/{{ $voteSummary['needed'] }}</strong> evet
-                            ({{ $voteSummary['no'] }} hayır, {{ $voteSummary['eligible'] }} oy hakkı).
-                        </p>
-                        <div class="h-2.5 rounded-full bg-pitch-bg border border-pitch-line overflow-hidden">
-                            <div class="h-full bg-gradient-to-r from-pitch-green to-bibB" style="width: {{ $voteSummary['needed'] > 0 ? min(100, round($voteSummary['yes'] / $voteSummary['needed'] * 100)) : 0 }}%"></div>
-                        </div>
-                        @if ($canVoteSquad)
-                            <div class="grid grid-cols-2 gap-2 sm:flex sm:items-center">
-                                <button wire:click="voteSquad(true)"
-                                        class="w-full sm:w-auto px-4 py-2 rounded-md text-sm font-semibold border transition {{ $mySquadVote?->approve === true ? 'bg-pitch-green border-pitch-green2' : 'border-pitch-line hover:bg-pitch-surface2 text-bibB' }}">
-                                    👍 Onaylıyorum
-                                </button>
-                                <button wire:click="voteSquad(false)"
-                                        class="w-full sm:w-auto px-4 py-2 rounded-md text-sm font-semibold border transition {{ $mySquadVote?->approve === false ? 'bg-red-700 border-red-600' : 'border-pitch-line hover:bg-pitch-surface2 text-[#FF8A8A]' }}">
-                                    👎 Reddediyorum
-                                </button>
-                                @if ($mySquadVote)
-                                    <span class="col-span-2 text-xs text-pitch-muted">Oyunu değiştirebilirsin.</span>
-                                @endif
-                            </div>
-                        @endif
-                        @if ($canManage && $voteSummary['no'] > $voteSummary['eligible'] - $voteSummary['needed'])
-                            <p class="text-sm text-gold">%60'a ulaşmak artık mümkün değil — <strong>Alternatif Kadro</strong> ile yeni bir bölünme sun ya da elle takas yap.</p>
-                        @endif
-                    @endif
-                </div>
-            @endif
-
-            {{-- Denge göstergesi + takım listeleri --}}
-            <div class="bg-pitch-surface border border-pitch-line rounded-xl p-6 space-y-4">
-                <div class="grid grid-cols-[1fr,auto,1fr] items-center gap-2 sm:gap-4">
-                    <div class="font-display text-lg sm:text-2xl font-bold text-bibA">TURUNCU <span class="block text-[10px] sm:text-[11px] tracking-[.15em] sm:tracking-[.2em] text-pitch-muted font-semibold">{{ $teamA->count() }} OYUNCU · ORT {{ number_format($avgA, 1) }}</span></div>
-                    @php $diff = $avgA - $avgB; $shift = max(-22, min(22, $diff * 12)); @endphp
-                    <div class="min-w-[90px] sm:min-w-[260px]">
-                        <div class="relative h-3.5 rounded-full bg-pitch-bg border border-pitch-line overflow-hidden">
-                            <div class="absolute left-0 top-0 bottom-0 bg-gradient-to-r from-bibA to-bibA/50" style="width: {{ 50 + $shift }}%"></div>
-                            <div class="absolute right-0 top-0 bottom-0 bg-gradient-to-l from-bibB to-bibB/50" style="width: {{ 50 - $shift }}%"></div>
-                            <div class="absolute left-1/2 -top-0.5 -bottom-0.5 w-0.5 bg-white/85"></div>
-                        </div>
-                        <div class="text-center text-xs text-pitch-muted mt-1.5">
-                            {{ abs($diff) < 0.05 ? 'Tam denge ✓' : 'Fark: '.number_format(abs($diff), 1).' puan ('.($diff > 0 ? 'Turuncu' : 'Yeşil').' önde)' }}
-                        </div>
-                    </div>
-                    <div class="font-display text-lg sm:text-2xl font-bold text-bibB text-end">YEŞİL <span class="block text-[10px] sm:text-[11px] tracking-[.15em] sm:tracking-[.2em] text-pitch-muted font-semibold">{{ $teamB->count() }} OYUNCU · ORT {{ number_format($avgB, 1) }}</span></div>
-                </div>
-
-                @if ($canManage && $match->status === 'scheduled')
-                    <p class="text-xs text-pitch-muted">Elle değişiklik: bir takımdan oyuncuya tıkla, sonra <strong class="text-gold">diğer takımdan</strong> birine tıkla — yer değiştirirler (oylama yeniden başlar).</p>
-                @endif
-
-                <div class="grid sm:grid-cols-2 gap-4">
-                    @foreach ([['A', 'Turuncu Yelek', $teamA, 'border-bibA', 'bg-bibA/10 text-bibA'], ['B', 'Yeşil Yelek', $teamB, 'border-bibB', 'bg-bibB/10 text-bibB']] as [$side, $teamName, $team, $borderClass, $headClass])
-                        <div class="border border-pitch-line rounded-xl overflow-hidden">
-                            <div class="px-4 py-2.5 border-b-2 {{ $borderClass }} {{ $headClass }} font-display uppercase tracking-wider text-lg font-bold">{{ $teamName }}</div>
-                            <ul>
-                                @foreach ($team as $rsvp)
-                                    <li @if ($canManage && $match->status === 'scheduled') wire:click="swap({{ $rsvp->player_id }})" @endif
-                                        class="flex items-center gap-3 px-4 py-2.5 border-b border-pitch-line last:border-b-0 transition
-                                               {{ $canManage && $match->status === 'scheduled' ? 'cursor-pointer hover:bg-pitch-surface2' : '' }}
-                                               {{ $swapArmed === $rsvp->player_id ? 'bg-gold/10 shadow-[inset_3px_0_0_#FFC83D]' : '' }}">
-                                        <x-ovr-badge :player="$rsvp->player" num-class="text-lg w-9" />
-                                        <span class="font-semibold {{ $rsvp->player->nameColorClass() }}">{{ $rsvp->player->name }}
-                                            @if ($rsvp->player->pitchIcon())<span class="font-normal">{{ $rsvp->player->pitchIcon() }}</span>@endif
-                                            @if ($rsvp->player->shirt_number)<span class="text-pitch-muted text-xs font-normal">#{{ $rsvp->player->shirt_number }}</span>@endif
-                                            @if ($myPlayer && $rsvp->player_id === $myPlayer->id)<span class="text-xs text-pitch-muted font-normal">(sen)</span>@endif
-                                        </span>
-                                        <span class="ms-auto flex gap-1 items-center">
-                                            @if ($roller = $rsvp->player->roleCodes())
-                                                {{-- Başkanın atadığı mevki (kadro bu mevkilere göre dengelendi) --}}
-                                                @foreach ($roller as $i => $rol)
-                                                    <span class="text-[10px] font-bold px-1.5 py-0.5 rounded-full border {{ $rol === 'KL' ? 'bg-gold/10 border-gold/40 text-gold' : 'bg-bibB/10 border-bibB/40 text-bibB' }}"
-                                                          title="{{ \App\Support\Roles::ALL[$rol]['name'] }}">{{ count($roller) > 1 ? ($i + 1).'·' : '' }}{{ \App\Support\Roles::ALL[$rol]['short'] }}</span>
-                                                @endforeach
-                                            @else
-                                                @foreach ($rsvp->player->positions ?? [] as $i => $pos)
-                                                    <span class="text-[10px] font-bold px-1.5 py-0.5 rounded-full bg-pitch-bg border border-pitch-line {{ $pos === 'KL' ? 'text-gold' : 'text-pitch-muted' }}">{{ count($rsvp->player->positions) > 1 ? ($i + 1).'·' : '' }}{{ $pos }}</span>
-                                                @endforeach
-                                            @endif
-                                            <span class="text-[10px] font-bold px-1.5 py-0.5 rounded-full bg-pitch-bg border border-pitch-line text-bibB" title="{{ \App\Support\Attributes::FEET[$rsvp->player->foot] ?? 'Sağ ayak' }}">🦶{{ $rsvp->player->footBadge() }}</span>
-                                        </span>
-                                    </li>
-                                @endforeach
-                            </ul>
-                        </div>
-                    @endforeach
-                </div>
-            </div>
-
             {{-- Saha dizilişi --}}
             {{-- Oyuncu şekli (yuvarlak / forma) kişisel tercih: bu cihazda hatırlanır --}}
             <div class="bg-pitch-surface border border-pitch-line rounded-xl p-6 space-y-3" wire:ignore.self
@@ -720,6 +517,209 @@
                 </svg>
                 @if ($canManage)
                     <p class="text-xs text-pitch-muted">Oyuncuları saha üzerinde <strong class="text-pitch-ink">sürükleyip bırakarak</strong> dizilişi istediğin gibi kurabilirsin.</p>
+                @endif
+            </div>
+
+            {{-- Denge göstergesi + takım listeleri --}}
+            <div class="bg-pitch-surface border border-pitch-line rounded-xl p-6 space-y-4">
+                <div class="grid grid-cols-[1fr,auto,1fr] items-center gap-2 sm:gap-4">
+                    <div class="font-display text-lg sm:text-2xl font-bold text-bibA">TURUNCU <span class="block text-[10px] sm:text-[11px] tracking-[.15em] sm:tracking-[.2em] text-pitch-muted font-semibold">{{ $teamA->count() }} OYUNCU · ORT {{ number_format($avgA, 1) }}</span></div>
+                    @php $diff = $avgA - $avgB; $shift = max(-22, min(22, $diff * 12)); @endphp
+                    <div class="min-w-[90px] sm:min-w-[260px]">
+                        <div class="relative h-3.5 rounded-full bg-pitch-bg border border-pitch-line overflow-hidden">
+                            <div class="absolute left-0 top-0 bottom-0 bg-gradient-to-r from-bibA to-bibA/50" style="width: {{ 50 + $shift }}%"></div>
+                            <div class="absolute right-0 top-0 bottom-0 bg-gradient-to-l from-bibB to-bibB/50" style="width: {{ 50 - $shift }}%"></div>
+                            <div class="absolute left-1/2 -top-0.5 -bottom-0.5 w-0.5 bg-white/85"></div>
+                        </div>
+                        <div class="text-center text-xs text-pitch-muted mt-1.5">
+                            {{ abs($diff) < 0.05 ? 'Tam denge ✓' : 'Fark: '.number_format(abs($diff), 1).' puan ('.($diff > 0 ? 'Turuncu' : 'Yeşil').' önde)' }}
+                        </div>
+                    </div>
+                    <div class="font-display text-lg sm:text-2xl font-bold text-bibB text-end">YEŞİL <span class="block text-[10px] sm:text-[11px] tracking-[.15em] sm:tracking-[.2em] text-pitch-muted font-semibold">{{ $teamB->count() }} OYUNCU · ORT {{ number_format($avgB, 1) }}</span></div>
+                </div>
+
+                @if ($canManage && $match->status === 'scheduled')
+                    <p class="text-xs text-pitch-muted">Elle değişiklik: bir takımdan oyuncuya tıkla, sonra <strong class="text-gold">diğer takımdan</strong> birine tıkla — yer değiştirirler (oylama yeniden başlar).</p>
+                @endif
+
+                <div class="grid sm:grid-cols-2 gap-4">
+                    @foreach ([['A', 'Turuncu Yelek', $teamA, 'border-bibA', 'bg-bibA/10 text-bibA'], ['B', 'Yeşil Yelek', $teamB, 'border-bibB', 'bg-bibB/10 text-bibB']] as [$side, $teamName, $team, $borderClass, $headClass])
+                        <div class="border border-pitch-line rounded-xl overflow-hidden">
+                            <div class="px-4 py-2.5 border-b-2 {{ $borderClass }} {{ $headClass }} font-display uppercase tracking-wider text-lg font-bold">{{ $teamName }}</div>
+                            <ul>
+                                @foreach ($team as $rsvp)
+                                    <li @if ($canManage && $match->status === 'scheduled') wire:click="swap({{ $rsvp->player_id }})" @endif
+                                        class="flex items-center gap-3 px-4 py-2.5 border-b border-pitch-line last:border-b-0 transition
+                                               {{ $canManage && $match->status === 'scheduled' ? 'cursor-pointer hover:bg-pitch-surface2' : '' }}
+                                               {{ $swapArmed === $rsvp->player_id ? 'bg-gold/10 shadow-[inset_3px_0_0_#FFC83D]' : '' }}">
+                                        <x-ovr-badge :player="$rsvp->player" num-class="text-lg w-9" />
+                                        <span class="font-semibold {{ $rsvp->player->nameColorClass() }}">{{ $rsvp->player->name }}
+                                            @if ($rsvp->player->pitchIcon())<span class="font-normal">{{ $rsvp->player->pitchIcon() }}</span>@endif
+                                            @if ($rsvp->player->shirt_number)<span class="text-pitch-muted text-xs font-normal">#{{ $rsvp->player->shirt_number }}</span>@endif
+                                            @if ($myPlayer && $rsvp->player_id === $myPlayer->id)<span class="text-xs text-pitch-muted font-normal">(sen)</span>@endif
+                                        </span>
+                                        <span class="ms-auto flex gap-1 items-center">
+                                            @if ($roller = $rsvp->player->roleCodes())
+                                                {{-- Başkanın atadığı mevki (kadro bu mevkilere göre dengelendi) --}}
+                                                @foreach ($roller as $i => $rol)
+                                                    <span class="text-[10px] font-bold px-1.5 py-0.5 rounded-full border {{ $rol === 'KL' ? 'bg-gold/10 border-gold/40 text-gold' : 'bg-bibB/10 border-bibB/40 text-bibB' }}"
+                                                          title="{{ \App\Support\Roles::ALL[$rol]['name'] }}">{{ count($roller) > 1 ? ($i + 1).'·' : '' }}{{ \App\Support\Roles::ALL[$rol]['short'] }}</span>
+                                                @endforeach
+                                            @else
+                                                @foreach ($rsvp->player->positions ?? [] as $i => $pos)
+                                                    <span class="text-[10px] font-bold px-1.5 py-0.5 rounded-full bg-pitch-bg border border-pitch-line {{ $pos === 'KL' ? 'text-gold' : 'text-pitch-muted' }}">{{ count($rsvp->player->positions) > 1 ? ($i + 1).'·' : '' }}{{ $pos }}</span>
+                                                @endforeach
+                                            @endif
+                                            <span class="text-[10px] font-bold px-1.5 py-0.5 rounded-full bg-pitch-bg border border-pitch-line text-bibB" title="{{ \App\Support\Attributes::FEET[$rsvp->player->foot] ?? 'Sağ ayak' }}">🦶{{ $rsvp->player->footBadge() }}</span>
+                                        </span>
+                                    </li>
+                                @endforeach
+                            </ul>
+                        </div>
+                    @endforeach
+                </div>
+            </div>
+
+            {{-- Onay oylaması --}}
+            @if ($voteSummary)
+                <div class="bg-pitch-surface border {{ $match->squad_status === 'approved' ? 'border-pitch-green2' : 'border-gold/40' }} rounded-xl p-6 space-y-3">
+                    @if ($match->squad_status === 'approved')
+                        <div class="flex items-center gap-3">
+                            <span class="text-2xl">✅</span>
+                            <div>
+                                <h3 class="font-display uppercase tracking-wider text-lg font-semibold text-bibB">Kadro Onaylandı</h3>
+                                <p class="text-sm text-pitch-muted">{{ $voteSummary['yes'] }} evet oyu ile %60 çoğunluk sağlandı.</p>
+                            </div>
+                        </div>
+                    @else
+                        <h3 class="font-display uppercase tracking-wider text-lg font-semibold">🗳️ Kadro Oylaması</h3>
+                        <p class="text-sm text-pitch-muted">
+                            Kadronun kesinleşmesi için kadrodaki oyuncuların <strong class="text-pitch-ink">%60'ının</strong> onayı gerekiyor:
+                            <strong class="text-pitch-ink">{{ $voteSummary['yes'] }}/{{ $voteSummary['needed'] }}</strong> evet
+                            ({{ $voteSummary['no'] }} hayır, {{ $voteSummary['eligible'] }} oy hakkı).
+                        </p>
+                        <div class="h-2.5 rounded-full bg-pitch-bg border border-pitch-line overflow-hidden">
+                            <div class="h-full bg-gradient-to-r from-pitch-green to-bibB" style="width: {{ $voteSummary['needed'] > 0 ? min(100, round($voteSummary['yes'] / $voteSummary['needed'] * 100)) : 0 }}%"></div>
+                        </div>
+                        @if ($canVoteSquad)
+                            <div class="grid grid-cols-2 gap-2 sm:flex sm:items-center">
+                                <button wire:click="voteSquad(true)"
+                                        class="w-full sm:w-auto px-4 py-2 rounded-md text-sm font-semibold border transition {{ $mySquadVote?->approve === true ? 'bg-pitch-green border-pitch-green2' : 'border-pitch-line hover:bg-pitch-surface2 text-bibB' }}">
+                                    👍 Onaylıyorum
+                                </button>
+                                <button wire:click="voteSquad(false)"
+                                        class="w-full sm:w-auto px-4 py-2 rounded-md text-sm font-semibold border transition {{ $mySquadVote?->approve === false ? 'bg-red-700 border-red-600' : 'border-pitch-line hover:bg-pitch-surface2 text-[#FF8A8A]' }}">
+                                    👎 Reddediyorum
+                                </button>
+                                @if ($mySquadVote)
+                                    <span class="col-span-2 text-xs text-pitch-muted">Oyunu değiştirebilirsin.</span>
+                                @endif
+                            </div>
+                        @endif
+                        @if ($canManage && $voteSummary['no'] > $voteSummary['eligible'] - $voteSummary['needed'])
+                            <p class="text-sm text-gold">%60'a ulaşmak artık mümkün değil — <strong>Alternatif Kadro</strong> ile yeni bir bölünme sun ya da elle takas yap.</p>
+                        @endif
+                    @endif
+                </div>
+            @endif
+        @endif
+
+        {{-- Başkan: hazır hatırlatma bildirimleri --}}
+        @if ($canManage && $match->status !== 'cancelled')
+            @php
+                $reminderTypes = [];
+                if ($match->status === 'scheduled') {
+                    $reminderTypes['rsvp'] = '📋 Katılım hatırlat';
+                    if ($match->squad_status === 'voting') $reminderTypes['squad_vote'] = '🗳️ Kadro oylaması hatırlat';
+                    if ($match->squad_status === 'approved') $reminderTypes['squad_announce'] = '📣 Kadroyu duyur';
+                } else {
+                    if ($match->mvpOpen()) $reminderTypes['mvp'] = '🏆 MVP hatırlat';
+                    if ($match->perfOpen()) $reminderTypes['perf'] = '📈 Performans hatırlat';
+                }
+            @endphp
+            @if ($reminderTypes)
+                <div class="bg-pitch-surface border border-pitch-line rounded-xl p-4 sm:p-6 space-y-3">
+                    <div class="flex items-center justify-between flex-wrap gap-2">
+                        <h3 class="font-display uppercase tracking-wider text-lg font-semibold">📣 Hatırlatma Gönder <span class="text-xs text-pitch-muted font-normal tracking-normal">(başkan)</span></h3>
+                        <span class="text-xs text-pitch-muted bg-pitch-bg border border-pitch-line rounded-full px-3 py-1">30 dk'da 1 bildirim</span>
+                    </div>
+                    <div class="grid grid-cols-2 gap-2 sm:flex sm:flex-wrap">
+                        @foreach ($reminderTypes as $type => $label)
+                            <x-secondary-button wire:click="sendReminder('{{ $type }}')" class="w-full sm:w-auto {{ count($reminderTypes) % 2 === 1 && $loop->last ? 'col-span-2' : '' }}">
+                                {{ $label }}
+                            </x-secondary-button>
+                        @endforeach
+                    </div>
+                    @if ($reminderNotice)
+                        <p class="text-sm text-bibB">{{ $reminderNotice }}</p>
+                    @endif
+                    <p class="text-xs text-pitch-muted">Hatırlatma yalnızca işini henüz yapmamış kişilere gider (katılım bildirmeyenler, oy kullanmayanlar vb.).</p>
+                </div>
+            @endif
+        @endif
+
+        {{-- RSVP — kadro kurulduktan sonra kişisel "geliyor musun?" sorusu gizlenir --}}
+        @if ($match->status === 'scheduled' && ($match->squad_status === 'none' || $canManage))
+            <div class="bg-pitch-surface border border-pitch-line rounded-xl p-6 space-y-3">
+                @if ($match->squad_status === 'none')
+                    <h3 class="font-display uppercase tracking-wider text-lg font-semibold">Geliyor musun?</h3>
+                    <div class="grid gap-2 sm:flex sm:flex-wrap">
+                        <button wire:click="rsvp('going')"
+                                class="w-full sm:w-auto px-5 py-2.5 rounded-md font-semibold text-sm border transition
+                                       {{ $myRsvp?->status === 'going' ? 'bg-pitch-green text-pitch-ink border-pitch-green2' : 'bg-transparent text-bibB border-pitch-line hover:bg-pitch-surface2' }}">
+                            ✅ Geliyorum
+                        </button>
+                        <button wire:click="rsvp('maybe')"
+                                class="w-full sm:w-auto px-5 py-2.5 rounded-md font-semibold text-sm border transition
+                                       {{ $myRsvp?->status === 'maybe' ? 'bg-gold text-pitch-bg border-gold' : 'bg-transparent text-gold border-pitch-line hover:bg-pitch-surface2' }}">
+                            🤔 Belki
+                        </button>
+                        <button wire:click="rsvp('not_going')"
+                                class="w-full sm:w-auto px-5 py-2.5 rounded-md font-semibold text-sm border transition
+                                       {{ $myRsvp?->status === 'not_going' ? 'bg-red-700 text-pitch-ink border-red-600' : 'bg-transparent text-[#FF8A8A] border-pitch-line hover:bg-pitch-surface2' }}">
+                            ❌ Gelmiyorum
+                        </button>
+                    </div>
+                    @if ($myRsvp?->status === 'going' && $myRsvp->waitlist_position !== null)
+                        <p class="text-sm text-gold bg-gold/10 border border-gold/30 rounded-md p-3">
+                            Kadro dolu — <strong>yedek listesinde {{ $myRsvp->waitlist_position }}. sıradasın.</strong>
+                            Biri çekilirse otomatik olarak kadroya geçersin.
+                        </p>
+                    @endif
+                @else
+                    <h3 class="font-display uppercase tracking-wider text-lg font-semibold">Katılım</h3>
+                    <p class="text-sm text-pitch-muted">Kadro kuruldu. Katılımı aşağıdan yönetebilir, gerekirse kadroyu yeniden kurabilirsin.</p>
+                @endif
+
+                @if ($canManage)
+                    <div class="border-t border-pitch-line pt-4">
+                        <x-secondary-button wire:click="$toggle('showManageRsvp')">
+                            👥 {{ $showManageRsvp ? 'Katılım yönetimini kapat' : 'Katılımı yönet (başkan)' }}
+                        </x-secondary-button>
+                        <p class="text-xs text-pitch-muted mt-2">Gelemeyenler adına da işaretleyebilirsin — WhatsApp'tan toplayıp tek tek girme derdi bitsin.</p>
+
+                        @if ($showManageRsvp)
+                            <div class="mt-3 space-y-1.5">
+                                @foreach ($roster as $player)
+                                    @php $st = $rsvpByPlayer[$player->id]->status ?? null; @endphp
+                                    <div class="flex items-center justify-between gap-3 bg-pitch-bg border border-pitch-line rounded-lg px-3 py-2">
+                                        <span class="text-sm min-w-0 truncate">
+                                            {{ $player->name }}
+                                            @if ($player->isGuest())<span class="text-xs text-gold">(misafir)</span>@endif
+                                        </span>
+                                        <div class="flex gap-1 shrink-0">
+                                            <button wire:click="setPlayerRsvp({{ $player->id }}, 'going')"
+                                                    class="text-xs px-2.5 py-1.5 rounded-md border transition {{ $st === 'going' ? 'bg-pitch-green border-pitch-green2 text-pitch-ink' : 'border-pitch-line text-bibB hover:bg-pitch-surface2' }}">Geliyor</button>
+                                            <button wire:click="setPlayerRsvp({{ $player->id }}, 'maybe')"
+                                                    class="text-xs px-2.5 py-1.5 rounded-md border transition {{ $st === 'maybe' ? 'bg-gold border-gold text-pitch-bg' : 'border-pitch-line text-gold hover:bg-pitch-surface2' }}">Belki</button>
+                                            <button wire:click="setPlayerRsvp({{ $player->id }}, 'not_going')"
+                                                    class="text-xs px-2.5 py-1.5 rounded-md border transition {{ $st === 'not_going' ? 'bg-red-700 border-red-600 text-pitch-ink' : 'border-pitch-line text-[#FF8A8A] hover:bg-pitch-surface2' }}">Gelmiyor</button>
+                                        </div>
+                                    </div>
+                                @endforeach
+                            </div>
+                        @endif
+                    </div>
                 @endif
             </div>
         @endif
