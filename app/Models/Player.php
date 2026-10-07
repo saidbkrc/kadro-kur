@@ -38,8 +38,27 @@ class Player extends Model
     {
         return [
             'positions' => 'array',
+            'roles' => 'array',
             'guest_rating' => 'float',
+            'rating_forced_public' => 'boolean',
         ];
+    }
+
+    /** Başkanın atadığı halı saha mevkileri (temizlenmiş, en çok 2). */
+    public function roleCodes(): array
+    {
+        return \App\Support\Roles::clean($this->roles);
+    }
+
+    /**
+     * Kadro dengesi ve saha dizilişinin kullandığı hatlar (KL/DEF/OS/FV):
+     * mevki atanmışsa mevkilerden türer, yoksa oyuncunun kendi seçtiği pozisyonlar.
+     */
+    public function fieldPositions(): array
+    {
+        $roller = $this->roleCodes();
+
+        return $roller !== [] ? \App\Support\Roles::lines($roller) : ($this->positions ?? []);
     }
 
     public function group(): BelongsTo
@@ -89,9 +108,10 @@ class Player extends Model
         return $this->user_id === null;
     }
 
+    /** Kaleci mi? Başkan mevki atadıysa ona, yoksa oyuncunun pozisyonuna bakılır. */
     public function isGoalkeeper(): bool
     {
-        return in_array('KL', $this->positions ?? [], true);
+        return in_array('KL', $this->fieldPositions(), true);
     }
 
     /** Mağazadan kuşanılan kart çerçevesi sınıfı (yoksa varsayılan altın). */
@@ -227,14 +247,46 @@ class Player extends Model
         return $averages;
     }
 
-    /** Genel puan (OVR) — puanlanmamış özellikler 5 (orta) kabul edilir. Misafir: başkanın ayarladığı puan, yoksa 6.5. */
+    /**
+     * Genel puan (OVR) — puanlanmamış özellikler 5 (orta) kabul edilir.
+     * Misafir: başkanın ayarladığı puan, yoksa 6.5. Eşik sayıda oy almamış üyede
+     * başkan elle puan verdiyse o kullanılır (bkz. ratingSource()).
+     */
     public function overall(): float
     {
+        return match ($this->ratingSource()) {
+            'guest' => $this->guest_rating ?? self::GUEST_RATING,
+            'manual' => (float) $this->guest_rating,
+            default => $this->votedOverall(),
+        };
+    }
+
+    /** Takım arkadaşlarının oylarından hesaplanan puan (başkan müdahalesi yok sayılır). */
+    public function votedOverall(): float
+    {
+        return round(Attributes::overall($this->averageAttributes(), $this->positions ?? []), 1);
+    }
+
+    /**
+     * Puanın kaynağı:
+     *  guest   → misafir (başkan puanı / 6.5)
+     *  votes   → oyların ortalaması (eşik geçildi ya da başkan "göster" dedi)
+     *  manual  → eşik altındaki üyeye başkanın verdiği puan
+     *  hidden  → eşik altı, müdahale yok — oyların ortalaması gizli ("?")
+     */
+    public function ratingSource(): string
+    {
         if ($this->isGuest()) {
-            return $this->guest_rating ?? self::GUEST_RATING;
+            return 'guest';
         }
 
-        return round(Attributes::overall($this->averageAttributes(), $this->positions ?? []), 1);
+        $adet = $this->ratingCount();
+
+        if ($adet >= self::minRatingsForVisibility() || ($this->rating_forced_public && $adet > 0)) {
+            return 'votes';
+        }
+
+        return $this->guest_rating !== null ? 'manual' : 'hidden';
     }
 
     /** Son 5 maçın performans ortalaması (her maçın kendi oy ortalamalarının ortalaması). Yoksa null. Misafir: yok. */
@@ -306,10 +358,6 @@ class Player extends Model
     /** Ortalama puan herkese (oyuncunun kendisine de) ancak eşik oylama sayısından sonra gösterilir. Misafir: sabit 6.5 hep görünür. */
     public function overallIsPublic(): bool
     {
-        if ($this->isGuest()) {
-            return true;
-        }
-
-        return $this->ratingCount() >= self::minRatingsForVisibility();
+        return $this->ratingSource() !== 'hidden';
     }
 }

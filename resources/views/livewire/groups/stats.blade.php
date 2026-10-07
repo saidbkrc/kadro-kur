@@ -32,18 +32,25 @@
                     </span>
                 </div>
 
-                <div class="grid sm:grid-cols-3 gap-3">
+                <div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
                     @foreach ([
                         ['goals', '👑', 'Gol Kralı', 'gol'],
                         ['mvp', '🌟', 'Sezonun MVP\'si', 'MVP'],
                         ['played', '🏟️', 'Demirbaş', 'maç'],
                     ] as [$alan, $ikon, $unvan, $birim])
-                        @php $l = $leaders[$alan] ?? null; @endphp
-                        <div class="rounded-lg border border-pitch-line bg-pitch-bg px-3 py-3">
+                        @php
+                            $l = $leaders[$alan] ?? null;
+                            // Sezon başında çok kişi berabere kalabiliyor (ör. 5 kişi 1'er MVP) —
+                            // ilk 3 isim + "+N kişi", kart taşmasın
+                            $gosterilen = $l ? $l['players']->take(3) : collect();
+                            $kalan = $l ? $l['players']->count() - $gosterilen->count() : 0;
+                        @endphp
+                        {{-- min-w-0: grid hücresi içeriğine göre genişleyip sayfayı taşırmasın (mobil) --}}
+                        <div class="min-w-0 rounded-lg border border-pitch-line bg-pitch-bg px-3 py-3">
                             <div class="text-[11px] tracking-[.14em] text-pitch-muted">{{ $ikon }} {{ mb_strtoupper($unvan, 'UTF-8') }}</div>
                             @if ($l)
-                                <div class="text-sm font-semibold mt-1 truncate">
-                                    {{ $l['players']->pluck('name')->implode(', ') }}
+                                <div class="text-sm font-semibold mt-1 break-words">
+                                    {{ $gosterilen->pluck('name')->implode(', ') }}@if ($kalan > 0)<span class="text-pitch-muted font-normal"> +{{ $kalan }} kişi</span>@endif
                                 </div>
                                 <div class="text-xs text-gold font-display">{{ $l['value'] }} {{ $birim }}</div>
                             @else
@@ -76,7 +83,7 @@
             </div>
         </div>
 
-        <div class="grid lg:grid-cols-2 gap-6 items-start">
+        <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 items-start">
             <div class="space-y-6 min-w-0">
                 
                 {{-- Gol krallığı --}}

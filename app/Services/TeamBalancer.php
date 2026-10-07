@@ -25,6 +25,13 @@ class TeamBalancer
     public const KEEPER_SOFT_WEIGHT = 25.0;
 
     /**
+     * Mevki grubu dengesizliği (tek sayıdaki doğal yarım fark hariç) başına ceza.
+     * 1.5 ≈ takım ortalamaları arasında 0.15 puan farkı: denk OVR'li alternatifler
+     * arasından mevkisi dengeli olanı seçtirir, belirgin güç farkını ise kabul ettirmez.
+     */
+    public const ROLE_BALANCE_WEIGHT = 1.5;
+
+    /**
      * @param  list<array{id: int, positions: list<string>, ovr: float}>  $players
      * @param  list<array{type: 'apart'|'together', a: int, b: int}>  $rules
      * @return list<array{score: float, a: list<int>, b: list<int>}> en iyi bölünmeler (skora göre sıralı)
@@ -116,7 +123,34 @@ class TeamBalancer
             $penalty += abs($coverA[$pos] - $coverB[$pos]) * 0.6;
         }
 
+        // Başkanın atadığı mevkiler: stoper, bek, orta, kanat, santrafor sayıları iki
+        // takımda dengelensin (ör. iki stoper aynı takıma düşmesin). Asıl mevki tam,
+        // yedek mevki yarım sayılır. Hat dengesinin üstüne biner, OVR'yi ezmez.
+        $rolA = $this->roleCoverage($teamA);
+        $rolB = $this->roleCoverage($teamB);
+        foreach (array_unique([...array_keys($rolA), ...array_keys($rolB)]) as $grup) {
+            $penalty += max(0, abs(($rolA[$grup] ?? 0) - ($rolB[$grup] ?? 0)) - 0.5) * self::ROLE_BALANCE_WEIGHT;
+        }
+
         return $avgDiff * 10 + $penalty + $this->rulesPenalty($teamA, $teamB, $rules);
+    }
+
+    /** Mevki grubu başına ağırlıklı sayı (asıl 1, yedek 0.5). Kaleci hariç — onu yukarıdaki kural yönetir. */
+    protected function roleCoverage(array $team): array
+    {
+        $sayim = [];
+
+        foreach ($team as $player) {
+            foreach (\App\Support\Roles::clean($player['roles'] ?? []) as $i => $rol) {
+                $grup = \App\Support\Roles::ALL[$rol]['group'];
+
+                if ($grup !== 'KL') {
+                    $sayim[$grup] = ($sayim[$grup] ?? 0) + ($i === 0 ? 1.0 : 0.5);
+                }
+            }
+        }
+
+        return $sayim;
     }
 
     /** Birincil pozisyonu kaleci olan oyuncu sayısı. */

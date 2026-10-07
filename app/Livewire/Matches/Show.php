@@ -637,7 +637,8 @@ class Show extends Component
             'id' => $r->player_id,
             'name' => $r->player->name,
             'number' => $r->player->shirt_number,
-            'positions' => $r->player->positions ?? [],
+            'positions' => $r->player->fieldPositions(),   // mevki atandıysa ondan türeyen hatlar
+            'roles' => $r->player->roleCodes(),
             'foot' => $r->player->foot ?? 'right',
             'ovr' => $r->player->displayRating(),
             'ovr_public' => $r->player->overallIsPublic(),

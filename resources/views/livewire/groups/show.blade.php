@@ -248,37 +248,70 @@
                                         @endif
                                     </div>
                                     <div class="flex gap-1 mt-1 flex-wrap items-center">
-                                        @foreach ($player->positions ?? [] as $i => $pos)
-                                            <span class="text-[10.5px] font-bold tracking-wide px-2 py-0.5 rounded-full bg-pitch-bg border border-pitch-line {{ $pos === 'KL' ? 'text-gold' : 'text-pitch-muted' }}">
-                                                {{ count($player->positions) > 1 ? ($i + 1).'·' : '' }}{{ $pos }}
-                                            </span>
-                                        @endforeach
+                                        @if ($roller = $player->roleCodes())
+                                            {{-- Başkanın atadığı mevki (kadro kurma bunu kullanır) --}}
+                                            @foreach ($roller as $i => $rol)
+                                                <span class="text-[10.5px] font-bold tracking-wide px-2 py-0.5 rounded-full border {{ $rol === 'KL' ? 'bg-gold/10 border-gold/40 text-gold' : 'bg-bibB/10 border-bibB/40 text-bibB' }}"
+                                                      title="{{ \App\Support\Roles::ALL[$rol]['name'] }}{{ $i === 0 ? ' (asıl)' : ' (yedek)' }}">
+                                                    {{ count($roller) > 1 ? ($i + 1).'·' : '' }}{{ \App\Support\Roles::ALL[$rol]['short'] }}
+                                                </span>
+                                            @endforeach
+                                        @else
+                                            @foreach ($player->positions ?? [] as $i => $pos)
+                                                <span class="text-[10.5px] font-bold tracking-wide px-2 py-0.5 rounded-full bg-pitch-bg border border-pitch-line {{ $pos === 'KL' ? 'text-gold' : 'text-pitch-muted' }}">
+                                                    {{ count($player->positions) > 1 ? ($i + 1).'·' : '' }}{{ $pos }}
+                                                </span>
+                                            @endforeach
+                                        @endif
                                         <span class="text-[10.5px] font-bold tracking-wide px-2 py-0.5 rounded-full bg-pitch-bg border border-pitch-line text-bibB" title="{{ \App\Support\Attributes::FEET[$player->foot] ?? 'Sağ ayak' }}">
                                             🦶 {{ $player->footBadge() }}
                                         </span>
                                     </div>
+                                    @php
+                                        $kaynak = $player->ratingSource();
+                                        $adet = $player->ratingCount();
+                                    @endphp
                                     <div class="text-xs text-pitch-muted mt-1">
                                         @if ($player->isGuest() && $isAdmin)
                                             {{-- Başkan misafir puanını elle ayarlar (misafir oylanamaz) --}}
-                                            <span class="inline-flex items-center gap-1.5">
-                                                <span>Misafir puanı:</span>
-                                                <button type="button" wire:click="adjustGuestRating({{ $player->id }}, -1)"
-                                                        @disabled($ovr <= \App\Models\Player::GUEST_RATING_MIN)
-                                                        class="w-6 h-6 rounded border border-pitch-line bg-pitch-bg text-pitch-ink leading-none hover:border-[#FF8A8A] disabled:opacity-30"
-                                                        title="Puanı düşür">−</button>
-                                                <strong class="text-pitch-ink font-display text-sm w-7 text-center">{{ number_format($ovr, 1) }}</strong>
-                                                <button type="button" wire:click="adjustGuestRating({{ $player->id }}, 1)"
-                                                        @disabled($ovr >= \App\Models\Player::GUEST_RATING_MAX)
-                                                        class="w-6 h-6 rounded border border-pitch-line bg-pitch-bg text-pitch-ink leading-none hover:border-bibB disabled:opacity-30"
-                                                        title="Puanı artır">+</button>
+                                            <x-rating-stepper :player="$player" label="Misafir puanı" :value="$ovr">
                                                 @if ($player->guest_rating === null)
                                                     <span class="text-pitch-muted/70">(varsayılan)</span>
                                                 @endif
-                                            </span>
+                                            </x-rating-stepper>
                                         @elseif ($player->isGuest())
                                             Misafir puanı · başkan belirler
+                                        @elseif ($isAdmin && $adet < $minRatings)
+                                            {{-- Eşik altındaki üye: başkan ortalamayı görür, açabilir ya da geçici puan verir --}}
+                                            <div class="space-y-1.5">
+                                                <div class="flex items-center gap-1.5 flex-wrap">
+                                                    <span>{{ $adet }}/{{ $minRatings }} oylama</span>
+                                                    @if ($adet > 0)
+                                                        <span>· ort. <strong class="text-pitch-ink">{{ number_format($player->votedOverall(), 1) }}</strong>
+                                                            <span class="text-pitch-muted/70">(sadece sen görüyorsun)</span></span>
+                                                        <button type="button" wire:click="toggleRatingVisibility({{ $player->id }})"
+                                                                class="text-[11px] px-2 py-0.5 rounded border transition
+                                                                       {{ $player->rating_forced_public ? 'border-bibB bg-bibB/10 text-bibB' : 'border-pitch-line hover:bg-pitch-surface2' }}">
+                                                            {{ $player->rating_forced_public ? '✓ Gösteriliyor · gizle' : 'Ortalamayı göster' }}
+                                                        </button>
+                                                    @endif
+                                                </div>
+                                                @if ($kaynak !== 'votes')
+                                                    <x-rating-stepper :player="$player" label="Başkan puanı"
+                                                                      :value="$kaynak === 'manual' ? $player->guest_rating : null">
+                                                        @if ($kaynak === 'manual')
+                                                            <button type="button" wire:click="clearManualRating({{ $player->id }})"
+                                                                    class="text-[11px] text-pitch-muted hover:text-pitch-ink underline">kaldır</button>
+                                                        @else
+                                                            <span class="text-pitch-muted/70">(yok — puan gizli)</span>
+                                                        @endif
+                                                    </x-rating-stepper>
+                                                @endif
+                                            </div>
+                                        @elseif ($kaynak === 'manual')
+                                            Başkan puanı · {{ $adet }}/{{ $minRatings }} oylama
                                         @else
-                                            {{ $ovrPublic ? $player->ratingCount().' oylama' : $player->ratingCount().'/'.$minRatings.' oylama' }}
+                                            {{ $ovrPublic ? $adet.' oylama' : $adet.'/'.$minRatings.' oylama' }}
                                         @endif
                                     </div>
 
@@ -354,6 +387,29 @@
                                         </button>
                                     @endforeach
                                 </div>
+
+                                {{-- Halı saha mevkisi: başkanın seçimi — kadro kurma ve saha dizilişi bunu kullanır --}}
+                                <div class="pt-3 border-t border-pitch-line space-y-2">
+                                    <div class="text-xs uppercase tracking-widest text-pitch-muted">
+                                        Mevki (başkan) — en çok {{ \App\Support\Roles::MAX_PER_PLAYER }}: 1. asıl, 2. yedek.
+                                        <span class="normal-case tracking-normal">Kadro kurarken ve sahada bu kullanılır; boşsa yukarıdaki pozisyon.</span>
+                                    </div>
+                                    <div class="flex gap-2 flex-wrap">
+                                        @foreach (\App\Support\Roles::ALL as $code => $rol)
+                                            @php $rank = array_search($code, $roleOrder, true); @endphp
+                                            <button type="button" wire:click="toggleRole('{{ $code }}')"
+                                                    class="relative px-3 py-1.5 rounded-full border text-sm font-semibold transition
+                                                           {{ $rank !== false ? 'bg-bibB/15 border-bibB text-bibB' : 'bg-pitch-bg border-pitch-line text-pitch-muted hover:brightness-125' }}
+                                                           {{ $rank === false && count($roleOrder) >= \App\Support\Roles::MAX_PER_PLAYER ? 'opacity-40' : '' }}">
+                                                {{ $rol['name'] }}
+                                                @if ($rank !== false && count($roleOrder) > 1)
+                                                    <span class="absolute -top-2 -right-1 w-4 h-4 rounded-full bg-gold text-pitch-bg text-[10px] font-extrabold leading-4">{{ $rank + 1 }}</span>
+                                                @endif
+                                            </button>
+                                        @endforeach
+                                    </div>
+                                </div>
+
                                 <div class="flex items-center gap-3 flex-wrap">
                                     <x-text-input wire:model="editName" type="text" maxlength="24" class="w-48" placeholder="Ad / Lakap" />
                                     <x-text-input wire:model="editNumber" type="number" min="1" max="99" class="w-28" placeholder="Forma No" />

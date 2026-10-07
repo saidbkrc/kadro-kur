@@ -217,7 +217,9 @@ class FootballMatch extends Model
         $players = $this->mainListRsvps()
             ->map(fn (Rsvp $rsvp) => [
                 'id' => $rsvp->player_id,
-                'positions' => $rsvp->player->positions ?? [],
+                // Başkanın atadığı mevkiden türeyen hatlar (yoksa oyuncunun pozisyonu)
+                'positions' => $rsvp->player->fieldPositions(),
+                'roles' => $rsvp->player->roleCodes(),
                 'ovr' => $rsvp->player->load('attributeRatings')->displayRating(),
             ])
             ->values()

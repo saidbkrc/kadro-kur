@@ -266,7 +266,12 @@ class PitchLayout
      */
     protected static function flankKey(array $player, string $side): int
     {
-        $foot = $player['foot'] ?? 'right';
+        // Başkanın atadığı mevki ayaktan önce gelir: sol bek/kanat sola, sağ sağa,
+        // merkez mevkiler (stoper, orta, santrafor) ortaya
+        $roller = Roles::clean($player['roles'] ?? []);
+        $foot = $roller !== []
+            ? match (Roles::side($roller)) { 'L' => 'left', 'R' => 'right', default => 'both' }
+            : ($player['foot'] ?? 'right');
 
         $order = $side === 'A'
             ? ['left' => 0, 'both' => 1, 'right' => 2]

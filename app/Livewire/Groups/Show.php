@@ -54,6 +54,9 @@ class Show extends Component
     /** @var list<string> tıklama sırası = öncelik */
     public array $posOrder = [];
 
+    /** @var list<string> başkanın atadığı halı saha mevkileri (tıklama sırası = öncelik) */
+    public array $roleOrder = [];
+
     public ?int $editNumber = null;
 
     public string $editName = '';
@@ -158,20 +161,28 @@ class Show extends Component
     }
 
     /**
-     * Misafir puanını adım adım artırır/azaltır (yön: +1 / -1). Misafir puanlanamadığı
-     * için birkaç kez gelmiş misafirin seviyesini başkan elle yansıtır.
+     * Başkan puanını adım adım artırır/azaltır (yön: +1 / -1).
+     *  - misafir: puanlanamadığı için seviyesini başkan yansıtır
+     *  - üye: henüz eşik sayıda oy almamışsa ve ortalaması açılmamışsa geçici puan
+     *    (yeterli oy gelince ya da başkan ortalamayı açınca oylar devreye girer)
      */
     public function adjustGuestRating(int $playerId, int $yon): void
     {
         abort_unless($this->group->isAdmin(Auth::user()), 403);
 
-        // İzolasyon: yalnızca bu grubun misafiri
-        $guest = $this->group->players()->whereNull('user_id')->findOrFail($playerId);
+        // İzolasyon: yalnızca bu grubun oyuncusu
+        $oyuncu = $this->group->players()->findOrFail($playerId);
 
-        $yeni = $guest->overall() + ($yon >= 0 ? 1 : -1) * \App\Models\Player::GUEST_RATING_STEP;
+        // Oylarla belirlenen üyenin puanına dokunulmaz
+        abort_if($oyuncu->ratingSource() === 'votes', 422);
+
+        // Gizli puanlı üyede başlangıç varsayılan puan (gizli ortalama sızmasın)
+        $mevcut = $oyuncu->ratingSource() === 'hidden' ? \App\Models\Player::GUEST_RATING : $oyuncu->overall();
+
+        $yeni = $mevcut + ($yon >= 0 ? 1 : -1) * \App\Models\Player::GUEST_RATING_STEP;
         $yeni = max(\App\Models\Player::GUEST_RATING_MIN, min(\App\Models\Player::GUEST_RATING_MAX, $yeni));
 
-        $guest->forceFill(['guest_rating' => round($yeni, 1)])->save();
+        $oyuncu->forceFill(['guest_rating' => round($yeni, 1)])->save();
     }
 
     /** Misafir kaydını kayıtlı bir üyeyle eşleştirir; üyenin otomatik açılmış boş kaydı silinir. */
@@ -212,6 +223,7 @@ class Show extends Component
 
         $this->editingPlayerId = $playerId;
         $this->posOrder = $player->positions ?? [];
+        $this->roleOrder = $player->roleCodes();
         $this->editNumber = $player->shirt_number;
         $this->editName = $player->name;
         $this->editFoot = $player->foot ?? 'right';
@@ -262,7 +274,51 @@ class Show extends Component
             'foot' => $this->editFoot,
         ]);
 
-        $this->reset('editingPlayerId', 'posOrder', 'editNumber', 'editName', 'editFoot');
+        // Mevki yalnızca başkan/admin tarafından atanır (toplu atamaya kapalı alan)
+        $roller = \App\Support\Roles::clean($this->roleOrder);
+        $player->forceFill(['roles' => $roller === [] ? null : $roller])->save();
+
+        $this->reset('editingPlayerId', 'posOrder', 'roleOrder', 'editNumber', 'editName', 'editFoot');
+    }
+
+    /** Mevki seç/bırak: tıklama sırası öncelik (1. asıl, 2. yedek); en çok 2. */
+    public function toggleRole(string $code): void
+    {
+        if (! array_key_exists($code, \App\Support\Roles::ALL)) {
+            return;
+        }
+
+        if (in_array($code, $this->roleOrder, true)) {
+            $this->roleOrder = array_values(array_diff($this->roleOrder, [$code]));
+        } elseif (count($this->roleOrder) < \App\Support\Roles::MAX_PER_PLAYER) {
+            $this->roleOrder[] = $code;
+        }
+    }
+
+    /* ---------- üye puanına başkan müdahalesi ---------- */
+
+    /**
+     * Eşik sayıda oy almamış üyenin oy ortalamasını göster/gizle.
+     * Yalnızca en az bir oyu olan ve eşiğin altındaki üyelerde anlamlı.
+     */
+    public function toggleRatingVisibility(int $playerId): void
+    {
+        abort_unless($this->group->isAdmin(Auth::user()), 403);
+
+        $oyuncu = $this->group->players()->whereNotNull('user_id')->findOrFail($playerId);
+
+        abort_if($oyuncu->ratingCount() === 0, 422);   // gösterilecek ortalama yok
+
+        $oyuncu->forceFill(['rating_forced_public' => ! $oyuncu->rating_forced_public])->save();
+    }
+
+    /** Üyeye verilen başkan puanını kaldırır (puan yeniden gizli/oy ortalamasına döner). */
+    public function clearManualRating(int $playerId): void
+    {
+        abort_unless($this->group->isAdmin(Auth::user()), 403);
+
+        $this->group->players()->whereNotNull('user_id')->findOrFail($playerId)
+            ->forceFill(['guest_rating' => null])->save();
     }
 
     /* ---------- eşleşme kuralları ---------- */
@@ -404,13 +460,19 @@ class Show extends Component
     {
         $sort = array_key_exists($this->sort, self::SORTS) ? $this->sort : 'puan';
         $isim = $this->nameComparator();
-        $sira = array_flip(array_keys(\App\Support\Attributes::POSITIONS)); // KL, DEF, OS, FV
+        // Mevki sırası (KL, STP, bekler, ön libero, orta, kanatlar, santrafor); mevkisi
+        // atanmamış oyuncu genel pozisyonunun hattındaki ilk mevkinin yerine oturur
+        $sira = array_flip(array_keys(\App\Support\Roles::ALL));
+        $hatSirasi = ['KL' => $sira['KL'], 'DEF' => $sira['STP'], 'OS' => $sira['MO'], 'FV' => $sira['SF']];
+        $mevkiSirasi = fn (Player $p) => ($r = $p->roleCodes()[0] ?? null) !== null
+            ? $sira[$r]
+            : ($hatSirasi[$p->positions[0] ?? ''] ?? 99);
 
         $anahtar = fn (Player $p) => match ($sort) {
             // Yüksek puan önce; gizliler en sonda
             'puan' => [$p->overallIsPublic() ? 0 : 1, $p->overallIsPublic() ? -$p->displayRating() : 0],
-            // Birinci pozisyona göre (pozisyonsuzlar en sonda), sonra yüksek puan
-            'pozisyon' => [$sira[$p->positions[0] ?? ''] ?? 99, $p->overallIsPublic() ? -$p->displayRating() : 0],
+            // Mevkiye göre (pozisyonsuzlar en sonda), sonra yüksek puan
+            'pozisyon' => [$mevkiSirasi($p), $p->overallIsPublic() ? -$p->displayRating() : 0],
             'mac' => [-($stats->get($p->id)['played'] ?? 0)],
             // Forma numarası olmayanlar en sonda
             'forma' => [$p->shirt_number === null ? 1 : 0, $p->shirt_number ?? 0],

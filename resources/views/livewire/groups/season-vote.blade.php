@@ -82,7 +82,7 @@
         @if ($resultsSeason)
             <div class="bg-pitch-surface border border-gold/40 rounded-xl p-4 sm:p-6">
                 <h3 class="font-display uppercase tracking-wider text-lg font-semibold text-gold mb-3">🏆 {{ $resultsSeason->name() }} — Oyuncuların Seçimi</h3>
-                <div class="grid sm:grid-cols-2 gap-3">
+                <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
                     @foreach ($categories as $kat => $k)
                         @php $r = $results[$kat] ?? null; @endphp
                         <div class="rounded-lg border border-pitch-line bg-pitch-bg px-3 py-3">

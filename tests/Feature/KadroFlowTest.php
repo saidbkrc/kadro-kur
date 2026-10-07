@@ -1380,12 +1380,12 @@ class KadroFlowTest extends TestCase
             ->call('adjustGuestRating', $yeni->id, 1)
             ->assertStatus(403);
 
-        // Kayıtlı üyenin puanı bu yolla değiştirilemez (misafir değil → 404)
-        $this->assertThrows(
-            fn () => Livewire::actingAs($owner)->test(Groups\Show::class, ['group' => $group])
-                ->call('adjustGuestRating', $uye->id, 1),
-            \Illuminate\Database\Eloquent\ModelNotFoundException::class,
-        );
+        // Oylarla puanı belirlenmiş üyenin puanına başkan dokunamaz (422)
+        $this->rateTimes($uye, \App\Models\Player::minRatingsForVisibility());
+        Livewire::actingAs($owner)->test(Groups\Show::class, ['group' => $group])
+            ->call('adjustGuestRating', $uye->id, 1)
+            ->assertStatus(422);
+        $this->assertNull($uye->fresh()->guest_rating);
 
         // Başka grubun misafiri → 404 (izolasyon)
         $baskaGrup = $this->makeGroup(User::factory()->create());
@@ -1396,6 +1396,129 @@ class KadroFlowTest extends TestCase
             \Illuminate\Database\Eloquent\ModelNotFoundException::class,
         );
         $this->assertSame(\App\Models\Player::GUEST_RATING, $yabanci->fresh()->overall());
+    }
+
+    /** Oyuncuya farklı kişilerden $adet kez özellik puanı verir (her özellik = $puan). */
+    private function rateTimes(Player $oyuncu, int $adet, int $puan = 8): void
+    {
+        foreach (range(1, $adet) as $_) {
+            \App\Models\AttributeRating::create([
+                'player_id' => $oyuncu->id,
+                'rater_id' => User::factory()->create()->id,
+                'scores' => array_fill_keys(array_keys(\App\Support\Attributes::forPositions($oyuncu->positions ?? [])), $puan),
+            ]);
+        }
+    }
+
+    public function test_baskan_esik_altindaki_uyenin_puanina_mudahale_eder(): void
+    {
+        $owner = User::factory()->create();
+        $group = $this->makeGroup($owner);
+        $yeni = $this->addMember($group);       // hiç oy yok
+        $azOylu = $this->addMember($group);     // eşik altı oy
+        $this->rateTimes($azOylu, 2, 8);
+        $esik = \App\Models\Player::minRatingsForVisibility();
+
+        $c = fn ($user = null) => Livewire::actingAs($user ?? $owner)->test(Groups\Show::class, ['group' => $group]);
+
+        // Başlangıç: ikisinin de puanı gizli
+        $this->assertSame('hidden', $yeni->fresh()->ratingSource());
+        $this->assertFalse($azOylu->fresh()->overallIsPublic());
+
+        // Senaryo 1 — hiç oy yok: başkan puan verir (varsayılandan başlar), herkes görür
+        $c()->assertSee('Başkan puanı:')->call('adjustGuestRating', $yeni->id, 1)->call('adjustGuestRating', $yeni->id, 1);
+        $yeni->refresh();
+        $this->assertSame('manual', $yeni->ratingSource());
+        $this->assertSame(6.7, $yeni->overall());
+        $this->assertTrue($yeni->overallIsPublic());
+        $c($azOylu->user)->assertSee('Başkan puanı · 0/'.$esik);
+
+        // Kaldırınca yeniden gizli
+        $c()->call('clearManualRating', $yeni->id);
+        $this->assertSame('hidden', $yeni->fresh()->ratingSource());
+
+        // Senaryo 2 — eşik altı oy: başkan ortalamayı görür (üye görmez), açar/kapatır
+        $ortalama = number_format($azOylu->fresh()->votedOverall(), 1);
+        $c()->assertSee('sadece sen görüyorsun')->assertSee($ortalama);
+        $c($yeni->user)->assertDontSee('sadece sen görüyorsun');
+
+        $c()->call('toggleRatingVisibility', $azOylu->id);
+        $azOylu->refresh();
+        $this->assertSame('votes', $azOylu->ratingSource());
+        $this->assertTrue($azOylu->overallIsPublic());
+        $this->assertSame($azOylu->votedOverall(), $azOylu->overall());
+
+        $c()->call('toggleRatingVisibility', $azOylu->id);
+        $this->assertFalse($azOylu->fresh()->overallIsPublic());
+
+        // Hiç oyu olmayanda "ortalamayı göster" anlamsız → 422
+        $c()->call('toggleRatingVisibility', $yeni->id)->assertStatus(422);
+
+        // Yetki ve izolasyon
+        $c($azOylu->user)->call('toggleRatingVisibility', $azOylu->id)->assertStatus(403);
+        $c($azOylu->user)->call('adjustGuestRating', $yeni->id, 1)->assertStatus(403);
+        $yabanci = $this->addMember($this->makeGroup(User::factory()->create()));
+        $this->assertThrows(
+            fn () => $c()->call('toggleRatingVisibility', $yabanci->id),
+            \Illuminate\Database\Eloquent\ModelNotFoundException::class,
+        );
+
+        // Eşik dolunca müdahale devre dışı: gerçek ortalama, başkan puanı yok sayılır
+        $c()->call('adjustGuestRating', $azOylu->id, 1);   // önce başkan puanı verilmiş olsun
+        $this->rateTimes($azOylu, $esik - 2, 8);
+        $azOylu->refresh();
+        $this->assertSame('votes', $azOylu->ratingSource());
+        $this->assertSame($azOylu->votedOverall(), $azOylu->overall());
+    }
+
+    public function test_mevkiler_kadro_dengesini_ve_dizilisi_belirler(): void
+    {
+        $owner = User::factory()->create();
+        $group = $this->makeGroup($owner);
+        $ben = $group->playerFor($owner);
+
+        // Başkan mevki atar (en çok 2, sıra = öncelik); geçersiz kod yok sayılır
+        $c = Livewire::actingAs($owner)->test(Groups\Show::class, ['group' => $group])
+            ->call('editPositions', $ben->id)
+            ->call('toggleRole', 'SLB')->call('toggleRole', 'SLK')->call('toggleRole', 'SF')   // 3. eklenmez
+            ->call('toggleRole', 'UYDURMA')
+            ->call('savePositions');
+        $ben->refresh();
+        $this->assertSame(['SLB', 'SLK'], $ben->roleCodes());
+        $this->assertSame(['DEF', 'OS'], $ben->fieldPositions());   // mevkiden türeyen hatlar
+        Livewire::actingAs($owner)->test(Groups\Show::class, ['group' => $group])->assertSee('SLB');
+
+        // Üye mevki atayamaz
+        $uye = $this->addMember($group);
+        Livewire::actingAs($uye->user)->test(Groups\Show::class, ['group' => $group])
+            ->call('editPositions', $uye->id)->assertStatus(403);
+
+        // Mevkili kaleci, pozisyonu kaleci olmasa da kaleci sayılır
+        $uye->forceFill(['roles' => ['KL']])->save();
+        $this->assertTrue($uye->fresh()->isGoalkeeper());
+
+        // Dengeleme: 2 stoper + 2 bek, hepsi aynı hatta (defans) ve eşit güçte. Eski hat
+        // dengesi bunları ayırt edemez (her bölünmede 2'şer defans) — ayrımı yalnızca
+        // mevki dengesi yapar: her takıma 1 stoper + 1 bek
+        $oyuncu = fn ($id, $rol) => ['id' => $id, 'positions' => \App\Support\Roles::lines([$rol]), 'roles' => [$rol], 'ovr' => 7.0];
+        $bolunme = (new \App\Services\TeamBalancer)->balance([
+            $oyuncu(1, 'STP'), $oyuncu(2, 'STP'), $oyuncu(3, 'SLB'), $oyuncu(4, 'SGB'),
+        ])[0];
+        $a = $bolunme['a'];
+        $this->assertCount(1, array_intersect($a, [1, 2]), 'Stoperler ayrı takımlara');
+        $this->assertCount(1, array_intersect($a, [3, 4]), 'Bekler ayrı takımlara');
+
+        // Diziliş: sol bek sola (A takımı için üst = küçük y), sağ bek sağa, ayak tercihine rağmen
+        // (santrafor da var — yoksa "en az 1 forvet" kuralı bir defansı forvete çeker)
+        $dugum = fn ($id, $rol, $ayak) => ['id' => $id, 'name' => "O$id", 'number' => null, 'ovr' => 7.0, 'attrs' => [],
+            'foot' => $ayak, 'positions' => \App\Support\Roles::lines([$rol]), 'roles' => [$rol]];
+        $dizilis = collect(\App\Support\PitchLayout::layout([
+            $dugum(1, 'KL', 'right'), $dugum(2, 'SGB', 'left'), $dugum(3, 'STP', 'right'), $dugum(4, 'SLB', 'right'),
+            $dugum(5, 'SF', 'right'),
+        ], 'A', null))->keyBy('id');
+        $this->assertSame($dizilis[2]['x'], $dizilis[4]['x'], 'Bekler aynı (defans) hattında');
+        $this->assertLessThan($dizilis[3]['y'], $dizilis[4]['y'], 'Sol bek üstte');
+        $this->assertGreaterThan($dizilis[3]['y'], $dizilis[2]['y'], 'Sağ bek altta (sol ayaklı olsa da)');
     }
 
     /** Belirli bir tarihte oynanmış, sonuçlanmış maç (sezon testleri için). */

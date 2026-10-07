@@ -573,9 +573,17 @@
                                             @if ($myPlayer && $rsvp->player_id === $myPlayer->id)<span class="text-xs text-pitch-muted font-normal">(sen)</span>@endif
                                         </span>
                                         <span class="ms-auto flex gap-1 items-center">
-                                            @foreach ($rsvp->player->positions ?? [] as $i => $pos)
-                                                <span class="text-[10px] font-bold px-1.5 py-0.5 rounded-full bg-pitch-bg border border-pitch-line {{ $pos === 'KL' ? 'text-gold' : 'text-pitch-muted' }}">{{ count($rsvp->player->positions) > 1 ? ($i + 1).'·' : '' }}{{ $pos }}</span>
-                                            @endforeach
+                                            @if ($roller = $rsvp->player->roleCodes())
+                                                {{-- Başkanın atadığı mevki (kadro bu mevkilere göre dengelendi) --}}
+                                                @foreach ($roller as $i => $rol)
+                                                    <span class="text-[10px] font-bold px-1.5 py-0.5 rounded-full border {{ $rol === 'KL' ? 'bg-gold/10 border-gold/40 text-gold' : 'bg-bibB/10 border-bibB/40 text-bibB' }}"
+                                                          title="{{ \App\Support\Roles::ALL[$rol]['name'] }}">{{ count($roller) > 1 ? ($i + 1).'·' : '' }}{{ \App\Support\Roles::ALL[$rol]['short'] }}</span>
+                                                @endforeach
+                                            @else
+                                                @foreach ($rsvp->player->positions ?? [] as $i => $pos)
+                                                    <span class="text-[10px] font-bold px-1.5 py-0.5 rounded-full bg-pitch-bg border border-pitch-line {{ $pos === 'KL' ? 'text-gold' : 'text-pitch-muted' }}">{{ count($rsvp->player->positions) > 1 ? ($i + 1).'·' : '' }}{{ $pos }}</span>
+                                                @endforeach
+                                            @endif
                                             <span class="text-[10px] font-bold px-1.5 py-0.5 rounded-full bg-pitch-bg border border-pitch-line text-bibB" title="{{ \App\Support\Attributes::FEET[$rsvp->player->foot] ?? 'Sağ ayak' }}">🦶{{ $rsvp->player->footBadge() }}</span>
                                         </span>
                                     </li>
@@ -587,7 +595,12 @@
             </div>
 
             {{-- Saha dizilişi --}}
-            <div class="bg-pitch-surface border border-pitch-line rounded-xl p-6 space-y-3" wire:ignore.self>
+            {{-- Oyuncu şekli (yuvarlak / forma) kişisel tercih: bu cihazda hatırlanır --}}
+            <div class="bg-pitch-surface border border-pitch-line rounded-xl p-6 space-y-3" wire:ignore.self
+                 x-data="{
+                    forma: (() => { try { return localStorage.getItem('saha-sekil') === 'forma'; } catch (e) { return false; } })(),
+                    sec(v) { this.forma = v; try { localStorage.setItem('saha-sekil', v ? 'forma' : 'yuvarlak'); } catch (e) {} },
+                 }">
                 <div class="flex items-center gap-4 flex-wrap">
                     <h3 class="font-display uppercase tracking-wider text-lg font-semibold">Saha Dizilişi</h3>
                     @if ($canManage)
@@ -611,6 +624,14 @@
                         </label>
                     @endif
                     <span class="grow"></span>
+                    <div class="inline-flex rounded-md border border-pitch-line overflow-hidden text-xs" role="group" aria-label="Oyuncu şekli">
+                        <button type="button" x-on:click="sec(false)"
+                                :class="forma ? 'text-pitch-muted hover:bg-pitch-surface2' : 'bg-bibB/15 text-bibB font-semibold'"
+                                class="px-3 py-2 transition">⚪ Yuvarlak</button>
+                        <button type="button" x-on:click="sec(true)"
+                                :class="forma ? 'bg-bibB/15 text-bibB font-semibold' : 'text-pitch-muted hover:bg-pitch-surface2'"
+                                class="px-3 py-2 border-s border-pitch-line transition">👕 Forma</button>
+                    </div>
                     @if ($canManage)
                         <x-secondary-button wire:click="resetLayout">Dizilişi Sıfırla</x-secondary-button>
                     @endif
@@ -669,10 +690,22 @@
                             </pattern>
                         @endforeach
                     </defs>
+                    {{-- Şekil seçimi SVG'nin İÇİNDE (stil + grup sınıfı): PNG dışa aktarma
+                         svg.innerHTML'i kopyalar, sayfa CSS'i oraya taşınmaz --}}
+                    <style>
+                        .sk-forma { display: none; }
+                        .sekil-forma .sk-forma { display: inline; }
+                        .sekil-forma .sk-yuvarlak { display: none; }
+                    </style>
+                    <g :class="forma ? 'sekil-forma' : ''">
                     @foreach ([['A', $pitchA, '#FF7A1A'], ['B', $pitchB, '#C8F04B']] as [$side, $nodes, $fill])
                         @foreach ($nodes as $node)
+                            @php $govde = empty($node['kit']) ? $fill : 'url(#kit-'.$node['kit'].'-'.$side.')'; @endphp
                             <g class="{{ $canManage ? 'pnode cursor-grab' : '' }}" data-id="{{ $node['id'] }}" transform="translate({{ $node['x'] }},{{ $node['y'] }})">
-                                <circle r="17" fill="{{ empty($node['kit']) ? $fill : 'url(#kit-'.$node['kit'].'-'.$side.')' }}" stroke="rgba(0,0,0,.4)" stroke-width="2"/>
+                                <circle class="sk-yuvarlak" r="17" fill="{{ $govde }}" stroke="rgba(0,0,0,.4)" stroke-width="2"/>
+                                {{-- Forma silueti: yaka, omuzlar, kısa kollar, gövde (~40×33, merkez 0,0) --}}
+                                <path class="sk-forma" d="M -7 -16 Q 0 -11 7 -16 L 17 -11 L 20 -1 L 12 1 L 12 17 L -12 17 L -12 1 L -20 -1 L -17 -11 Z"
+                                      fill="{{ $govde }}" stroke="rgba(0,0,0,.45)" stroke-width="2" stroke-linejoin="round"/>
                                 @php $label = $node['number'] ?? (($node['ovr_public'] ?? true) ? round($node['ovr']) : '–'); @endphp
                                 <text y="4.5" text-anchor="middle" font-family="Arial, sans-serif" font-size="{{ strlen((string) $label) > 1 ? 12 : 13 }}" font-weight="800" fill="#10240F">{{ $label }}</text>
                                 @if (! empty($node['icon']))
@@ -683,6 +716,7 @@
                             </g>
                         @endforeach
                     @endforeach
+                    </g>
                 </svg>
                 @if ($canManage)
                     <p class="text-xs text-pitch-muted">Oyuncuları saha üzerinde <strong class="text-pitch-ink">sürükleyip bırakarak</strong> dizilişi istediğin gibi kurabilirsin.</p>

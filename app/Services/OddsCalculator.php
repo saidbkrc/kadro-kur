@@ -206,7 +206,7 @@ class OddsCalculator
         // Maç başına bir kez: odds() her oyuncu × market için ayrı çağrılıyor
         $agirliklar = $this->priorCache[$match->id][$kural] ??= $match->rsvps()->with('player')
             ->where('status', 'going')->whereNull('waitlist_position')->get()
-            ->mapWithKeys(fn (Rsvp $r) => [$r->player_id => $this->priorWeight($kural, $r->player->positions ?? [])])
+            ->mapWithKeys(fn (Rsvp $r) => [$r->player_id => $this->priorWeight($kural, $r->player->fieldPositions())])
             ->all();
 
         $toplam = array_sum($agirliklar);
