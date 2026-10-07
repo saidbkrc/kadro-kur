@@ -914,7 +914,16 @@
         const exportPng = () => {
             const svg = document.getElementById('pitchSvg');
             if (!svg) return;
-            const svgStr = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${PW} ${PH}" width="${PW * 2}" height="${PH * 2}">${svg.innerHTML}</svg>`;
+            // Kopya üzerinde Alpine/Livewire özniteliklerini (:class, x-*, wire:*, @*) temizle:
+            // bağımsız SVG'de ":class" gibi adlar geçersiz XML → görsel yüklenmez, indirme sessizce
+            // başarısız olur. Alpine seçili şekli zaten normal "class"a yazdığı için o korunur.
+            const kopya = svg.cloneNode(true);
+            kopya.querySelectorAll('*').forEach((el) => {
+                [...el.attributes].forEach((a) => {
+                    if (/^(:|@|x-|wire:)/.test(a.name)) el.removeAttribute(a.name);
+                });
+            });
+            const svgStr = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${PW} ${PH}" width="${PW * 2}" height="${PH * 2}">${kopya.innerHTML}</svg>`;
             const url = URL.createObjectURL(new Blob([svgStr], { type: 'image/svg+xml;charset=utf-8' }));
             const img = new Image();
             img.onload = () => {
