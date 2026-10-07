@@ -14,10 +14,10 @@ class Kehanet
     /** Yeni kullanıcının başlangıç bakiyesi. */
     public const STARTING_BALANCE = 100;
 
-    /** Tek kupona yatırılabilecek en az / en çok Çim. */
+    /** Tek kupona yatırılabilecek en az / en çok Çim (nesnel market'ler). */
     public const MIN_STAKE = 5;
 
-    public const MAX_STAKE = 500;
+    public const MAX_STAKE = 750;
 
     /** Oran sınırları (aşırı uçları kırpar). */
     public const MIN_ODDS = 1.05;
@@ -28,12 +28,42 @@ class Kehanet
     /** Oyuncu bazlı market'lerde tavan daha düşük (kadro büyüdükçe oran şişmesin). */
     public const MAX_ODDS_PLAYER = 10.0;
 
+    /**
+     * Öznel market'ler: sonucu skordan değil bir insan kararından çıkar (başkanın
+     * işaretlediği olaylar, MVP oyu, performans puanı). Veri azken oran modeli
+     * grubun bildiğini bilmez ve sonucu belirleyen kişi kupon da oynayabilir —
+     * Ekim 2026 verisinde bu market'lerin kazanç/yatırılan oranı 2,6–9,5 çıktı
+     * (adil oranda ~1). Eğlence kalsınlar diye tutar ve oran küçük tutulur.
+     */
+    public const SUBJECTIVE_MARKETS = ['mvp', 'top_perf'];   // + source === 'event' olanların hepsi
+
+    public const MAX_STAKE_SUBJECTIVE = 100;
+
+    public const MAX_ODDS_SUBJECTIVE = 6.0;
+
+    /** MVP / performans kuponu: oylama kapandığında bundan az kişi oy/puan verdiyse iade. */
+    public const MIN_VOTERS_SUBJECTIVE = 3;
+
+    public static function isSubjective(string $market): bool
+    {
+        return in_array($market, self::SUBJECTIVE_MARKETS, true)
+            || (self::MARKETS[$market]['source'] ?? '') === 'event';
+    }
+
     /** Market'in oran tavanı. */
     public static function maxOdds(string $market): float
     {
-        return (self::MARKETS[$market]['kind'] ?? '') === 'oyuncu'
-            ? self::MAX_ODDS_PLAYER
-            : self::MAX_ODDS;
+        return match (true) {
+            self::isSubjective($market) => self::MAX_ODDS_SUBJECTIVE,
+            (self::MARKETS[$market]['kind'] ?? '') === 'oyuncu' => self::MAX_ODDS_PLAYER,
+            default => self::MAX_ODDS,
+        };
+    }
+
+    /** Market'te tek kupona yatırılabilecek en çok Çim. */
+    public static function maxStake(string $market): int
+    {
+        return self::isSubjective($market) ? self::MAX_STAKE_SUBJECTIVE : self::MAX_STAKE;
     }
 
     /** Kombine kuponda en az / en çok bacak sayısı. */
@@ -44,9 +74,9 @@ class Kehanet
     /**
      * Kombine sınırları. Oranlar çarpıldığı için tek kombine mağazanın
      * tamamını alabiliyordu (500 × 500× = 250.000) — hem tutar hem oran kırpılır.
-     * En yüksek kombine kazancı: 100 × 50× = 5.000 Çim.
+     * En yüksek kombine kazancı: 200 × 50× = 10.000 Çim.
      */
-    public const MAX_PARLAY_STAKE = 100;
+    public const MAX_PARLAY_STAKE = 200;
 
     public const MAX_PARLAY_ODDS = 50.0;
 
@@ -54,7 +84,7 @@ class Kehanet
      * Bir kullanıcının tek maça yatırabileceği toplam Çim (tekli + o maçı
      * içeren kombineler). Bakiyeyi tek maçta eritmeyi engeller.
      */
-    public const MAX_MATCH_STAKE = 1000;
+    public const MAX_MATCH_STAKE = 1500;
 
     /** Başkanın maç sonrası işaretlediği olaylar — manuel market'lerin kaynağı. */
     public const EVENTS = [

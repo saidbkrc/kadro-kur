@@ -1398,6 +1398,14 @@ class KadroFlowTest extends TestCase
         $this->assertSame(\App\Models\Player::GUEST_RATING, $yabanci->fresh()->overall());
     }
 
+    /** Maça farklı (yeni) kullanıcılardan $adet MVP oyu ekler. */
+    private function extraMvpVotes(FootballMatch $match, Player $kime, int $adet): void
+    {
+        foreach (range(1, $adet) as $_) {
+            $match->mvpVotes()->create(['voter_id' => User::factory()->create()->id, 'player_id' => $kime->id]);
+        }
+    }
+
     /** Oyuncuya farklı kişilerden $adet kez özellik puanı verir (her özellik = $puan). */
     private function rateTimes(Player $oyuncu, int $adet, int $puan = 8): void
     {
@@ -2191,9 +2199,10 @@ class KadroFlowTest extends TestCase
             ->assertSee('MVP oylaması bitince sonuçlanır')
             ->assertSee('saat kaldı');
 
-        // Oylar: friend MVP
+        // Oylar: friend MVP (en az 3 kişi — yoksa kupon iade edilir)
         $match->mvpVotes()->create(['voter_id' => $owner->id, 'player_id' => $friend->id]);
         $match->mvpVotes()->create(['voter_id' => $ucuncu->user_id, 'player_id' => $friend->id]);
+        $this->extraMvpVotes($match, $friend, 1);
 
         // Oylama kapanmadan saat başı geçer: hâlâ bekler
         $this->travelTo(now()->addHour()->startOfHour());
@@ -2227,6 +2236,7 @@ class KadroFlowTest extends TestCase
 
         $kuponlar = $maclar->map(function ($m) use ($owner, $friend) {
             $m->mvpVotes()->create(['voter_id' => $owner->id, 'player_id' => $friend->id]);
+            $this->extraMvpVotes($m, $friend, 2);   // en az 3 oy veren
 
             return \App\Models\Prediction::create([
                 'user_id' => $owner->id, 'match_id' => $m->id, 'market_key' => 'mvp',
@@ -2407,10 +2417,12 @@ class KadroFlowTest extends TestCase
         $veliKuponu = $kupon('veli', $veli);
         $canKuponu = $kupon('can', $can);
 
-        // 24 saat içinde verilen puanlar: Ali ve Veli 8.0 ile berabere, Can 6.0
-        $mac->performanceRatings()->create(['rater_id' => $owner->id, 'player_id' => $ali->id, 'score' => 8]);
-        $mac->performanceRatings()->create(['rater_id' => $owner->id, 'player_id' => $veli->id, 'score' => 8]);
-        $mac->performanceRatings()->create(['rater_id' => $owner->id, 'player_id' => $can->id, 'score' => 6]);
+        // 24 saat içinde 3 kişinin verdiği puanlar: Ali ve Veli 8.0 ile berabere, Can 6.0
+        foreach ([$owner, User::factory()->create(), User::factory()->create()] as $puanlayan) {
+            $mac->performanceRatings()->create(['rater_id' => $puanlayan->id, 'player_id' => $ali->id, 'score' => 8]);
+            $mac->performanceRatings()->create(['rater_id' => $puanlayan->id, 'player_id' => $veli->id, 'score' => 8]);
+            $mac->performanceRatings()->create(['rater_id' => $puanlayan->id, 'player_id' => $can->id, 'score' => 6]);
+        }
 
         // 24 saat dolmadan: bekler
         app(\App\Services\KehanetService::class)->settleMatch($mac->fresh());
@@ -2429,6 +2441,58 @@ class KadroFlowTest extends TestCase
         $this->assertSame('won', $aliKuponu->refresh()->status);
         $this->assertSame('won', $veliKuponu->refresh()->status);
         $this->assertSame('lost', $canKuponu->refresh()->status);
+        $this->travelBack();
+    }
+
+    public function test_az_oyla_mvp_ve_performans_kuponu_iade_edilir(): void
+    {
+        Notification::fake();
+
+        $owner = User::factory()->create();
+        $group = $this->makeGroup($owner);
+        $ali = $this->addMember($group);
+
+        $this->travelTo(now()->startOfHour());
+        $mac = $group->matches()->create([
+            'created_by' => $owner->id, 'title' => 'Az oylu maç', 'starts_at' => now()->subHours(2),
+            'capacity' => 14, 'status' => 'completed', 'team_a_score' => 1, 'team_b_score' => 0,
+            'mvp_closes_at' => now()->addHours(24),
+        ]);
+        $owner->forceFill(['cim_balance' => 1000])->save();
+
+        // Tekli MVP + tekli performans + MVP bacaklı kombine
+        $tekliMvp = \App\Models\Prediction::create(['user_id' => $owner->id, 'match_id' => $mac->id, 'market_key' => 'mvp',
+            'selection' => (string) $ali->id, 'odds' => 5.0, 'stake' => 100]);
+        $tekliPerf = \App\Models\Prediction::create(['user_id' => $owner->id, 'match_id' => $mac->id, 'market_key' => 'top_perf',
+            'selection' => (string) $ali->id, 'odds' => 5.0, 'stake' => 80]);
+        $slip = \App\Models\PredictionSlip::create(['user_id' => $owner->id, 'group_id' => $group->id, 'stake' => 50, 'total_odds' => 10]);
+        foreach ([['mvp', (string) $ali->id], ['winner', 'A']] as [$m, $sec]) {
+            \App\Models\Prediction::create(['user_id' => $owner->id, 'match_id' => $mac->id, 'slip_id' => $slip->id,
+                'market_key' => $m, 'selection' => $sec, 'odds' => 3.0, 'stake' => 0]);
+        }
+
+        // Yalnızca 2 kişi oy/puan verdi (kuponu oynayan dahil) — süre içinde
+        $mac->mvpVotes()->create(['voter_id' => $owner->id, 'player_id' => $ali->id]);
+        $this->extraMvpVotes($mac, $ali, 1);
+        foreach ([$owner, User::factory()->create()] as $p) {
+            $mac->performanceRatings()->create(['rater_id' => $p->id, 'player_id' => $ali->id, 'score' => 9]);
+        }
+
+        // Süre dolmadan karar verilmez
+        app(\App\Services\KehanetService::class)->settleMatch($mac->fresh());
+        $this->assertSame('pending', $tekliMvp->refresh()->status);
+
+        // Süre doldu: 3 kişiden az → iade (kazanç değil), kombine de iade
+        $this->travelTo(now()->addHours(25));
+        // Süre sonrası gelen puan eşiği tamamlamaz
+        $mac->performanceRatings()->create(['rater_id' => User::factory()->create()->id, 'player_id' => $ali->id, 'score' => 9]);
+        $once = $owner->refresh()->cim_balance;
+        app(\App\Services\KehanetService::class)->settleDueMatches();
+
+        $this->assertSame('void', $tekliMvp->refresh()->status);
+        $this->assertSame('void', $tekliPerf->refresh()->status);
+        $this->assertSame('void', $slip->refresh()->status);
+        $this->assertSame($once + 100 + 80 + 50, $owner->refresh()->cim_balance);
         $this->travelBack();
     }
 
@@ -2522,18 +2586,29 @@ class KadroFlowTest extends TestCase
         $slip = \App\Models\PredictionSlip::firstOrFail();
         $this->assertLessThanOrEqual(\App\Support\Kehanet::MAX_PARLAY_ODDS, (float) $slip->total_odds);
 
-        // Kombine tutarı maçın limitinden düşer: 100 kullanıldı, 900 kaldı
+        // Kombine tutarı maçın limitinden düşer: 100 kullanıldı
+        $K = \App\Support\Kehanet::class;
         $servis = app(\App\Services\KehanetService::class);
         $this->assertSame(100, $servis->matchStakeUsed($owner, $match));
 
-        // Tekliler: 500 + 400 = limit dolar (100 + 900 = 1000)
-        $c->set("selection.{$match->id}-scorer", (string) $friend->id)
-            ->set("stake.{$match->id}-scorer", 500)
-            ->call('bet', $match->id, 'scorer');
+        // Öznel market (MVP): tekli üst sınır düşük
         $c->set("selection.{$match->id}-mvp", (string) $friend->id)
-            ->set("stake.{$match->id}-mvp", 400)
-            ->call('bet', $match->id, 'mvp');
-        $this->assertSame(1000, $servis->matchStakeUsed($owner, $match));
+            ->set("stake.{$match->id}-mvp", $K::MAX_STAKE_SUBJECTIVE + 1)
+            ->call('bet', $match->id, 'mvp')
+            ->assertSet('notice', fn ($v) => str_contains((string) $v, 'öznel'));
+        $c->set("stake.{$match->id}-mvp", $K::MAX_STAKE_SUBJECTIVE)->call('bet', $match->id, 'mvp');
+
+        // Nesnel market: daha yüksek üst sınır; tekliler maç limitini doldurur
+        $c->set("selection.{$match->id}-scorer", (string) $friend->id)
+            ->set("stake.{$match->id}-scorer", $K::MAX_STAKE + 1)
+            ->call('bet', $match->id, 'scorer')
+            ->assertSet('notice', fn ($v) => str_contains((string) $v, 'arasında olmalı'));
+        $c->set("stake.{$match->id}-scorer", $K::MAX_STAKE)->call('bet', $match->id, 'scorer');
+        $kalan = $K::MAX_MATCH_STAKE - $servis->matchStakeUsed($owner, $match);
+        $c->set("selection.{$match->id}-brace", (string) $friend->id)
+            ->set("stake.{$match->id}-brace", $kalan)
+            ->call('bet', $match->id, 'brace');
+        $this->assertSame($K::MAX_MATCH_STAKE, $servis->matchStakeUsed($owner, $match));
 
         // Limit dolunca yeni kupon reddedilir, bakiye değişmez
         $bakiye = $owner->refresh()->cim_balance;
@@ -2543,7 +2618,7 @@ class KadroFlowTest extends TestCase
             ->assertSet('notice', fn ($v) => str_contains((string) $v, 'limitini doldurdun'));
         $this->assertSame($bakiye, $owner->refresh()->cim_balance);
 
-        // İade edilen (void) kupon limitten düşmez: friend kadrodan çıkınca scorer/mvp iade
+        // İade edilen (void) kupon limitten düşmez: friend kadrodan çıkınca scorer/brace/mvp iade
         $match->setRsvp($friend, 'not_going');
         $this->assertSame(100, $servis->matchStakeUsed($owner, $match));
     }
@@ -2595,11 +2670,13 @@ class KadroFlowTest extends TestCase
         $yedekOrani = $oran($yedekKaleci);
         $sahaOrani = $oran($sahaOyunculari[0]);
 
-        // Asıl kaleci favori, yedek arada, kaleye geçmeyen tavanda
+        // Asıl kaleci favori; yedek kaleci ve kaleye geçmeyen ondan uzun. Öznel market
+        // tavanı (6×) yüzünden yedek ile saha oyuncusu aynı tavana takılabilir.
         $this->assertLessThan($yedekOrani, $kaleciOrani);
-        $this->assertLessThan($sahaOrani, $yedekOrani);
+        $this->assertLessThanOrEqual($sahaOrani, $yedekOrani);
         $this->assertLessThan(3.5, $kaleciOrani, 'Asıl kaleci kısa oranlı olmalı');
-        $this->assertSame(\App\Support\Kehanet::maxOdds('kurtaris'), $sahaOrani);
+        $this->assertSame(\App\Support\Kehanet::MAX_ODDS_SUBJECTIVE, $sahaOrani);
+        $this->assertSame(\App\Support\Kehanet::MAX_ODDS_SUBJECTIVE, \App\Support\Kehanet::maxOdds('kurtaris'));
 
         // Pozisyon ağırlığı yalnızca 'prior' tanımlı market'lere uygulanır:
         // diğer olaylarda (örn. günün çalımı) veri yokken herkes hâlâ eşit
@@ -2824,6 +2901,7 @@ class KadroFlowTest extends TestCase
             $match->rsvps()->create(['player_id' => $p->id, 'status' => 'going', 'team' => 'A']);
         }
         $match->mvpVotes()->create(['voter_id' => $owner->id, 'player_id' => $yildiz->id]);
+        $this->extraMvpVotes($match, $yildiz, 2);   // en az 3 oy veren — yoksa iade
 
         $kupon = \App\Models\Prediction::create([
             'user_id' => $owner->id, 'match_id' => $match->id, 'market_key' => 'mvp',

@@ -81,8 +81,11 @@ class KehanetService
             return ['ok' => false, 'message' => 'Bu maç için kupon kapandı.'];
         }
 
-        if ($stake < Kehanet::MIN_STAKE || $stake > Kehanet::MAX_STAKE) {
-            return ['ok' => false, 'message' => 'Tutar '.Kehanet::MIN_STAKE.'-'.Kehanet::MAX_STAKE.' Çim arasında olmalı.'];
+        $ust = Kehanet::maxStake($market);   // öznel market'lerde daha düşük
+
+        if ($stake < Kehanet::MIN_STAKE || $stake > $ust) {
+            return ['ok' => false, 'message' => 'Tutar '.Kehanet::MIN_STAKE.'-'.$ust.' Çim arasında olmalı'
+                .(Kehanet::isSubjective($market) ? ' (öznel tahminlerde en fazla '.$ust.').' : '.')];
         }
 
         // Kendi hakkında tahmin yapılamaz (takım market'leri serbest)
@@ -288,6 +291,31 @@ class KehanetService
     }
 
     /**
+     * Oylama penceresi kapanmış maçta MVP / performans market'leri için yeterli
+     * katılım olmadı mı? (Kehanet::MIN_VOTERS_SUBJECTIVE farklı kişiden az)
+     * Pencere sürüyorsa false — henüz karar verilmez. Performans puanı, kuponla
+     * aynı kuralla yalnızca pencere içinde verilenler sayılır.
+     *
+     * @return array{mvp: bool, top_perf: bool}
+     */
+    protected function tooFewVoters(FootballMatch $match): array
+    {
+        if ($match->mvpOpen()) {
+            return ['mvp' => false, 'top_perf' => false];
+        }
+
+        $mvpKisi = $match->mvpVotes()->distinct()->count('voter_id');
+        $perfKisi = $match->performanceRatings()
+            ->when($match->mvp_closes_at, fn ($q, $kapanis) => $q->where('created_at', '<=', $kapanis))
+            ->distinct()->count('rater_id');
+
+        return [
+            'mvp' => $mvpKisi < Kehanet::MIN_VOTERS_SUBJECTIVE,
+            'top_perf' => $perfKisi < Kehanet::MIN_VOTERS_SUBJECTIVE,
+        ];
+    }
+
+    /**
      * Maçın bekleyen kuponlarını sonuçlandırır.
      * Sonucu henüz belli olmayan market'ler (başkan işaretlemediyse) beklemede kalır.
      */
@@ -304,7 +332,23 @@ class KehanetService
         $sayac = 0;
         $kazananlar = []; // [user_id => toplam net kazanç] → bildirim için
 
+        $azOylu = $this->tooFewVoters($match);   // ['mvp' => bool, 'top_perf' => bool]
+
         foreach (Prediction::where('match_id', $match->id)->where('status', 'pending')->get() as $kupon) {
+            // MVP / performans: oylama kapandı ama sonucu birkaç kişi belirledi → iade
+            if ($azOylu[$kupon->market_key] ?? false) {
+                $kupon->update(['status' => 'void', 'payout' => $kupon->stake, 'settled_at' => now()]);
+
+                if ($kupon->slip_id === null) {
+                    $this->adjustBalance($kupon->user_id, $kupon->stake, 'refund', 'Yeterli oy yok — '.Kehanet::label($kupon->market_key));
+                } else {
+                    $this->voidSlip($kupon->slip, 'Yeterli oy yok');
+                }
+                $sayac++;
+
+                continue;
+            }
+
             $tuttu = $this->evaluate($match, $kupon->market_key, $kupon->selection);
 
             if ($tuttu === null) {

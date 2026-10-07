@@ -19,6 +19,19 @@ class Announcements
     {
         return [
             [
+                'id' => 'kehanet-limitler-2026-10',
+                'title' => '📢 Kehanet limitleri güncellendi',
+                'until' => '2026-10-21',
+                'link' => 'kehanet',
+                'lines' => [
+                    '⬆️ Tekli kupon en fazla '.K::MAX_STAKE.' Çim, kombine '.K::MAX_PARLAY_STAKE.' Çim, maç başına toplam '
+                        .number_format(K::MAX_MATCH_STAKE, 0, ',', '.').' Çim',
+                    '🎭 Öznel tahminler (başkanın işaretlediği olaylar, MVP, en yüksek performans): en fazla '
+                        .K::MAX_STAKE_SUBJECTIVE.' Çim, oran en çok '.(int) K::MAX_ODDS_SUBJECTIVE.'×',
+                    '🗳️ MVP ve performans kuponunda 24 saatte '.K::MIN_VOTERS_SUBJECTIVE.' kişiden az oy/puan verilirse kupon iade edilir',
+                ],
+            ],
+            [
                 'id' => 'sezon-sistemi-2026-09',
                 'title' => '🏁 Sezonlar başladı',
                 'until' => '2026-10-20',

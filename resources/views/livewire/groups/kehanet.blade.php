@@ -31,7 +31,8 @@
                 Her hafta <strong class="text-pitch-ink">{{ K::WEEKLY_GRANT }} Çim</strong> hesabına yüklenir. Kuponlar <strong class="text-pitch-ink">kesindir</strong> — yapıldıktan sonra değiştirilemez veya iptal edilemez. Çim tamamen sanaldır; eğlence amaçlıdır, gerçek parayla ilişkisi yoktur.
             </p>
             <p class="text-[11px] text-pitch-muted mt-1.5">
-                📏 Limitler: tekli kupon {{ K::MIN_STAKE }}–{{ K::MAX_STAKE }} Çim ·
+                📏 Limitler: tekli kupon {{ K::MIN_STAKE }}–{{ K::MAX_STAKE }} Çim
+                (öznel tahminlerde — olaylar, MVP, performans — en fazla {{ K::MAX_STAKE_SUBJECTIVE }} Çim, oran ≤ {{ (int) K::MAX_ODDS_SUBJECTIVE }}×) ·
                 kombine en fazla {{ K::MAX_PARLAY_STAKE }} Çim, oran tavanı {{ (int) K::MAX_PARLAY_ODDS }}× ·
                 maç başına toplam {{ number_format(K::MAX_MATCH_STAKE) }} Çim
             </p>
@@ -264,7 +265,9 @@
                             @endphp
                             <div class="border border-pitch-line rounded-lg p-3">
                                 <div class="flex items-center justify-between gap-2 mb-2 flex-wrap">
-                                    <span class="text-sm font-semibold">{{ $market['icon'] }} {{ $market['name'] }}</span>
+                                    <span class="text-sm font-semibold">{{ $market['icon'] }} {{ $market['name'] }}
+                                        @if (K::isSubjective($key))<span class="ms-1 text-[10px] font-normal text-pitch-muted" title="Sonucu bir insan kararı belirler (başkanın işareti / oylama)">· öznel, en fazla {{ K::MAX_STAKE_SUBJECTIVE }} Çim</span>@endif
+                                    </span>
                                     @if ($mevcut)
                                         <span class="text-[11px] text-gold">✓ {{ $mevcut->selection }} · {{ $mevcut->stake }} Çim @ {{ $mevcut->odds }}×</span>
                                     @endif
@@ -283,7 +286,7 @@
                                     @if ($mevcut)
                                         <span class="text-xs text-gold">🔒 Kuponun kesinleşti — değiştirilemez.</span>
                                     @else
-                                        <input type="number" min="{{ K::MIN_STAKE }}" max="{{ K::MAX_STAKE }}" placeholder="20"
+                                        <input type="number" min="{{ K::MIN_STAKE }}" max="{{ K::maxStake($key) }}" placeholder="20"
                                                wire:model="stake.{{ $anahtar }}"
                                                class="w-24 text-sm bg-pitch-bg border-pitch-line text-pitch-ink rounded-md focus:border-bibB focus:ring-bibB/40">
                                         <span class="text-xs text-pitch-muted">Çim</span>
@@ -298,7 +301,9 @@
                         @elseif ($secenekler)
                             <div class="border border-pitch-line rounded-lg p-3">
                                 <div class="flex items-center justify-between gap-2 mb-2 flex-wrap">
-                                    <span class="text-sm font-semibold">{{ $market['icon'] }} {{ $market['name'] }}</span>
+                                    <span class="text-sm font-semibold">{{ $market['icon'] }} {{ $market['name'] }}
+                                        @if (K::isSubjective($key))<span class="ms-1 text-[10px] font-normal text-pitch-muted" title="Sonucu bir insan kararı belirler (başkanın işareti / oylama)">· öznel, en fazla {{ K::MAX_STAKE_SUBJECTIVE }} Çim</span>@endif
+                                    </span>
                                     @if ($mevcut)
                                         <span class="text-[11px] text-gold">
                                             ✓ {{ $this->selectionText($mevcut->market_key, $mevcut->selection) }} · {{ $mevcut->stake }} Çim @ {{ $mevcut->odds }}×
@@ -355,7 +360,7 @@
                                                     title="Kombineye ekle">🎰</button>
                                         @endif
                                     @else
-                                        <input type="number" min="{{ K::MIN_STAKE }}" max="{{ K::MAX_STAKE }}" placeholder="20"
+                                        <input type="number" min="{{ K::MIN_STAKE }}" max="{{ K::maxStake($key) }}" placeholder="20"
                                                wire:model="stake.{{ $anahtar }}"
                                                class="w-24 text-sm bg-pitch-bg border-pitch-line text-pitch-ink rounded-md focus:border-bibB focus:ring-bibB/40">
                                         <span class="text-xs text-pitch-muted">Çim</span>
