@@ -81,6 +81,22 @@ class Show extends Component
 
     public int $groupCapacity = 14;
 
+    /** Format (takım başına oyuncu, Attributes::TEAM_FORMATS); seçilince kapasiteyi doldurur. */
+    public int $groupFormat = 7;
+
+    public function updatedGroupFormat($value): void
+    {
+        if (array_key_exists((int) $value, \App\Support\Attributes::TEAM_FORMATS)) {
+            $this->groupCapacity = (int) $value * 2;
+        }
+    }
+
+    /** Kapasite elle değişirse format seçimi ona uyar. */
+    public function updatedGroupCapacity($value): void
+    {
+        $this->groupFormat = \App\Support\Attributes::teamSizeFor((int) $value);
+    }
+
     public bool $autoSchedule = false;
 
     public function mount(Group $group): void
@@ -93,6 +109,7 @@ class Show extends Component
         $this->matchTime = $group->match_time ? substr($group->match_time, 0, 5) : null;
         $this->defaultLocation = $group->default_location ?? '';
         $this->groupCapacity = (int) ($group->capacity ?? 14);
+        $this->groupFormat = \App\Support\Attributes::teamSizeFor($this->groupCapacity);
         $this->autoSchedule = (bool) $group->auto_schedule;
         $this->location = $group->default_location ?? '';
     }
@@ -433,6 +450,8 @@ class Show extends Component
             return;
         }
 
+        $eskiKapasite = (int) $this->group->capacity;
+
         $this->group->update([
             'match_day' => $this->matchDay,
             'match_time' => $this->matchTime,
@@ -440,6 +459,13 @@ class Show extends Component
             'capacity' => $this->groupCapacity,
             'auto_schedule' => $this->autoSchedule,
         ]);
+
+        // Format/kapasite değiştiyse henüz oynanmamış maçlar da yeni kapasiteye geçer
+        // (yedekten terfi / yedeğe inme; asıl liste değişirse kadro yeniden kurulur)
+        if ($eskiKapasite !== (int) $this->groupCapacity) {
+            $this->group->matches()->where('status', 'scheduled')->where('starts_at', '>=', now())->get()
+                ->each(fn ($mac) => $mac->changeCapacity((int) $this->groupCapacity));
+        }
 
         if ($this->autoSchedule) {
             $this->group->refresh();

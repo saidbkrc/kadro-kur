@@ -22,6 +22,20 @@
                                   placeholder="Her salı 21:00, Yıldız Halı Saha"></textarea>
                         <x-input-error :messages="$errors->get('description')" class="mt-2" />
                     </div>
+                    <div>
+                        <x-input-label value="Format" />
+                        <div class="mt-1 flex gap-2 flex-wrap">
+                            @foreach (\App\Support\Attributes::TEAM_FORMATS as $boyut => $etiket)
+                                <button type="button" wire:click="$set('format', {{ $boyut }})"
+                                        class="px-4 py-2 rounded-md border text-sm font-semibold transition
+                                               {{ $format === $boyut ? 'border-bibB bg-bibB/10 text-bibB' : 'border-pitch-line text-pitch-muted hover:bg-pitch-surface2' }}">
+                                    {{ $etiket }}
+                                </button>
+                            @endforeach
+                        </div>
+                        <p class="text-xs text-pitch-muted mt-1">Kadro kapasitesi ve saha dizilişi buna göre ayarlanır; sonradan grup ayarlarından değiştirebilirsin.</p>
+                        <x-input-error :messages="$errors->get('format')" class="mt-2" />
+                    </div>
                     <x-primary-button class="w-full sm:w-auto">Grubu Kur</x-primary-button>
                 </form>
             </div>

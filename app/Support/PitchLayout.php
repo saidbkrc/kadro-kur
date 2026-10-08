@@ -33,7 +33,7 @@ class PitchLayout
             return [];
         }
 
-        $nodes = ($formation !== null && in_array($formation, Attributes::FORMATIONS, true))
+        $nodes = Attributes::isFormation($formation)
             ? self::formationLayout($team, $side, $formation)
             : self::autoLayout($team, $side);
 

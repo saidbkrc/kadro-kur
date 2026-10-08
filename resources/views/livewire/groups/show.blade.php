@@ -88,8 +88,25 @@
                         </div>
                         <div>
                             <label for="groupCapacity" class="block font-semibold text-xs uppercase tracking-widest text-pitch-muted mb-1.5">Kapasite</label>
-                            <input wire:model="groupCapacity" id="groupCapacity" type="number" min="4" max="24" style="height:2.625rem" class="{{ $fieldClasses }}">
+                            <input wire:model.blur="groupCapacity" id="groupCapacity" type="number" min="4" max="24" style="height:2.625rem" class="{{ $fieldClasses }}">
                         </div>
+                    </div>
+                    {{-- Format: kapasiteyi doldurur; diziliş şablonları da buna göre değişir --}}
+                    <div>
+                        <span class="block font-semibold text-xs uppercase tracking-widest text-pitch-muted mb-1.5">Format</span>
+                        <div class="flex gap-2 flex-wrap">
+                            @foreach (\App\Support\Attributes::TEAM_FORMATS as $boyut => $etiket)
+                                <button type="button" wire:click="$set('groupFormat', {{ $boyut }})"
+                                        class="px-4 py-2 rounded-md border text-sm font-semibold transition
+                                               {{ $groupFormat === $boyut ? 'border-bibB bg-bibB/10 text-bibB' : 'border-pitch-line text-pitch-muted hover:bg-pitch-surface2' }}">
+                                    {{ $etiket }}
+                                </button>
+                            @endforeach
+                            @unless (array_key_exists($groupFormat, \App\Support\Attributes::TEAM_FORMATS))
+                                <span class="self-center text-xs text-pitch-muted">Özel kapasite ({{ $groupCapacity }}) — diziliş yalnızca otomatik</span>
+                            @endunless
+                        </div>
+                        <p class="text-xs text-pitch-muted mt-1.5">Değiştirirsen henüz oynanmamış maçlar da yeni kapasiteye geçer (yedekten terfi / yedeğe inme).</p>
                     </div>
                     <label class="flex items-center gap-2 text-sm">
                         <input type="checkbox" wire:model="autoSchedule"

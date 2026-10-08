@@ -313,7 +313,8 @@ class Show extends Component
         abort_unless($this->match->canManage(Auth::user()), 403);
         abort_unless(in_array($side, ['a', 'b'], true), 400);
 
-        $formation = in_array($value, Attributes::FORMATIONS, true) ? $value : null;
+        // Yalnızca maçın formatına (kapasitesine) uyan şablonlar; diğerleri "otomatik"
+        $formation = in_array($value, Attributes::formationsFor((int) $this->match->capacity), true) ? $value : null;
 
         // O takımın elle verilen konumları sıfırlanır
         $teamIds = $this->match->rsvps()->where('team', strtoupper($side))->pluck('player_id');

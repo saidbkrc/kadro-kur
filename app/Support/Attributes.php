@@ -13,7 +13,42 @@ class Attributes
     /** Tercih edilen ayak — saha dizilişinde kanat yerleşimini belirler. */
     public const FEET = ['right' => 'Sağ ayak', 'left' => 'Sol ayak', 'both' => 'Çift ayak'];
 
+    /** 7v7 (6 saha oyuncusu + kaleci) şablonları — geriye dönük ad; tümü için FORMATIONS_BY_SIZE. */
     public const FORMATIONS = ['3-1-2', '3-2-1', '2-3-1', '2-2-2', '2-1-3'];
+
+    /**
+     * Maç formatları: takım başına oyuncu (kaleci dahil) => etiket. Format ayrı
+     * saklanmaz, kapasiteden türer (kapasite = 2 × takım büyüklüğü). Yeni format
+     * eklemek için buraya ve FORMATIONS_BY_SIZE'a bir satır yeterli.
+     */
+    public const TEAM_FORMATS = [
+        7 => '7v7 (6+1)',
+        8 => '8v8 (7+1)',
+    ];
+
+    /** Takım büyüklüğüne göre diziliş şablonları (defans-orta-forvet; toplam = saha oyuncusu). */
+    public const FORMATIONS_BY_SIZE = [
+        7 => self::FORMATIONS,
+        8 => ['3-3-1', '3-2-2', '2-3-2', '3-1-3', '2-4-1'],
+    ];
+
+    /** Kapasiteden takım büyüklüğü (tek sayıda kapasitede küçük taraf). */
+    public static function teamSizeFor(int $capacity): int
+    {
+        return intdiv(max(0, $capacity), 2);
+    }
+
+    /** Kapasiteye uyan diziliş şablonları; tanımlı format değilse boş (yalnızca otomatik). */
+    public static function formationsFor(int $capacity): array
+    {
+        return self::FORMATIONS_BY_SIZE[self::teamSizeFor($capacity)] ?? [];
+    }
+
+    /** Herhangi bir formatta geçerli şablon mu? (kayıtlı dizilişi okurken) */
+    public static function isFormation(?string $value): bool
+    {
+        return $value !== null && in_array($value, array_merge(...array_values(self::FORMATIONS_BY_SIZE)), true);
+    }
 
     /** Genel özellikler — kaleciler dahil herkes için listelenir. */
     public const GENERAL = [

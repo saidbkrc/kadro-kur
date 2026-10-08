@@ -1769,6 +1769,77 @@ class KadroFlowTest extends TestCase
         $this->travelBack();
     }
 
+    public function test_sekize_sekiz_format_grup_kurma_ayar_ve_dizilis(): void
+    {
+        $owner = User::factory()->create();
+
+        // Yeni grup 8v8 kurulur → kapasite 16
+        Livewire::actingAs($owner)->test(Groups\Index::class)
+            ->set('name', 'Sekizli Grup')->set('format', 8)->call('create');
+        $sekizli = Group::where('name', 'Sekizli Grup')->firstOrFail();
+        $this->assertSame(16, (int) $sekizli->capacity);
+
+        // Mevcut 7v7 grup: 14 asıl + 2 yedekli yaklaşan maç
+        $group = $this->makeGroup($owner);
+        $group->update(['capacity' => 14]);
+        $match = $this->makeMatch($group);
+        $match->update(['capacity' => 14]);
+        $oyuncular = collect([$group->playerFor($owner)])->merge(collect(range(1, 16))->map(fn () => $this->addMember($group)));
+        foreach ($oyuncular as $i => $p) {
+            $this->travelTo(now()->addMinute());   // katılım sırası belli olsun
+            $match->setRsvp($p, 'going');
+        }
+        $this->travelBack();
+        $this->assertSame(14, $match->confirmedCount());
+
+        // Ayarlardan 8v8: kapasite 16, yaklaşan maçta yedekteki 2 kişi asıl listeye geçer
+        Livewire::actingAs($owner)->test(Groups\Show::class, ['group' => $group])
+            ->set('showSettings', true)
+            ->assertSee('8v8 (7+1)')
+            ->set('groupFormat', 8)
+            ->assertSet('groupCapacity', 16)
+            ->call('saveSettings');
+        $this->assertSame(16, (int) $group->fresh()->capacity);
+        $match->refresh();
+        $this->assertSame(16, (int) $match->capacity);
+        $this->assertSame(16, $match->confirmedCount());
+        $this->assertSame(1, $match->rsvps()->whereNotNull('waitlist_position')->count());
+
+        // 8v8 şablonları geçerli, 7v7 şablonu bu maçta reddedilir (otomatiğe düşer)
+        $c = Livewire::actingAs($owner)->test(Matches\Show::class, ['match' => $match]);
+        $c->call('setFormation', 'a', '3-3-1');
+        $this->assertSame('3-3-1', $match->fresh()->formation_a);
+        $c->call('setFormation', 'a', '3-1-2');
+        $this->assertNull($match->fresh()->formation_a);
+
+        // 16 kişiyle kadro kurulur: 8'e 8, saha başlığında format
+        $c->call('buildSquads');
+        $this->assertSame(8, $match->rsvps()->where('team', 'A')->count());
+        $this->assertSame(8, $match->rsvps()->where('team', 'B')->count());
+        $c->call('setFormation', 'a', '3-3-1');
+        $this->actingAs($owner)->get(route('matches.show', $match))->assertOk()->assertSee('8v8 (7+1)');
+
+        // 8v8 diziliş: 1 kaleci + 3 defans + 3 orta + 1 forvet hattı
+        $dugum = fn ($id, $poz) => ['id' => $id, 'name' => "O$id", 'number' => null, 'ovr' => 7.0, 'attrs' => [], 'positions' => [$poz]];
+        $dizilis = collect(\App\Support\PitchLayout::layout([
+            $dugum(1, 'KL'), $dugum(2, 'DEF'), $dugum(3, 'DEF'), $dugum(4, 'DEF'),
+            $dugum(5, 'OS'), $dugum(6, 'OS'), $dugum(7, 'OS'), $dugum(8, 'FV'),
+        ], 'A', '3-3-1'));
+        $this->assertSame([1, 3, 3, 1], $dizilis->groupBy('x')->sortKeys()->map->count()->values()->all());
+
+        // Geri 7v7: asıl listeye en son katılan 2 kişi yedeğin başına iner, eski yedek 3. sıraya
+        $eskiYedek = $match->rsvps()->whereNotNull('waitlist_position')->value('player_id');
+        $sonGelenler = $match->rsvps()->where('status', 'going')->whereNull('waitlist_position')
+            ->orderByDesc('created_at')->orderByDesc('id')->take(2)->pluck('player_id')->sort()->values()->all();
+        Livewire::actingAs($owner)->test(Groups\Show::class, ['group' => $group])
+            ->set('showSettings', true)->set('groupFormat', 7)->call('saveSettings');
+        $match->refresh();
+        $this->assertSame(14, $match->confirmedCount());
+        $this->assertSame($sonGelenler, $match->rsvps()->whereIn('waitlist_position', [1, 2])->pluck('player_id')->sort()->values()->all());
+        $this->assertSame(3, (int) $match->rsvps()->where('player_id', $eskiYedek)->value('waitlist_position'));
+        $this->assertSame('none', $match->squad_status, 'Asıl liste değişti → kadro sıfırlandı');
+    }
+
     public function test_mac_sayfasi_bolum_sirasi(): void
     {
         $owner = User::factory()->create();

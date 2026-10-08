@@ -167,6 +167,52 @@ class FootballMatch extends Model
         });
     }
 
+    /**
+     * Kapasiteyi değiştirir (ör. grup 7v7 → 8v8) ve listeleri yeniden akıtır:
+     *  - arttıysa: yedek listesinden sırayla asıl listeye terfi
+     *  - azaldıysa: asıl listeye en son katılanlar yedeğin BAŞINA iner (mevcut
+     *    yedeklerden önce gelmişlerdi)
+     * Asıl liste değişirse kurulmuş kadro sıfırlanır ve kadrodan çıkanların
+     * kuponları iade edilir (setRsvp ile aynı kural).
+     */
+    public function changeCapacity(int $capacity): void
+    {
+        DB::transaction(function () use ($capacity) {
+            $this->rsvps()->lockForUpdate()->get();
+            $mainBefore = $this->mainListPlayerIds();
+
+            $this->update(['capacity' => $capacity]);
+
+            $fazla = $this->confirmedCount() - $capacity;
+
+            if ($fazla > 0) {
+                // En son katılanlar (aynı anda katılanlarda en büyük id) yedeğe iner
+                $inenler = $this->rsvps()->where('status', 'going')->whereNull('waitlist_position')
+                    ->orderByDesc('created_at')->orderByDesc('id')->take($fazla)->get()
+                    ->reverse()->values();   // aralarında önce gelen öne
+
+                $this->rsvps()->where('status', 'going')->whereNotNull('waitlist_position')
+                    ->increment('waitlist_position', $fazla);
+
+                foreach ($inenler as $i => $rsvp) {
+                    $rsvp->update(['waitlist_position' => $i + 1, 'team' => null]);
+                }
+            } else {
+                for ($bos = -$fazla; $bos > 0; $bos--) {
+                    $this->promoteFirstWaitlisted();
+                }
+            }
+
+            if ($mainBefore !== $this->mainListPlayerIds()) {
+                if ($this->squad_status !== 'none') {
+                    $this->resetSquad();
+                }
+
+                app(\App\Services\KehanetService::class)->voidBetsForMissingPlayers($this);
+            }
+        });
+    }
+
     protected function mainListPlayerIds(): array
     {
         return $this->rsvps()

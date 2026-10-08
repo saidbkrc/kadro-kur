@@ -399,13 +399,17 @@
                     sec(v) { this.forma = v; try { localStorage.setItem('saha-sekil', v ? 'forma' : 'yuvarlak'); } catch (e) {} },
                  }">
                 <div class="flex items-center gap-4 flex-wrap">
-                    <h3 class="font-display uppercase tracking-wider text-lg font-semibold">Saha Dizilişi</h3>
+                    <h3 class="font-display uppercase tracking-wider text-lg font-semibold">
+                        Saha Dizilişi
+                        @php $format = Attributes::TEAM_FORMATS[Attributes::teamSizeFor((int) $match->capacity)] ?? null; @endphp
+                        @if ($format)<span class="ms-1 text-xs font-normal tracking-normal text-pitch-muted normal-case">· {{ $format }}</span>@endif
+                    </h3>
                     @if ($canManage)
                         <label class="inline-flex items-center gap-2 text-sm font-semibold text-bibA">🟠 Turuncu
                             <select wire:change="setFormation('a', $event.target.value)"
                                     class="bg-pitch-bg border-pitch-line text-pitch-ink rounded-md text-sm focus:border-bibB focus:ring-bibB/40">
                                 <option value="auto" @selected($match->formation_a === null)>Otomatik</option>
-                                @foreach (Attributes::FORMATIONS as $f)
+                                @foreach (Attributes::formationsFor((int) $match->capacity) as $f)
                                     <option value="{{ $f }}" @selected($match->formation_a === $f)>{{ $f }}</option>
                                 @endforeach
                             </select>
@@ -414,7 +418,7 @@
                             <select wire:change="setFormation('b', $event.target.value)"
                                     class="bg-pitch-bg border-pitch-line text-pitch-ink rounded-md text-sm focus:border-bibB focus:ring-bibB/40">
                                 <option value="auto" @selected($match->formation_b === null)>Otomatik</option>
-                                @foreach (Attributes::FORMATIONS as $f)
+                                @foreach (Attributes::formationsFor((int) $match->capacity) as $f)
                                     <option value="{{ $f }}" @selected($match->formation_b === $f)>{{ $f }}</option>
                                 @endforeach
                             </select>

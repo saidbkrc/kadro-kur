@@ -17,12 +17,23 @@ class Index extends Component
 
     public string $description = '';
 
+    /** Takım başına oyuncu (Attributes::TEAM_FORMATS) — grubun kapasitesini belirler. */
+    public int $format = 7;
+
+    public function mount(): void
+    {
+        // Panel varsayılanı tanımlı bir formata denk geliyorsa onunla başla
+        $varsayilan = \App\Support\Attributes::teamSizeFor(\App\Models\Setting::int('default_capacity', 14));
+        $this->format = array_key_exists($varsayilan, \App\Support\Attributes::TEAM_FORMATS) ? $varsayilan : 7;
+    }
+
     public function create()
     {
         $this->validate(
             [
                 'name' => 'required|string|min:3|max:50',
                 'description' => 'nullable|string|max:500',
+                'format' => 'required|in:'.implode(',', array_keys(\App\Support\Attributes::TEAM_FORMATS)),
             ],
             [
                 'name.required' => 'Grup adı zorunlu.',
@@ -36,7 +47,7 @@ class Index extends Component
             'owner_id' => Auth::id(),
             'name' => $this->name,
             'description' => $this->description !== '' ? $this->description : null,
-            'capacity' => \App\Models\Setting::int('default_capacity', 14),
+            'capacity' => $this->format * 2,
         ]);
 
         $group->members()->attach(Auth::id(), ['role' => 'owner']);
