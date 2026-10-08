@@ -2444,6 +2444,52 @@ class KadroFlowTest extends TestCase
         $this->travelBack();
     }
 
+    public function test_ayni_markette_kombine_ve_iade_sonrasi_tekli_kupon_yapilabilir(): void
+    {
+        // Canlıda "Duplicate entry ... predictions_user_id_match_id_market_key_unique":
+        // tekillik MySQL'de kaldırılamamıştı (FK index'i). Kural uygulama katmanında.
+        $this->assertFalse(\Illuminate\Support\Facades\Schema::hasIndex('predictions', 'predictions_user_id_match_id_market_key_unique'));
+        $this->assertTrue(\Illuminate\Support\Facades\Schema::hasIndex('predictions', 'predictions_user_id_index'), 'user_id FK index\'i');
+
+        $owner = User::factory()->create();
+        $group = $this->makeGroup($owner);
+        $ben = $group->playerFor($owner);
+        [$ali, $veli] = [$this->addMember($group), $this->addMember($group)];
+        $owner->forceFill(['cim_balance' => 3000, 'cim_granted_at' => now()])->save();
+
+        $match = $this->makeMatch($group);
+        foreach ([$ben, $ali, $veli] as $p) {
+            $match->setRsvp($p, 'going');
+        }
+
+        $c = Livewire::actingAs($owner)->test(Groups\Kehanet::class, ['group' => $group]);
+
+        // 1) Kombinede gol yemeyen takım = A; aynı market'e tekli kupon da yapılabilmeli
+        $c->call('toggleParlay', $match->id, 'clean_sheet', 'A')
+            ->call('toggleParlay', $match->id, 'winner', 'A')
+            ->set('parlayStake', 20)->call('placeParlay');
+        $c->set("selection.{$match->id}-clean_sheet", 'A')
+            ->set("stake.{$match->id}-clean_sheet", 30)
+            ->call('bet', $match->id, 'clean_sheet');
+        $this->assertSame(2, \App\Models\Prediction::where('market_key', 'clean_sheet')->count());
+
+        // Aynı market'e ikinci tekli hâlâ yasak (uygulama kuralı)
+        $c->call('bet', $match->id, 'clean_sheet')
+            ->assertSet('notice', fn ($v) => str_contains((string) $v, 'zaten var'));
+
+        // 2) Kadro değişince iade edilen kupondan sonra aynı market'e yeniden kupon
+        $c->set("selection.{$match->id}-scorer", (string) $ali->id)
+            ->set("stake.{$match->id}-scorer", 25)
+            ->call('bet', $match->id, 'scorer');
+        $match->setRsvp($ali, 'not_going');
+        $this->assertSame('void', \App\Models\Prediction::where('market_key', 'scorer')->value('status'));
+
+        $c->set("selection.{$match->id}-scorer", (string) $veli->id)
+            ->set("stake.{$match->id}-scorer", 25)
+            ->call('bet', $match->id, 'scorer');
+        $this->assertSame(1, \App\Models\Prediction::where('market_key', 'scorer')->where('status', 'pending')->count());
+    }
+
     public function test_az_oyla_mvp_ve_performans_kuponu_iade_edilir(): void
     {
         Notification::fake();
