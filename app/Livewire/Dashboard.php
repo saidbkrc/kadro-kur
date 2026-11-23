@@ -42,15 +42,56 @@ class Dashboard extends Component
             ->get()
             ->keyBy('match_id');
 
+        $mainGroup = $user->groups()->orderBy('name')->first();
+
         return view('livewire.dashboard', [
             'cimBalance' => $user->cim_balance,
-            'kehanetGroup' => $user->groups()->orderBy('name')->first(),
+            'kehanetGroup' => $mainGroup,
+            'mainGroup' => $mainGroup,
+            ...$this->lastMatchCard($groupIds),
+            'formPlayers' => $this->formPlayers($mainGroup),
             'upcoming' => $upcoming,
             'myRsvps' => $myRsvps,
             'groups' => $user->groups()->withCount('members')->orderBy('name')->get(),
             'stats' => $this->personalStats($playerIds),
             'pending' => $this->pendingActions($user, $groupIds, $upcoming, $myRsvps),
         ]);
+    }
+
+    /** Kullanıcının gruplarındaki en son oynanmış maç + (oylama kapandıysa) MVP'si. */
+    protected function lastMatchCard($groupIds): array
+    {
+        $lastMatch = FootballMatch::with('group')
+            ->whereIn('group_id', $groupIds)
+            ->where('status', 'completed')
+            ->orderByDesc('starts_at')
+            ->first();
+
+        $mvpName = null;
+        if ($lastMatch && ! $lastMatch->mvpOpen()) {
+            $top = $lastMatch->mvpVotes()
+                ->selectRaw('player_id, count(*) as c')
+                ->groupBy('player_id')
+                ->orderByDesc('c')
+                ->first();
+            $mvpName = $top ? $lastMatch->group->players()->find($top->player_id)?->name : null;
+        }
+
+        return ['lastMatch' => $lastMatch, 'lastMvpName' => $mvpName];
+    }
+
+    /** Ana gruptaki puanı açık oyuncular, nihai puana göre ilk 3 (oyuncu kartı şeridi). */
+    protected function formPlayers($group)
+    {
+        if (! $group) {
+            return collect();
+        }
+
+        return $group->players()->get()
+            ->filter(fn ($p) => $p->overallIsPublic())
+            ->sortByDesc(fn ($p) => $p->displayRating())
+            ->take(3)
+            ->values();
     }
 
     /** Kullanıcının tüm gruplardaki kişisel istatistikleri. */

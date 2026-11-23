@@ -1,14 +1,14 @@
-<div class="py-10">
+<div class="py-6 sm:py-10">
     <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 space-y-6">
         <div class="flex items-center justify-between">
-            <h2 class="font-display uppercase tracking-wider text-2xl font-bold">Gruplarım</h2>
+            <h2 class="font-display uppercase tracking-wide text-3xl sm:text-4xl font-extrabold leading-none">Gruplarım</h2>
             <x-secondary-button wire:click="$toggle('showForm')">
                 {{ $showForm ? 'Vazgeç' : '+ Yeni Grup' }}
             </x-secondary-button>
         </div>
 
         @if ($showForm)
-            <div class="bg-pitch-surface border border-pitch-line rounded-xl">
+            <div class="bg-pitch-surface border border-pitch-line rounded-3xl">
                 <form wire:submit="create" class="p-6 space-y-4">
                     <div>
                         <x-input-label for="name" value="Grup adı" />
@@ -43,24 +43,25 @@
 
         @forelse ($groups as $group)
             <a href="{{ route('groups.show', $group) }}" wire:navigate
-               class="block bg-pitch-surface border border-pitch-line rounded-xl hover:bg-pitch-surface2 transition">
-                <div class="p-6 flex items-center justify-between">
-                    <div>
-                        <div class="font-semibold text-lg">{{ $group->name }}</div>
-                        @if ($group->description)
-                            <div class="text-sm text-pitch-muted mt-1">{{ $group->description }}</div>
-                        @endif
-                    </div>
-                    <div class="text-sm text-pitch-muted shrink-0 ms-4">
-                        {{ $group->members_count }} üye
-                        @if ($group->owner_id === auth()->id())
-                            <span class="ms-2 inline-flex px-2 py-0.5 rounded text-xs font-medium bg-gold/15 text-gold">Başkan</span>
-                        @endif
-                    </div>
-                </div>
+               class="flex items-center gap-4 bg-pitch-surface border border-pitch-line rounded-3xl p-4 sm:p-5 hover:border-bibB/50 transition">
+                <span class="w-14 h-14 shrink-0 rounded-2xl bg-bibB/10 text-bibB flex items-center justify-center font-display text-3xl font-extrabold">
+                    {{ mb_strtoupper(mb_substr($group->name, 0, 1)) }}
+                </span>
+                <span class="min-w-0 flex-1">
+                    <span class="block font-display uppercase tracking-wide text-xl font-extrabold truncate">{{ $group->name }}</span>
+                    @if ($group->description)
+                        <span class="block text-sm text-pitch-muted truncate">{{ $group->description }}</span>
+                    @endif
+                </span>
+                <span class="text-sm text-pitch-muted shrink-0 text-end">
+                    {{ $group->members_count }} üye
+                    @if ($group->owner_id === auth()->id())
+                        <span class="block mt-1 px-2 py-0.5 rounded-full text-xs font-semibold bg-gold/15 text-gold">Başkan</span>
+                    @endif
+                </span>
             </a>
         @empty
-            <div class="bg-pitch-surface border border-dashed border-pitch-line rounded-xl">
+            <div class="bg-pitch-surface border border-dashed border-pitch-line rounded-3xl">
                 <div class="p-8 text-center text-pitch-muted">
                     Henüz bir grubun yok.<br><strong class="text-pitch-ink">Yeni Grup</strong> ile ilk grubunu kur, davet linkini arkadaşlarına gönder. ⚽
                 </div>

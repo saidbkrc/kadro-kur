@@ -4,39 +4,89 @@
     $tier = fn (float $o) => $o >= 8 ? 'text-gold' : ($o >= 6.5 ? 'text-[#7DE39A]' : ($o >= 5 ? 'text-pitch-ink' : 'text-pitch-muted'));
 @endphp
 
-<div class="py-10">
+<div class="py-6 sm:py-10">
     <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 space-y-6">
 
         <x-group-nav :group="$group" :active="$match->status === 'scheduled' ? 'match' : ($match->status === 'completed' ? 'last' : null)" />
 
-        {{-- Maç bilgisi --}}
-        <div class="bg-pitch-surface border border-pitch-line rounded-xl p-6 space-y-3">
-            <div class="flex items-start justify-between gap-4">
-                <div>
-                    <a href="{{ route('groups.show', $group) }}" wire:navigate class="text-sm text-bibB hover:underline">← {{ $group->name }}</a>
-                    <h2 class="font-display uppercase tracking-wider text-2xl font-bold mt-1">{{ $match->title }}</h2>
-                    <p class="text-pitch-muted mt-1">
-                        📅 {{ $match->starts_at->translatedFormat('d F Y, l H:i') }}
-                        @if ($match->location) · 📍 {{ $match->location }} @endif
-                    </p>
-                    @if ($match->status === 'completed' && $match->result_edited_at)
-                        <p class="text-xs text-pitch-muted mt-1">✏️ Sonuç sonradan düzenlendi — {{ $match->result_edited_at->translatedFormat('d F H:i') }}{{ $match->resultEditor ? ', '.$match->resultEditor->name : '' }}</p>
-                    @endif
+        {{-- Maç bilgisi: skorbord --}}
+        <div class="bg-pitch-surface border border-pitch-line rounded-3xl p-5 sm:p-6 space-y-4">
+            <div class="flex items-center gap-3">
+                <a href="{{ route('groups.show', $group) }}" wire:navigate aria-label="{{ $group->name }} grubuna dön"
+                   class="w-11 h-11 shrink-0 rounded-xl bg-pitch-surface2 border border-pitch-line flex items-center justify-center hover:border-pitch-muted/60 transition">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 18l-6-6 6-6"/></svg>
+                </a>
+                <div class="min-w-0 flex-1">
+                    <div class="text-xs text-pitch-muted truncate">{{ $group->name }}</div>
+                    <h2 class="font-display uppercase tracking-wide text-2xl sm:text-3xl font-extrabold leading-none truncate">{{ $match->title }}</h2>
                 </div>
-                <div class="shrink-0 text-end">
-                    @if ($match->status === 'scheduled')
-                        <div class="font-display text-3xl font-bold {{ $going->count() >= $match->capacity ? 'text-bibA' : '' }}">
-                            {{ $going->count() }}/{{ $match->capacity }}
-                        </div>
-                        <div class="text-xs tracking-[.2em] text-pitch-muted">KADRO</div>
-                    @elseif ($match->status === 'completed')
-                        <div class="font-display text-3xl font-bold"><span class="text-bibA">{{ $match->team_a_score }}</span> : <span class="text-bibB">{{ $match->team_b_score }}</span></div>
-                        <div class="text-xs tracking-[.2em] text-pitch-muted">TURUNCU : YEŞİL</div>
-                    @else
-                        <span class="inline-flex px-2.5 py-1 rounded text-sm font-medium bg-red-500/15 text-[#FF8A8A]">İptal edildi</span>
-                    @endif
-                </div>
+                @if ($match->status === 'scheduled')
+                    <span class="shrink-0 font-display uppercase tracking-wider text-xs font-bold px-2.5 py-1.5 rounded-lg
+                                 {{ $match->squad_status === 'approved' ? 'bg-bibB/15 text-bibB' : ($match->squad_status === 'voting' ? 'bg-gold/15 text-gold' : 'bg-pitch-surface2 text-pitch-muted') }}">
+                        {{ $match->squad_status === 'approved' ? 'Kadro hazır' : ($match->squad_status === 'voting' ? 'Oylamada' : 'Katılım') }}
+                    </span>
+                @elseif ($match->status === 'completed')
+                    <span class="shrink-0 font-display uppercase tracking-wider text-xs font-bold px-2.5 py-1.5 rounded-lg bg-pitch-surface2 text-pitch-muted">Bitti</span>
+                @else
+                    <span class="shrink-0 inline-flex px-2.5 py-1 rounded-lg text-sm font-medium bg-red-500/15 text-[#FF8A8A]">İptal edildi</span>
+                @endif
             </div>
+
+            @if ($match->status === 'completed')
+                <div class="flex items-stretch rounded-2xl bg-pitch-bg/60 overflow-hidden">
+                    <span class="w-1.5 bg-bibA"></span>
+                    <div class="flex-1 px-4 py-3">
+                        <div class="font-display uppercase tracking-wider text-sm font-bold text-bibA">Turuncu</div>
+                        <div class="font-display text-6xl font-extrabold leading-none">{{ $match->team_a_score }}</div>
+                    </div>
+                    <div class="flex items-center font-display text-3xl font-bold text-pitch-muted">:</div>
+                    <div class="flex-1 px-4 py-3 text-end">
+                        <div class="font-display uppercase tracking-wider text-sm font-bold text-bibB">Yeşil</div>
+                        <div class="font-display text-6xl font-extrabold leading-none">{{ $match->team_b_score }}</div>
+                    </div>
+                    <span class="w-1.5 bg-bibB"></span>
+                </div>
+            @elseif ($match->status === 'scheduled')
+                @php $cap = max(1, (int) $match->capacity); $filled = min($cap, $going->count()); @endphp
+                <div>
+                    @if ($cap <= 24)
+                        <div class="grid gap-[3px]" style="grid-template-columns: repeat({{ $cap }}, minmax(0, 1fr))">
+                            @for ($i = 0; $i < $cap; $i++)
+                                <div class="h-2 rounded-sm {{ $i < $filled ? 'bg-bibB' : 'bg-pitch-line' }}"></div>
+                            @endfor
+                        </div>
+                    @else
+                        <div class="h-2 rounded-full bg-pitch-line overflow-hidden"><div class="h-full bg-bibB" style="width: {{ round($filled / $cap * 100) }}%"></div></div>
+                    @endif
+                    <div class="flex justify-between text-sm mt-1.5">
+                        <span><strong class="font-display text-lg {{ $going->count() >= $match->capacity ? 'text-bibA' : '' }}">{{ $going->count() }}/{{ $match->capacity }}</strong> <span class="text-pitch-muted">kadro</span></span>
+                        @if ($waitlist->count() > 0)<span class="text-gold">{{ $waitlist->count() }} yedek</span>@endif
+                    </div>
+                </div>
+            @endif
+
+            <p class="text-sm text-pitch-ink/80">
+                {{ $match->starts_at->translatedFormat('d F Y, l · H:i') }}
+                @if ($match->location) · {{ $match->location }} @endif
+            </p>
+            @if ($match->status === 'completed' && $match->result_edited_at)
+                <p class="text-xs text-pitch-muted">✏️ Sonuç sonradan düzenlendi — {{ $match->result_edited_at->translatedFormat('d F H:i') }}{{ $match->resultEditor ? ', '.$match->resultEditor->name : '' }}</p>
+            @endif
+
+            {{-- Bölümlere hızlı geçiş (uzun sayfada kaydırma yerine) --}}
+            @php
+                $sections = [];
+                if ($teamA->isNotEmpty() || $teamB->isNotEmpty()) $sections['kadro'] = 'Kadro';
+                $sections['katilim'] = 'Katılım';
+                if ($match->status === 'completed') $sections['sonuc'] = 'Sonuç';
+            @endphp
+            @if (count($sections) > 1)
+                <nav aria-label="Maç bölümleri" class="flex gap-1.5 p-1 rounded-2xl bg-pitch-bg/60">
+                    @foreach ($sections as $id => $label)
+                        <a href="#{{ $id }}" class="flex-1 text-center min-h-[40px] flex items-center justify-center rounded-xl font-display uppercase tracking-wider text-sm font-bold text-pitch-muted hover:bg-pitch-surface2 hover:text-pitch-ink transition">{{ $label }}</a>
+                    @endforeach
+                </nav>
+            @endif
 
             @if ($canManage && $match->status === 'scheduled')
                 <div class="pt-3 border-t border-pitch-line space-y-2">
@@ -143,9 +193,9 @@
 
         {{-- Sonuç girme formu --}}
         @if ($showResultForm && $canManage)
-            <div class="bg-pitch-surface border border-pitch-line rounded-xl">
+            <div class="bg-pitch-surface border border-pitch-line rounded-2xl">
                 <form wire:submit="saveResult" class="p-6 space-y-4">
-                    <h3 class="font-display uppercase tracking-wider text-lg font-semibold">{{ $match->status === 'completed' ? '✏️ Sonucu Düzenle' : 'Maç Bitti Mi?' }}</h3>
+                    <h3 class="font-display uppercase tracking-wider text-xl font-bold">{{ $match->status === 'completed' ? '✏️ Sonucu Düzenle' : 'Maç Bitti Mi?' }}</h3>
                     <div class="flex items-center justify-center sm:justify-start gap-3">
                         <span class="font-bold text-bibA">Turuncu</span>
                         <x-text-input wire:model="teamAScore" type="number" min="0" max="99" class="w-20 text-center text-lg font-bold" />
@@ -215,11 +265,12 @@
 
         {{-- Maç sonu: golcüler + MVP --}}
         @if ($match->status === 'completed')
+            <div id="sonuc" class="scroll-mt-4 !mt-0"></div>
             @if ($matchGoals->isNotEmpty() || $match->formaGoalPlayer)
-                <div class="bg-pitch-surface border border-pitch-line rounded-xl p-6 space-y-3">
+                <div class="bg-pitch-surface border border-pitch-line rounded-3xl p-5 sm:p-6 space-y-3">
                     @if ($matchGoals->isNotEmpty())
                         <div>
-                            <h3 class="font-display uppercase tracking-wider text-lg font-semibold mb-3">⚽ Golleri Atanlar</h3>
+                            <h3 class="font-display uppercase tracking-wider text-xl font-bold mb-3">⚽ Golleri Atanlar</h3>
                             <ul class="space-y-1.5 text-sm">
                                 @foreach ($matchGoals as $goal)
                                     <li>
@@ -246,10 +297,10 @@
 
             {{-- Paylaşılabilir maç kartı: tarayıcıda canvas ile üretilir, native paylaşımla WhatsApp'a gider --}}
             @if ($shareCard)
-                <div class="bg-pitch-surface border border-pitch-line rounded-xl p-4 sm:p-6 space-y-3"
+                <div class="bg-pitch-surface border border-pitch-line rounded-3xl p-4 sm:p-6 space-y-3"
                      x-data="macKarti(@js($shareCard))">
                     <div class="flex items-center justify-between flex-wrap gap-2">
-                        <h3 class="font-display uppercase tracking-wider text-lg font-semibold">📲 Maç Kartı</h3>
+                        <h3 class="font-display uppercase tracking-wider text-xl font-bold">📲 Maç Kartı</h3>
                         <span class="text-xs text-pitch-muted">Gruba atmak için hazır</span>
                     </div>
 
@@ -267,9 +318,9 @@
                 </div>
             @endif
 
-            <div class="bg-pitch-surface border border-pitch-line rounded-xl p-6 space-y-4">
+            <div class="bg-pitch-surface border border-pitch-line rounded-3xl p-5 sm:p-6 space-y-4">
                 <div class="flex items-center justify-between flex-wrap gap-2">
-                    <h3 class="font-display uppercase tracking-wider text-lg font-semibold">🏆 Maçın Adamı (MVP)</h3>
+                    <h3 class="font-display uppercase tracking-wider text-xl font-bold">🏆 Maçın Adamı (MVP)</h3>
                     @if ($match->mvpOpen())
                         @php $mvpHoursLeft = (int) ceil(now()->diffInHours($match->mvp_closes_at, true)); @endphp
                         <span class="text-xs text-gold bg-gold/10 border border-gold/30 rounded-full px-3 py-1">
@@ -318,9 +369,9 @@
             </div>
 
             {{-- Maç sonu performans puanı --}}
-            <div class="bg-pitch-surface border border-pitch-line rounded-xl p-6 space-y-4">
+            <div class="bg-pitch-surface border border-pitch-line rounded-3xl p-5 sm:p-6 space-y-4">
                 <div class="flex items-center justify-between flex-wrap gap-2">
-                    <h3 class="font-display uppercase tracking-wider text-lg font-semibold">📈 Performans Puanı</h3>
+                    <h3 class="font-display uppercase tracking-wider text-xl font-bold">📈 Performans Puanı</h3>
                     @if ($perfOpen)
                         @php $perfHoursLeft = (int) ceil(now()->diffInHours($match->perfClosesAt(), true)); @endphp
                         <span class="text-xs text-gold bg-gold/10 border border-gold/30 rounded-full px-3 py-1">{{ \App\Models\FootballMatch::ratingUnlimited() ? 'Açık (sınırsız)' : 'Açık — '.($perfHoursLeft > 48 ? (int) ceil($perfHoursLeft / 24).' gün kaldı' : $perfHoursLeft.' saat kaldı') }}</span>
@@ -391,15 +442,16 @@
 
         {{-- Kadro: saha dizilişi → takım listeleri (takas) → onay oylaması --}}
         @if ($teamA->isNotEmpty() || $teamB->isNotEmpty())
+            <div id="kadro" class="scroll-mt-4 !mt-0"></div>
             {{-- Saha dizilişi --}}
-            {{-- Oyuncu şekli (yuvarlak / forma) kişisel tercih: bu cihazda hatırlanır --}}
-            <div class="bg-pitch-surface border border-pitch-line rounded-xl p-6 space-y-3" wire:ignore.self
+            {{-- Oyuncu şekli (kart / yuvarlak / forma) kişisel tercih: bu cihazda hatırlanır, varsayılan kart --}}
+            <div class="bg-pitch-surface border border-pitch-line rounded-3xl p-5 sm:p-6 space-y-3" wire:ignore.self
                  x-data="{
-                    forma: (() => { try { return localStorage.getItem('saha-sekil') === 'forma'; } catch (e) { return false; } })(),
-                    sec(v) { this.forma = v; try { localStorage.setItem('saha-sekil', v ? 'forma' : 'yuvarlak'); } catch (e) {} },
+                    sekil: (() => { try { return localStorage.getItem('saha-sekil') || 'kart'; } catch (e) { return 'kart'; } })(),
+                    sec(v) { this.sekil = v; try { localStorage.setItem('saha-sekil', v); } catch (e) {} },
                  }">
                 <div class="flex items-center gap-4 flex-wrap">
-                    <h3 class="font-display uppercase tracking-wider text-lg font-semibold">
+                    <h3 class="font-display uppercase tracking-wider text-xl font-bold">
                         Saha Dizilişi
                         @php $format = Attributes::TEAM_FORMATS[Attributes::teamSizeFor((int) $match->capacity)] ?? null; @endphp
                         @if ($format)<span class="ms-1 text-xs font-normal tracking-normal text-pitch-muted normal-case">· {{ $format }}</span>@endif
@@ -425,13 +477,12 @@
                         </label>
                     @endif
                     <span class="grow"></span>
-                    <div class="inline-flex rounded-md border border-pitch-line overflow-hidden text-xs" role="group" aria-label="Oyuncu şekli">
-                        <button type="button" x-on:click="sec(false)"
-                                :class="forma ? 'text-pitch-muted hover:bg-pitch-surface2' : 'bg-bibB/15 text-bibB font-semibold'"
-                                class="px-3 py-2 transition">⚪ Yuvarlak</button>
-                        <button type="button" x-on:click="sec(true)"
-                                :class="forma ? 'bg-bibB/15 text-bibB font-semibold' : 'text-pitch-muted hover:bg-pitch-surface2'"
-                                class="px-3 py-2 border-s border-pitch-line transition">👕 Forma</button>
+                    <div class="inline-flex rounded-xl border border-pitch-line overflow-hidden text-xs" role="group" aria-label="Oyuncu şekli">
+                        @foreach (['kart' => '🛡 Kart', 'yuvarlak' => '⚪ Yuvarlak', 'forma' => '👕 Forma'] as $sk => $skLabel)
+                            <button type="button" x-on:click="sec('{{ $sk }}')" :aria-pressed="sekil === '{{ $sk }}'"
+                                    :class="sekil === '{{ $sk }}' ? 'bg-bibB/15 text-bibB font-semibold' : 'text-pitch-muted hover:bg-pitch-surface2'"
+                                    class="px-3 min-h-[40px] transition {{ $loop->first ? '' : 'border-s border-pitch-line' }}">{{ $skLabel }}</button>
+                        @endforeach
                     </div>
                     @if ($canManage)
                         <x-secondary-button wire:click="resetLayout">Dizilişi Sıfırla</x-secondary-button>
@@ -493,12 +544,21 @@
                     </defs>
                     {{-- Şekil seçimi SVG'nin İÇİNDE (stil + grup sınıfı): PNG dışa aktarma
                          svg.innerHTML'i kopyalar, sayfa CSS'i oraya taşınmaz --}}
+                    {{-- Kart şekli: takım renginde parlak gradyan (oyuncu kartı) --}}
+                    <defs>
+                        <linearGradient id="kart-A" x1="0" y1="0" x2="0.35" y2="1">
+                            <stop offset="0" stop-color="#FFD2A8"/><stop offset=".55" stop-color="#FF7A1A"/><stop offset="1" stop-color="#9A3B00"/>
+                        </linearGradient>
+                        <linearGradient id="kart-B" x1="0" y1="0" x2="0.35" y2="1">
+                            <stop offset="0" stop-color="#F0FFC2"/><stop offset=".5" stop-color="#C8F04B"/><stop offset="1" stop-color="#5E8A12"/>
+                        </linearGradient>
+                    </defs>
                     <style>
-                        .sk-forma { display: none; }
-                        .sekil-forma .sk-forma { display: inline; }
-                        .sekil-forma .sk-yuvarlak { display: none; }
+                        .sk-forma, .sk-kart { display: none; }
+                        .sekil-forma .sk-forma, .sekil-kart .sk-kart { display: inline; }
+                        .sekil-forma .sk-yuvarlak, .sekil-kart .sk-yuvarlak { display: none; }
                     </style>
-                    <g :class="forma ? 'sekil-forma' : ''">
+                    <g :class="sekil === 'forma' ? 'sekil-forma' : (sekil === 'kart' ? 'sekil-kart' : '')">
                     @foreach ([['A', $pitchA, '#FF7A1A'], ['B', $pitchB, '#C8F04B']] as [$side, $nodes, $fill])
                         @foreach ($nodes as $node)
                             @php $govde = empty($node['kit']) ? $fill : 'url(#kit-'.$node['kit'].'-'.$side.')'; @endphp
@@ -507,6 +567,9 @@
                                 {{-- Forma silueti: yaka, omuzlar, kısa kollar, gövde (~40×33, merkez 0,0) --}}
                                 <path class="sk-forma" d="M -7 -16 Q 0 -11 7 -16 L 17 -11 L 20 -1 L 12 1 L 12 17 L -12 17 L -12 1 L -20 -1 L -17 -11 Z"
                                       fill="{{ $govde }}" stroke="rgba(0,0,0,.45)" stroke-width="2" stroke-linejoin="round"/>
+                                {{-- Kalkan kart (~34×42, merkez 0,0); forma deseni kuşanılmışsa o, yoksa takım gradyanı --}}
+                                <path class="sk-kart" d="M -16 -20 L 16 -20 L 16 10 L 0 21 L -16 10 Z"
+                                      fill="{{ empty($node['kit']) ? 'url(#kart-'.$side.')' : $govde }}" stroke="rgba(0,0,0,.5)" stroke-width="1.5" stroke-linejoin="round"/>
                                 @php $label = $node['number'] ?? (($node['ovr_public'] ?? true) ? round($node['ovr']) : '–'); @endphp
                                 <text y="4.5" text-anchor="middle" font-family="Arial, sans-serif" font-size="{{ strlen((string) $label) > 1 ? 12 : 13 }}" font-weight="800" fill="#10240F">{{ $label }}</text>
                                 @if (! empty($node['icon']))
@@ -525,7 +588,7 @@
             </div>
 
             {{-- Denge göstergesi + takım listeleri --}}
-            <div class="bg-pitch-surface border border-pitch-line rounded-xl p-6 space-y-4">
+            <div class="bg-pitch-surface border border-pitch-line rounded-3xl p-5 sm:p-6 space-y-4">
                 <div class="grid grid-cols-[1fr,auto,1fr] items-center gap-2 sm:gap-4">
                     <div class="font-display text-lg sm:text-2xl font-bold text-bibA">TURUNCU <span class="block text-[10px] sm:text-[11px] tracking-[.15em] sm:tracking-[.2em] text-pitch-muted font-semibold">{{ $teamA->count() }} OYUNCU · ORT {{ number_format($avgA, 1) }}</span></div>
                     @php $diff = $avgA - $avgB; $shift = max(-22, min(22, $diff * 12)); @endphp
@@ -586,17 +649,17 @@
 
             {{-- Onay oylaması --}}
             @if ($voteSummary)
-                <div class="bg-pitch-surface border {{ $match->squad_status === 'approved' ? 'border-pitch-green2' : 'border-gold/40' }} rounded-xl p-6 space-y-3">
+                <div class="bg-pitch-surface border {{ $match->squad_status === 'approved' ? 'border-pitch-green2' : 'border-gold/40' }} rounded-3xl p-5 sm:p-6 space-y-3">
                     @if ($match->squad_status === 'approved')
                         <div class="flex items-center gap-3">
                             <span class="text-2xl">✅</span>
                             <div>
-                                <h3 class="font-display uppercase tracking-wider text-lg font-semibold text-bibB">Kadro Onaylandı</h3>
+                                <h3 class="font-display uppercase tracking-wider text-xl font-bold text-bibB">Kadro Onaylandı</h3>
                                 <p class="text-sm text-pitch-muted">{{ $voteSummary['yes'] }} evet oyu ile %60 çoğunluk sağlandı.</p>
                             </div>
                         </div>
                     @else
-                        <h3 class="font-display uppercase tracking-wider text-lg font-semibold">🗳️ Kadro Oylaması</h3>
+                        <h3 class="font-display uppercase tracking-wider text-xl font-bold">🗳️ Kadro Oylaması</h3>
                         <p class="text-sm text-pitch-muted">
                             Kadronun kesinleşmesi için kadrodaki oyuncuların <strong class="text-pitch-ink">%60'ının</strong> onayı gerekiyor:
                             <strong class="text-pitch-ink">{{ $voteSummary['yes'] }}/{{ $voteSummary['needed'] }}</strong> evet
@@ -642,9 +705,9 @@
                 }
             @endphp
             @if ($reminderTypes)
-                <div class="bg-pitch-surface border border-pitch-line rounded-xl p-4 sm:p-6 space-y-3">
+                <div class="bg-pitch-surface border border-pitch-line rounded-3xl p-4 sm:p-6 space-y-3">
                     <div class="flex items-center justify-between flex-wrap gap-2">
-                        <h3 class="font-display uppercase tracking-wider text-lg font-semibold">📣 Hatırlatma Gönder <span class="text-xs text-pitch-muted font-normal tracking-normal">(başkan)</span></h3>
+                        <h3 class="font-display uppercase tracking-wider text-xl font-bold">📣 Hatırlatma Gönder <span class="text-xs text-pitch-muted font-normal tracking-normal">(başkan)</span></h3>
                         <span class="text-xs text-pitch-muted bg-pitch-bg border border-pitch-line rounded-full px-3 py-1">30 dk'da 1 bildirim</span>
                     </div>
                     <div class="grid grid-cols-2 gap-2 sm:flex sm:flex-wrap">
@@ -664,24 +727,24 @@
 
         {{-- RSVP — kadro kurulduktan sonra kişisel "geliyor musun?" sorusu gizlenir --}}
         @if ($match->status === 'scheduled' && ($match->squad_status === 'none' || $canManage))
-            <div class="bg-pitch-surface border border-pitch-line rounded-xl p-6 space-y-3">
+            <div class="bg-pitch-surface border border-pitch-line rounded-3xl p-5 sm:p-6 space-y-3">
                 @if ($match->squad_status === 'none')
-                    <h3 class="font-display uppercase tracking-wider text-lg font-semibold">Geliyor musun?</h3>
-                    <div class="grid gap-2 sm:flex sm:flex-wrap">
-                        <button wire:click="rsvp('going')"
-                                class="w-full sm:w-auto px-5 py-2.5 rounded-md font-semibold text-sm border transition
-                                       {{ $myRsvp?->status === 'going' ? 'bg-pitch-green text-pitch-ink border-pitch-green2' : 'bg-transparent text-bibB border-pitch-line hover:bg-pitch-surface2' }}">
-                            ✅ Geliyorum
+                    <h3 class="font-display uppercase tracking-wider text-xl font-bold">Geliyor musun?</h3>
+                    <div class="grid grid-cols-2 gap-2 sm:flex sm:flex-wrap">
+                        <button wire:click="rsvp('going')" @if ($myRsvp?->status === 'going') aria-pressed="true" @endif
+                                class="col-span-2 sm:col-span-1 sm:min-w-[200px] min-h-[52px] px-5 rounded-2xl font-display uppercase tracking-wider text-xl font-extrabold border transition active:scale-[.98]
+                                       {{ $myRsvp?->status === 'going' ? 'bg-bibB text-pitch-bg border-bibB' : 'bg-bibB/10 text-bibB border-bibB/50 hover:bg-bibB/20' }}">
+                            {{ $myRsvp?->status === 'going' ? '✓ Geliyorum' : 'Geliyorum' }}
                         </button>
-                        <button wire:click="rsvp('maybe')"
-                                class="w-full sm:w-auto px-5 py-2.5 rounded-md font-semibold text-sm border transition
+                        <button wire:click="rsvp('maybe')" @if ($myRsvp?->status === 'maybe') aria-pressed="true" @endif
+                                class="min-h-[48px] px-5 rounded-2xl font-display uppercase tracking-wider text-base font-bold border transition active:scale-[.98]
                                        {{ $myRsvp?->status === 'maybe' ? 'bg-gold text-pitch-bg border-gold' : 'bg-transparent text-gold border-pitch-line hover:bg-pitch-surface2' }}">
-                            🤔 Belki
+                            Belki
                         </button>
-                        <button wire:click="rsvp('not_going')"
-                                class="w-full sm:w-auto px-5 py-2.5 rounded-md font-semibold text-sm border transition
+                        <button wire:click="rsvp('not_going')" @if ($myRsvp?->status === 'not_going') aria-pressed="true" @endif
+                                class="min-h-[48px] px-5 rounded-2xl font-display uppercase tracking-wider text-base font-bold border transition active:scale-[.98]
                                        {{ $myRsvp?->status === 'not_going' ? 'bg-red-700 text-pitch-ink border-red-600' : 'bg-transparent text-[#FF8A8A] border-pitch-line hover:bg-pitch-surface2' }}">
-                            ❌ Gelmiyorum
+                            Gelmiyorum
                         </button>
                     </div>
                     @if ($myRsvp?->status === 'going' && $myRsvp->waitlist_position !== null)
@@ -691,7 +754,7 @@
                         </p>
                     @endif
                 @else
-                    <h3 class="font-display uppercase tracking-wider text-lg font-semibold">Katılım</h3>
+                    <h3 class="font-display uppercase tracking-wider text-xl font-bold">Katılım</h3>
                     <p class="text-sm text-pitch-muted">Kadro kuruldu. Katılımı aşağıdan yönetebilir, gerekirse kadroyu yeniden kurabilirsin.</p>
                 @endif
 
@@ -729,8 +792,8 @@
         @endif
 
         {{-- Katılım listeleri --}}
-        <div class="grid sm:grid-cols-3 gap-4">
-            <div class="bg-pitch-surface border border-pitch-line rounded-xl p-5">
+        <div id="katilim" class="grid sm:grid-cols-3 gap-4 scroll-mt-4">
+            <div class="bg-pitch-surface border border-pitch-line rounded-3xl p-5">
                 <h3 class="font-semibold mb-3">✅ Kadro ({{ $going->count() }}/{{ $match->capacity }})</h3>
                 <ol class="space-y-1.5 text-sm list-decimal list-inside">
                     @forelse ($going as $rsvp)
@@ -751,7 +814,7 @@
                     </ol>
                 @endif
             </div>
-            <div class="bg-pitch-surface border border-pitch-line rounded-xl p-5">
+            <div class="bg-pitch-surface border border-pitch-line rounded-3xl p-5">
                 <h3 class="font-semibold mb-3">🤔 Belki ({{ $maybe->count() }})</h3>
                 <ul class="space-y-1.5 text-sm">
                     @forelse ($maybe as $rsvp)
@@ -761,7 +824,7 @@
                     @endforelse
                 </ul>
             </div>
-            <div class="bg-pitch-surface border border-pitch-line rounded-xl p-5">
+            <div class="bg-pitch-surface border border-pitch-line rounded-3xl p-5">
                 <h3 class="font-semibold mb-3">❌ Gelmiyor ({{ $notGoing->count() }})</h3>
                 <ul class="space-y-1.5 text-sm">
                     @forelse ($notGoing as $rsvp)
@@ -794,7 +857,7 @@
 
                 // Zemin
                 const g = x.createLinearGradient(0, 0, 0, H);
-                g.addColorStop(0, '#16294E'); g.addColorStop(1, '#0F1F41');
+                g.addColorStop(0, '#121829'); g.addColorStop(1, '#0A0E1A');
                 x.fillStyle = g; x.fillRect(0, 0, W, H);
                 x.strokeStyle = 'rgba(255,200,61,.35)'; x.lineWidth = 6;
                 x.strokeRect(24, 24, W - 48, H - 48);
@@ -802,17 +865,17 @@
                 x.textAlign = 'center';
 
                 // Başlık
-                x.fillStyle = '#92A5CC'; x.font = f('600', 30);
+                x.fillStyle = '#9AA4C0'; x.font = f('600', 30);
                 x.fillText(veri.group.toUpperCase(), W / 2, 110);
-                x.fillStyle = '#EDF2FB'; x.font = f('700', 46);
+                x.fillStyle = '#F1F4FB'; x.font = f('700', 46);
                 x.fillText(veri.title, W / 2, 168);
-                x.fillStyle = '#92A5CC'; x.font = f('500', 28);
+                x.fillStyle = '#9AA4C0'; x.font = f('500', 28);
                 x.fillText(veri.date, W / 2, 212);
 
                 // Skor
                 x.font = f('800', 150);
                 x.fillStyle = '#FF7A1A'; x.textAlign = 'right'; x.fillText(veri.scoreA, W / 2 - 45, 380);
-                x.fillStyle = '#92A5CC'; x.textAlign = 'center'; x.fillText(':', W / 2, 372);
+                x.fillStyle = '#9AA4C0'; x.textAlign = 'center'; x.fillText(':', W / 2, 372);
                 x.fillStyle = '#C8F04B'; x.textAlign = 'left'; x.fillText(veri.scoreB, W / 2 + 45, 380);
 
                 x.textAlign = 'center'; x.font = f('600', 26);
@@ -825,8 +888,8 @@
                     x.fillStyle = renk;
                     liste.slice(0, 9).forEach((ad, i) => x.fillText(ad, cx, 500 + i * 46));
                 };
-                yaz(veri.teamA, W / 2 - 250, '#EDF2FB');
-                yaz(veri.teamB, W / 2 + 250, '#EDF2FB');
+                yaz(veri.teamA, W / 2 - 250, '#F1F4FB');
+                yaz(veri.teamB, W / 2 + 250, '#F1F4FB');
 
                 // Alt bilgi: MVP + golcüler
                 let y = 940;
@@ -836,7 +899,7 @@
                     y += 46;
                 }
                 if (veri.scorers.length) {
-                    x.fillStyle = '#92A5CC'; x.font = f('500', 26);
+                    x.fillStyle = '#9AA4C0'; x.font = f('500', 26);
                     x.fillText('⚽ ' + veri.scorers.join(' · '), W / 2, y);
                 }
 

@@ -1,10 +1,10 @@
-<div class="py-10">
+<div class="py-6 sm:py-10">
     <div class="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 space-y-6">
         <x-group-nav :group="$group" />
 
         <div>
             <a href="{{ route('groups.show', $group) }}" wire:navigate class="text-sm text-bibB hover:underline">← {{ $group->name }}</a>
-            <h2 class="font-display uppercase tracking-wider text-2xl font-bold mt-1">🗳️ Sezon Oylaması</h2>
+            <h2 class="font-display uppercase tracking-wide text-3xl sm:text-4xl font-extrabold leading-none mt-1">🗳️ Sezon Oylaması</h2>
             <p class="text-sm text-pitch-muted mt-1">
                 Sezon bitince oyuncular sezonu kendi aralarında oylar — istatistiğin ölçemediklerini.
                 Oylar <strong class="text-pitch-ink">anonimdir</strong>, oylama kapanana kadar değiştirebilirsin.
@@ -17,9 +17,9 @@
 
         @if ($open)
             @php $verilen = count($myVotes); $toplamKat = count($categories); @endphp
-            <div class="bg-pitch-surface border border-gold/40 rounded-xl p-4 sm:p-6">
+            <div class="bg-pitch-surface border border-gold/40 rounded-3xl p-4 sm:p-6">
                 <div class="flex items-baseline justify-between gap-2 flex-wrap">
-                    <h3 class="font-display uppercase tracking-wider text-lg font-semibold text-gold">{{ $open->name() }}</h3>
+                    <h3 class="font-display uppercase tracking-wider text-xl font-bold text-gold">{{ $open->name() }}</h3>
                     <span class="text-xs text-pitch-muted">
                         Kapanış: <strong class="text-pitch-ink">{{ $open->votingClosesAt()->translatedFormat('j F, H:i') }}</strong>
                         · {{ $voterCount }} kişi oy verdi
@@ -44,10 +44,10 @@
 
                 @foreach ($categories as $kat => $k)
                     @php $secim = $myVotes[$kat] ?? null; @endphp
-                    <div class="bg-pitch-surface border {{ $secim ? 'border-bibB/50' : 'border-pitch-line' }} rounded-xl p-4 sm:p-6">
+                    <div class="bg-pitch-surface border {{ $secim ? 'border-bibB/50' : 'border-pitch-line' }} rounded-3xl p-4 sm:p-6">
                         <div class="flex items-baseline justify-between gap-2 flex-wrap mb-3">
                             <div>
-                                <h3 class="font-display uppercase tracking-wider text-lg font-semibold">{{ $k['icon'] }} {{ $k['name'] }}</h3>
+                                <h3 class="font-display uppercase tracking-wider text-xl font-bold">{{ $k['icon'] }} {{ $k['name'] }}</h3>
                                 <p class="text-xs text-pitch-muted">{{ $k['hint'] }}</p>
                             </div>
                             @if ($secim)
@@ -69,7 +69,7 @@
                 @endforeach
             @endif
         @else
-            <div class="bg-pitch-surface border border-pitch-line rounded-xl p-4 sm:p-6">
+            <div class="bg-pitch-surface border border-pitch-line rounded-3xl p-4 sm:p-6">
                 <p class="text-sm text-pitch-muted">
                     Şu an açık oylama yok. Sıradaki oylama <strong class="text-pitch-ink">{{ \App\Support\Season::current()->name() }}</strong>
                     bitince, <strong class="text-pitch-ink">{{ $nextOpens->translatedFormat('j F') }}</strong> tarihinde açılır ve
@@ -80,8 +80,8 @@
 
         {{-- Son kapanan oylamanın sonuçları --}}
         @if ($resultsSeason)
-            <div class="bg-pitch-surface border border-gold/40 rounded-xl p-4 sm:p-6">
-                <h3 class="font-display uppercase tracking-wider text-lg font-semibold text-gold mb-3">🏆 {{ $resultsSeason->name() }} — Oyuncuların Seçimi</h3>
+            <div class="bg-pitch-surface border border-gold/40 rounded-3xl p-4 sm:p-6">
+                <h3 class="font-display uppercase tracking-wider text-xl font-bold text-gold mb-3">🏆 {{ $resultsSeason->name() }} — Oyuncuların Seçimi</h3>
                 <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
                     @foreach ($categories as $kat => $k)
                         @php $r = $results[$kat] ?? null; @endphp

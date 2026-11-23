@@ -1,4 +1,4 @@
-<div class="py-10">
+<div class="py-6 sm:py-10">
     <div class="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 space-y-6">
 
         <x-group-nav :group="$group" :active="$player->user_id === auth()->id() ? 'profile' : null" />
@@ -7,21 +7,74 @@
             <a href="{{ route('groups.stats', $group) }}" wire:navigate class="text-sm text-bibB hover:underline">← İstatistikler</a>
         </div>
 
-        {{-- Oyuncu başlığı --}}
-        <div class="bg-pitch-surface border border-pitch-line rounded-xl p-4 sm:p-6 flex items-center gap-4">
-            <x-ovr-badge :player="$player" numClass="text-4xl w-16" />
-            <div class="min-w-0">
-                <h2 class="font-display uppercase tracking-wider text-2xl font-bold truncate {{ $player->nameColorClass() }}">{{ $player->name }}</h2>
-                <div class="text-sm text-pitch-muted mt-0.5 flex flex-wrap items-center gap-x-2 gap-y-1">
-                    @if (!empty($player->positions))
-                        <span class="font-semibold text-pitch-ink">{{ implode(' · ', $player->positions) }}</span>
-                    @endif
-                    <span>Ayak: {{ $player->footBadge() }}</span>
-                    @if ($player->shirt_number)
-                        <span>#{{ $player->shirt_number }}</span>
+        {{-- Oyuncu kartı (oyun menüsü tarzı): renk kademesi nihai puana göre; mağaza kozmetikleri (çerçeve, halka, isim rengi, unvan) korunur --}}
+        @php
+            $ovrPublic = $player->overallIsPublic() && ! $player->isGuest();
+            $ovr = $ovrPublic ? $player->displayRating() : ($player->isGuest() ? $player->overall() : null);
+            $delta = $ovrPublic ? $player->formDelta() : null;
+            [$cardBg, $cardInk] = match (true) {
+                $ovr === null => ['bg-[linear-gradient(165deg,#2A3350_0%,#1A2139_100%)]', 'text-pitch-ink'],
+                $ovr >= 8 => ['bg-[linear-gradient(165deg,#FFF3C4_0%,#F2BF45_42%,#B97A12_78%,#7A4C06_100%)]', 'text-[#3A2600]'],
+                $ovr >= 6.5 => ['bg-[linear-gradient(165deg,#F0FFC2_0%,#C8F04B_50%,#5E8A12_100%)]', 'text-[#1E2B00]'],
+                default => ['bg-[linear-gradient(165deg,#F5F8FD_0%,#B7C2D6_50%,#5D6A84_100%)]', 'text-[#1B2233]'],
+            };
+        @endphp
+        <div class="flex flex-col items-center">
+            <div class="relative w-72 max-w-full rounded-[28px] border p-5 {{ $cardBg }} {{ $cardInk }} {{ $player->frameClass() }}">
+                <div class="flex items-start justify-between">
+                    <div class="leading-none">
+                        <div class="font-display text-6xl font-extrabold">{{ $ovr !== null ? number_format($ovr, 1) : '?' }}</div>
+                        <div class="text-[10px] font-bold tracking-[.2em] opacity-80 mt-0.5">GENEL</div>
+                        <div class="font-display text-lg font-extrabold mt-1">{{ $player->positions[0] ?? '—' }}</div>
+                        @if ($delta !== null && abs($delta) >= 0.05)
+                            <div class="text-xs font-bold mt-1" title="Son 5 maç formu">{{ $delta > 0 ? '▲' : '▼' }} {{ number_format(abs($delta), 1) }}</div>
+                        @endif
+                    </div>
+                    <div class="text-end leading-none">
+                        @if ($player->shirt_number)<div class="font-display text-3xl font-extrabold">#{{ $player->shirt_number }}</div>@endif
+                        <div class="text-xs font-bold mt-1">{{ \App\Support\Attributes::FEET[$player->foot] ?? 'Sağ ayak' }}</div>
+                    </div>
+                </div>
+
+                {{-- Halka dış sarmalayıcıda: iç kutu overflow-hidden olduğu için orada kırpılırdı --}}
+                <div class="relative w-24 h-24 mx-auto -mt-4 rounded-full {{ $player->avatarRingClass() }}">
+                    <div class="w-24 h-24 rounded-full overflow-hidden border-2 border-black/25 bg-black/15 flex items-center justify-center">
+                        @if ($player->photoUrl())
+                            <img src="{{ $player->photoUrl() }}" alt="{{ $player->name }}" class="w-full h-full object-cover">
+                        @else
+                            <span class="font-display text-4xl font-extrabold">{{ mb_strtoupper(mb_substr($player->name, 0, 1)) }}</span>
+                        @endif
+                    </div>
+                </div>
+
+                <div class="mt-3 rounded-xl bg-pitch-bg/85 px-3 py-1.5 text-center">
+                    <h2 class="font-display uppercase tracking-wide text-2xl font-extrabold leading-tight truncate text-pitch-ink {{ $player->nameColorClass() }}">{{ $player->name }}</h2>
+                    @if ($player->titleText())
+                        <div class="text-[10px] tracking-[.18em] text-gold">{{ mb_strtoupper($player->titleText(), 'UTF-8') }}</div>
                     @endif
                 </div>
+
+                <div class="mt-3 grid grid-cols-2 gap-x-6 gap-y-1 px-2">
+                    @foreach ($player->cardStats() as $label => $value)
+                        <div class="flex items-baseline justify-between">
+                            <span class="font-display text-2xl font-extrabold">{{ $ovrPublic ? number_format($value, 1) : '?' }}</span>
+                            <span class="font-display text-sm font-bold tracking-wider">{{ $label }}</span>
+                        </div>
+                    @endforeach
+                </div>
+                @if (! empty($player->positions) && count($player->positions) > 1)
+                    <div class="mt-2 text-center text-xs font-bold opacity-80">{{ implode(' · ', $player->positions) }}</div>
+                @endif
             </div>
+
+            @if ($player->user_id === auth()->id())
+                <label class="mt-3 inline-flex items-center gap-1.5 min-h-[40px] px-4 rounded-full border border-pitch-line text-sm text-bibB hover:border-bibB/50 cursor-pointer transition">
+                    📷 Kart fotoğrafını değiştir
+                    <input type="file" wire:model="photo" accept="image/*" class="hidden">
+                </label>
+                <div wire:loading wire:target="photo" class="mt-1 text-center text-xs text-pitch-muted">Yükleniyor…</div>
+                <x-input-error :messages="$errors->get('photo')" class="mt-1 text-center" />
+            @endif
         </div>
 
         {{-- Sezon özeti --}}
@@ -36,7 +89,7 @@
                 ];
             @endphp
             @foreach ($cards as $card)
-                <div class="bg-pitch-surface border border-pitch-line rounded-xl p-3 text-center">
+                <div class="bg-pitch-surface border border-pitch-line rounded-2xl p-3 text-center">
                     <div class="font-display font-extrabold text-2xl {{ $card['class'] }}">{{ $card['value'] }}</div>
                     <div class="text-[10px] tracking-[.12em] text-pitch-muted mt-0.5">{{ $card['label'] }}</div>
                 </div>
@@ -45,7 +98,7 @@
 
         @if ($bestPartner)
             @php $partner = $bestPartner['a']->id === $player->id ? $bestPartner['b'] : $bestPartner['a']; @endphp
-            <div class="bg-pitch-surface border border-pitch-line rounded-xl px-4 py-3 text-sm flex items-center gap-2 flex-wrap">
+            <div class="bg-pitch-surface border border-pitch-line rounded-2xl px-4 py-3 text-sm flex items-center gap-2 flex-wrap">
                 <span>🧪 En uyumlu ortağı:</span>
                 <a href="{{ route('groups.player', [$group, $partner]) }}" wire:navigate class="font-semibold text-bibB hover:underline">{{ $partner->name }}</a>
                 <span class="text-pitch-muted">— birlikte %{{ $bestPartner['rate'] }} kazanma ({{ $bestPartner['together'] }} maç)</span>
@@ -53,9 +106,9 @@
         @endif
 
         {{-- Kafa kafaya karşılaştırma --}}
-        <div class="bg-pitch-surface border border-pitch-line rounded-xl p-4 sm:p-6 space-y-4">
+        <div class="bg-pitch-surface border border-pitch-line rounded-3xl p-4 sm:p-6 space-y-4">
             <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
-                <h3 class="font-display uppercase tracking-wider text-lg font-semibold">⚔️ Kafa Kafaya</h3>
+                <h3 class="font-display uppercase tracking-wider text-xl font-bold">⚔️ Kafa Kafaya</h3>
                 <select wire:model.live="compareId"
                         class="w-full sm:w-64 bg-pitch-bg border-pitch-line text-pitch-ink rounded-md text-sm focus:border-bibB focus:ring-bibB/40">
                     <option value="">Rakip seç…</option>
@@ -117,65 +170,10 @@
             @endif
         </div>
 
-        {{-- FIFA tarzı oyuncu kartı --}}
-        @php
-            $ovrPublic = $player->overallIsPublic() && ! $player->isGuest();
-            $ovr = $ovrPublic ? $player->displayRating() : ($player->isGuest() ? $player->overall() : null);
-            $ovrTier = $ovr === null ? 'text-pitch-muted' : ($ovr >= 8 ? 'text-gold' : ($ovr >= 6.5 ? 'text-[#7DE39A]' : 'text-pitch-ink'));
-        @endphp
         <div>
-            <div class="relative w-64 mx-auto rounded-2xl border bg-gradient-to-b from-pitch-surface2 to-pitch-surface p-5 {{ $player->frameClass() }}">
-                <div class="flex items-start justify-between gap-3">
-                    <div class="text-center shrink-0">
-                        <div class="font-display text-4xl font-extrabold leading-none {{ $ovrTier }}">{{ $ovr !== null ? number_format($ovr, 1) : '?' }}</div>
-                        <div class="text-[9px] tracking-[.2em] text-pitch-muted mt-0.5">GENEL</div>
-                        <div class="mt-1.5 text-xs font-bold text-pitch-muted">
-                            {{ ($player->positions[0] ?? '—') }} · {{ $player->footBadge() }}
-                        </div>
-                    </div>
-                    {{-- Halka dış sarmalayıcıda: iç kutu overflow-hidden olduğu için orada kırpılırdı --}}
-                    <div class="relative shrink-0 rounded-xl {{ $player->avatarRingClass() }}">
-                        <div class="w-24 h-24 rounded-xl overflow-hidden border border-pitch-line bg-pitch-bg flex items-center justify-center">
-                            @if ($player->photoUrl())
-                                <img src="{{ $player->photoUrl() }}" alt="{{ $player->name }}" class="w-full h-full object-cover">
-                            @else
-                                <span class="text-4xl opacity-40">👤</span>
-                            @endif
-                        </div>
-                    </div>
-                </div>
-
-                <div class="mt-3 pt-2 border-t border-gold/30 text-center">
-                    <div class="font-display uppercase tracking-wider text-lg font-bold truncate {{ $player->nameColorClass() }}">
-                        {{ $player->name }}@if ($player->shirt_number) <span class="text-pitch-muted">#{{ $player->shirt_number }}</span>@endif
-                    </div>
-                    @if ($player->titleText())
-                        <div class="text-[10px] tracking-[.18em] text-gold mt-0.5">{{ mb_strtoupper($player->titleText(), 'UTF-8') }}</div>
-                    @endif
-                </div>
-
-                <div class="mt-2 grid grid-cols-2 gap-x-8 gap-y-1.5 px-3">
-                    @foreach ($player->cardStats() as $label => $value)
-                        <div class="flex items-baseline justify-between">
-                            <span class="text-[10px] tracking-[.15em] text-pitch-muted">{{ $label }}</span>
-                            <span class="font-display text-lg font-bold">{{ $ovrPublic ? number_format($value, 1) : '?' }}</span>
-                        </div>
-                    @endforeach
-                </div>
-            </div>
-
-            @if ($player->user_id === auth()->id())
-                <label class="block w-64 mx-auto mt-2 text-center text-xs text-bibB hover:underline cursor-pointer">
-                    📷 Kart fotoğrafını değiştir
-                    <input type="file" wire:model="photo" accept="image/*" class="hidden">
-                </label>
-                <div wire:loading wire:target="photo" class="mt-1 text-center text-xs text-pitch-muted">Yükleniyor…</div>
-                <x-input-error :messages="$errors->get('photo')" class="mt-1 text-center" />
-            @endif
-
             {{-- Gelişim grafiği: maç maç performans puanı --}}
             @if ($formHistory->count() >= 2)
-                <div class="w-full max-w-md mx-auto mt-5 bg-pitch-surface border border-pitch-line rounded-xl p-4">
+                <div class="w-full max-w-md mx-auto mt-5 bg-pitch-surface border border-pitch-line rounded-2xl p-4">
                     <x-form-chart :history="$formHistory" />
                     <p class="text-[10px] text-pitch-muted mt-2 leading-snug">
                         Maç sonrası takım arkadaşlarının verdiği puanların maç başına ortalaması. Son 5 maçın ortalaması genel puanına %20 oranında yansır.
@@ -185,9 +183,9 @@
         </div>
 
         {{-- Nitelikler (takım arkadaşı onayları) --}}
-        <div class="bg-pitch-surface border border-pitch-line rounded-xl p-4 sm:p-6 space-y-4">
+        <div class="bg-pitch-surface border border-pitch-line rounded-3xl p-4 sm:p-6 space-y-4">
             <div class="flex items-center justify-between flex-wrap gap-2">
-                <h3 class="font-display uppercase tracking-wider text-lg font-semibold">🏷️ Nitelikler</h3>
+                <h3 class="font-display uppercase tracking-wider text-xl font-bold">🏷️ Nitelikler</h3>
                 @if ($player->user_id !== auth()->id())
                     <x-secondary-button wire:click="openTraitPicker" class="w-full sm:w-auto">
                         {{ $showTraitPicker ? 'Kapat' : '➕ Nitelik Onayla' }}
@@ -319,9 +317,9 @@
             $kazanilan = collect($allTimeBadges)->where('earned', true);
         @endphp
         @if ($slots > 0 && ($vitrin->isNotEmpty() || $benimProfilim))
-            <div class="bg-pitch-surface border border-pitch-line rounded-xl p-4 sm:p-6">
+            <div class="bg-pitch-surface border border-pitch-line rounded-3xl p-4 sm:p-6">
                 <div class="flex items-baseline justify-between gap-2 flex-wrap mb-4">
-                    <h3 class="font-display uppercase tracking-wider text-lg font-semibold">🏆 Vitrin</h3>
+                    <h3 class="font-display uppercase tracking-wider text-xl font-bold">🏆 Vitrin</h3>
                     @if ($benimProfilim)
                         <button wire:click="openShowcasePicker" class="text-xs text-pitch-muted hover:text-pitch-ink underline">
                             {{ $vitrin->isEmpty() ? 'Rozet seç' : 'Değiştir' }} ({{ $vitrin->count() }}/{{ $slots }})
@@ -381,8 +379,8 @@
 
         {{-- Sezon sonu oylamasında takım arkadaşlarının verdiği kalıcı unvanlar --}}
         @if ($seasonTitles !== [])
-            <div class="bg-pitch-surface border border-gold/40 rounded-xl p-4 sm:p-6">
-                <h3 class="font-display uppercase tracking-wider text-lg font-semibold text-gold mb-3">🗳️ Sezon Ödülleri</h3>
+            <div class="bg-pitch-surface border border-gold/40 rounded-3xl p-4 sm:p-6">
+                <h3 class="font-display uppercase tracking-wider text-xl font-bold text-gold mb-3">🗳️ Sezon Ödülleri</h3>
                 <div class="flex flex-wrap gap-2">
                     @foreach ($seasonTitles as $t)
                         @php $k = \App\Services\SeasonVoting::CATEGORIES[$t['category']]; @endphp
@@ -400,9 +398,9 @@
             $earnedCount = collect($badges)->where('earned', true)->count();
             $byGroup = collect($badges)->groupBy('group');
         @endphp
-        <div class="bg-pitch-surface border border-pitch-line rounded-xl p-4 sm:p-6">
+        <div class="bg-pitch-surface border border-pitch-line rounded-3xl p-4 sm:p-6">
             <div class="flex items-baseline justify-between gap-2 flex-wrap mb-1">
-                <h3 class="font-display uppercase tracking-wider text-lg font-semibold">🏅 Rozetler</h3>
+                <h3 class="font-display uppercase tracking-wider text-xl font-bold">🏅 Rozetler</h3>
                 <span class="text-sm font-bold text-gold">{{ $earnedCount }}<span class="text-pitch-muted font-normal">/{{ count($badges) }}</span></span>
             </div>
             <p class="text-[11px] text-pitch-muted mb-4">

@@ -19,15 +19,15 @@ export default {
                 sans: ['Figtree', ...defaultTheme.fontFamily.sans],
                 display: ['"Barlow Condensed"', '"Arial Narrow"', 'Impact', ...defaultTheme.fontFamily.sans],
             },
-            // Lacivert zemin + logodaki canlı saha yeşili aksan (kadro-logo)
+            // Gece stadı: neredeyse siyah zemin + neon yelek yeşili vurgu (oyun menüsü tarzı)
             colors: {
                 pitch: {
-                    bg: '#0F1F41',
-                    surface: '#16294E',
-                    surface2: '#1E3560',
-                    line: '#2C4577',
-                    ink: '#EDF2FB',
-                    muted: '#92A5CC',
+                    bg: '#0A0E1A',
+                    surface: '#121829',
+                    surface2: '#182037',
+                    line: '#252F4A',
+                    ink: '#F1F4FB',
+                    muted: '#9AA4C0',
                     green: '#1F8F44',
                     green2: '#28AD55',
                 },

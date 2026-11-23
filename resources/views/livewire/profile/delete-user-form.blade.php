@@ -1,4 +1,4 @@
-﻿<?php
+<?php
 
 use App\Livewire\Actions\Logout;
 use Illuminate\Support\Facades\Auth;
@@ -25,7 +25,7 @@ new class extends Component
 
 <section class="space-y-6">
     <header>
-        <h2 class="text-lg font-medium text-pitch-ink">
+        <h2 class="font-display uppercase tracking-wider text-xl font-bold text-pitch-ink">
             {{ __('Delete Account') }}
         </h2>
 
@@ -42,7 +42,7 @@ new class extends Component
     <x-modal name="confirm-user-deletion" :show="$errors->isNotEmpty()" focusable>
         <form wire:submit="deleteUser" class="p-6">
 
-            <h2 class="text-lg font-medium text-pitch-ink">
+            <h2 class="font-display uppercase tracking-wider text-xl font-bold text-pitch-ink">
                 {{ __('Are you sure you want to delete your account?') }}
             </h2>
 

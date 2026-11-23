@@ -1,4 +1,4 @@
-﻿<?php
+<?php
 
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Hash;
@@ -40,7 +40,7 @@ new class extends Component
 
 <section>
     <header>
-        <h2 class="text-lg font-medium text-pitch-ink">
+        <h2 class="font-display uppercase tracking-wider text-xl font-bold text-pitch-ink">
             {{ __('Update Password') }}
         </h2>
 

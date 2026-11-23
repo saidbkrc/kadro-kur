@@ -1,9 +1,9 @@
-<div class="py-10">
+<div class="py-6 sm:py-10">
     <div class="max-w-xl mx-auto px-4 sm:px-6 lg:px-8">
-        <div class="bg-pitch-surface border border-pitch-line rounded-xl">
+        <div class="bg-pitch-surface border border-pitch-line rounded-2xl">
             <div class="p-8 text-center space-y-4">
                 <div class="text-4xl">⚽</div>
-                <h2 class="font-display uppercase tracking-wider text-2xl font-bold">{{ $group->name }}</h2>
+                <h2 class="font-display uppercase tracking-wide text-3xl sm:text-4xl font-extrabold leading-none">{{ $group->name }}</h2>
                 @if ($group->description)
                     <p class="text-pitch-muted">{{ $group->description }}</p>
                 @endif

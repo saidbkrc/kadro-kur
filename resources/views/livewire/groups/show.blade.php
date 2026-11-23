@@ -3,7 +3,7 @@
     $tier = fn (float $o) => $o >= 8 ? 'text-gold' : ($o >= 6.5 ? 'text-[#7DE39A]' : ($o >= 5 ? 'text-pitch-ink' : 'text-pitch-muted'));
 @endphp
 
-<div class="py-10">
+<div class="py-6 sm:py-10">
     <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 space-y-6">
 
         <x-group-nav :group="$group" active="group" />
@@ -23,13 +23,18 @@
         @endif
 
         {{-- Başlık + davet linki + ayarlar --}}
-        <div class="bg-pitch-surface border border-pitch-line rounded-xl p-6 space-y-4">
+        <div class="bg-pitch-surface border border-pitch-line rounded-3xl p-5 sm:p-6 space-y-4">
             <div class="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3 sm:gap-4">
-                <div class="min-w-0">
-                    <h2 class="font-display uppercase tracking-wider text-2xl font-bold">{{ $group->name }}</h2>
-                    @if ($group->description)
-                        <p class="text-pitch-muted mt-1">{{ $group->description }}</p>
-                    @endif
+                <div class="min-w-0 flex items-center gap-4">
+                    <span class="w-14 h-14 shrink-0 rounded-2xl bg-bibB text-pitch-bg flex items-center justify-center font-display text-3xl font-extrabold">
+                        {{ mb_strtoupper(mb_substr($group->name, 0, 1)) }}
+                    </span>
+                    <div class="min-w-0">
+                        <h2 class="font-display uppercase tracking-wide text-3xl font-extrabold leading-none truncate">{{ $group->name }}</h2>
+                        @if ($group->description)
+                            <p class="text-pitch-muted mt-1">{{ $group->description }}</p>
+                        @endif
+                    </div>
                 </div>
                 <div class="shrink-0 grid grid-cols-2 gap-2 sm:flex sm:items-center sm:flex-wrap">
                     <span class="col-span-2 sm:col-auto text-sm text-pitch-muted">{{ $players->count() }} oyuncu</span>
@@ -121,9 +126,9 @@
         </div>
 
         {{-- Yaklaşan maçlar --}}
-        <div class="bg-pitch-surface border border-pitch-line rounded-xl p-6 space-y-4">
+        <div class="bg-pitch-surface border border-pitch-line rounded-3xl p-5 sm:p-6 space-y-4">
             <div class="flex items-center justify-between">
-                <h3 class="font-display uppercase tracking-wider text-lg font-semibold">Yaklaşan Maçlar</h3>
+                <h3 class="font-display uppercase tracking-wider text-xl font-bold">Yaklaşan Maçlar</h3>
                 @if ($isAdmin)
                     <x-secondary-button wire:click="$toggle('showMatchForm')">
                         {{ $showMatchForm ? 'Vazgeç' : '+ Maç Aç' }}
@@ -160,19 +165,21 @@
 
             @forelse ($upcoming as $match)
                 <a href="{{ route('matches.show', $match) }}" wire:navigate
-                   class="block border border-pitch-line rounded-lg p-4 hover:bg-pitch-surface2 transition">
-                    <div class="flex items-center justify-between">
-                        <div>
-                            <div class="font-semibold">{{ $match->title }}</div>
-                            <div class="text-sm text-pitch-muted mt-0.5">
-                                {{ $match->starts_at->translatedFormat('d F Y, l H:i') }}
-                                @if ($match->location) · {{ $match->location }} @endif
-                            </div>
-                        </div>
-                        <div class="font-display text-lg font-bold shrink-0 ms-4 {{ $match->going_count >= $match->capacity ? 'text-bibA' : '' }}">
-                            {{ $match->going_count }}/{{ $match->capacity }}
-                        </div>
-                    </div>
+                   class="flex items-center gap-3 rounded-2xl bg-pitch-bg/60 border border-pitch-line px-4 py-3 hover:border-bibB/50 transition">
+                    <span class="text-center w-12 shrink-0">
+                        <span class="block font-display text-2xl font-extrabold leading-none">{{ $match->starts_at->format('d') }}</span>
+                        <span class="block text-[11px] uppercase text-pitch-muted">{{ $match->starts_at->translatedFormat('M') }}</span>
+                    </span>
+                    <span class="min-w-0 flex-1">
+                        <span class="block font-semibold truncate">{{ $match->title }}</span>
+                        <span class="block text-sm text-pitch-muted truncate">
+                            {{ $match->starts_at->translatedFormat('l H:i') }}
+                            @if ($match->location) · {{ $match->location }} @endif
+                        </span>
+                    </span>
+                    <span class="font-display text-xl font-bold shrink-0 {{ $match->going_count >= $match->capacity ? 'text-bibA' : '' }}">
+                        {{ $match->going_count }}<span class="text-pitch-muted text-sm">/{{ $match->capacity }}</span>
+                    </span>
                 </a>
             @empty
                 <p class="text-pitch-muted">
@@ -185,9 +192,9 @@
         </div>
 
         {{-- Oyuncu havuzu --}}
-        <div class="bg-pitch-surface border border-pitch-line rounded-xl p-6 space-y-4">
+        <div class="bg-pitch-surface border border-pitch-line rounded-3xl p-5 sm:p-6 space-y-4">
             <div class="flex items-center justify-between flex-wrap gap-3">
-                <h3 class="font-display uppercase tracking-wider text-lg font-semibold">Oyuncu Havuzu</h3>
+                <h3 class="font-display uppercase tracking-wider text-xl font-bold">Oyuncu Havuzu</h3>
                 <div class="grid grid-cols-2 gap-2 w-full sm:w-auto sm:flex sm:items-center sm:flex-wrap">
                     <a href="{{ route('groups.rate', $group) }}" wire:navigate class="{{ $isAdmin ? '' : 'col-span-1' }}">
                         <x-primary-button type="button" class="w-full sm:w-auto">⭐ Oyuncuları Puanla</x-primary-button>
@@ -450,8 +457,8 @@
 
         {{-- Eşleşme kuralları --}}
         @if ($isAdmin && $players->count() >= 2)
-            <div class="bg-pitch-surface border border-pitch-line rounded-xl p-6 space-y-4">
-                <h3 class="font-display uppercase tracking-wider text-lg font-semibold">Eşleşme Kuralları <span class="text-xs text-pitch-muted tracking-widest font-normal">DENGELEME BU KURALLARA UYAR</span></h3>
+            <div class="bg-pitch-surface border border-pitch-line rounded-3xl p-5 sm:p-6 space-y-4">
+                <h3 class="font-display uppercase tracking-wider text-xl font-bold">Eşleşme Kuralları <span class="text-xs text-pitch-muted tracking-widest font-normal">DENGELEME BU KURALLARA UYAR</span></h3>
                 <div class="flex flex-wrap items-center gap-2">
                     <select wire:model="ruleA" class="bg-pitch-bg border-pitch-line text-pitch-ink rounded-md text-sm focus:border-bibB focus:ring-bibB/40">
                         <option value="">— oyuncu —</option>
@@ -489,8 +496,8 @@
 
         {{-- Geçmiş maçlar --}}
         @if ($past->isNotEmpty())
-            <div class="bg-pitch-surface border border-pitch-line rounded-xl p-6 space-y-3">
-                <h3 class="font-display uppercase tracking-wider text-lg font-semibold">Geçmiş Maçlar</h3>
+            <div class="bg-pitch-surface border border-pitch-line rounded-3xl p-5 sm:p-6 space-y-3">
+                <h3 class="font-display uppercase tracking-wider text-xl font-bold">Geçmiş Maçlar</h3>
                 @foreach ($past as $match)
                     <a href="{{ route('matches.show', $match) }}" wire:navigate
                        class="block border border-pitch-line rounded-lg p-4 hover:bg-pitch-surface2 transition">

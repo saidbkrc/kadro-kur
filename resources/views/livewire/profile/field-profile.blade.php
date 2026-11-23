@@ -6,7 +6,7 @@
 <div class="space-y-6">
     {{-- Kişisel istatistik --}}
     <div>
-        <h3 class="font-display uppercase tracking-wider text-lg font-semibold mb-1">İstatistiklerim</h3>
+        <h3 class="font-display uppercase tracking-wider text-xl font-bold mb-1">İstatistiklerim</h3>
         <p class="text-sm text-pitch-muted mb-4">Tüm gruplardaki kayıtlı maçlardan hesaplanır.</p>
         <div class="grid grid-cols-2 lg:grid-cols-4 gap-3">
             @php
@@ -31,7 +31,7 @@
 
     {{-- Saha profilleri (grup başına) --}}
     <div>
-        <h3 class="font-display uppercase tracking-wider text-lg font-semibold mb-1">Saha Profilim</h3>
+        <h3 class="font-display uppercase tracking-wider text-xl font-bold mb-1">Saha Profilim</h3>
         <p class="text-sm text-pitch-muted mb-4">Her grupta oynadığın pozisyonları, tercih ettiğin ayağı ve forma numaranı buradan ayarlayabilirsin.</p>
 
         @forelse ($players as $player)

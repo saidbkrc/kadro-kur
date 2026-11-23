@@ -3,13 +3,13 @@
     $tier = fn (float $o) => $o >= 8 ? 'text-gold' : ($o >= 6.5 ? 'text-[#7DE39A]' : ($o >= 5 ? 'text-pitch-ink' : 'text-pitch-muted'));
 @endphp
 
-<div class="py-10">
+<div class="py-6 sm:py-10">
     <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 space-y-6">
         <x-group-nav :group="$group" />
 
         <div>
             <a href="{{ route('groups.show', $group) }}" wire:navigate class="text-sm text-bibB hover:underline">← {{ $group->name }}</a>
-            <h2 class="font-display uppercase tracking-wider text-2xl font-bold mt-1">Oyuncuları Puanla</h2>
+            <h2 class="font-display uppercase tracking-wide text-3xl sm:text-4xl font-extrabold leading-none mt-1">Oyuncuları Puanla</h2>
             <p class="text-sm text-pitch-muted mt-1">
                 Puanların <strong class="text-pitch-ink">anonim</strong> — kimseye kimin ne verdiği gösterilmez.
                 İstediğin zaman dönüp güncelleyebilirsin; ortalamalar kadro dengelemesinde kullanılır.
@@ -18,7 +18,7 @@
 
         <div class="grid lg:grid-cols-[340px,1fr] gap-6 items-start">
             {{-- Oyuncu listesi --}}
-            <div class="min-w-0 bg-pitch-surface border border-pitch-line rounded-xl p-4 space-y-1">
+            <div class="min-w-0 bg-pitch-surface border border-pitch-line rounded-2xl p-4 space-y-1">
                 @forelse ($players as $player)
                     <button wire:click="select({{ $player->id }})"
                             class="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-start transition
@@ -42,7 +42,7 @@
             </div>
 
             {{-- Puanlama formu --}}
-            <div class="min-w-0 bg-pitch-surface border border-pitch-line rounded-xl p-4 sm:p-6">
+            <div class="min-w-0 bg-pitch-surface border border-pitch-line rounded-3xl p-4 sm:p-6">
                 @if ($selected)
                     <form wire:submit="save" class="space-y-5">
                         <div class="flex items-center justify-between gap-4">

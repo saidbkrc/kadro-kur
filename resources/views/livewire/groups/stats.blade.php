@@ -1,11 +1,11 @@
-<div class="py-10">
+<div class="py-6 sm:py-10">
     <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 space-y-6">
         <x-group-nav :group="$group" active="stats" />
 
         <div class="flex items-end justify-between gap-3 flex-wrap">
             <div>
                 <a href="{{ route('groups.show', $group) }}" wire:navigate class="text-sm text-bibB hover:underline">← {{ $group->name }}</a>
-                <h2 class="font-display uppercase tracking-wider text-2xl font-bold mt-1">İstatistikler</h2>
+                <h2 class="font-display uppercase tracking-wide text-3xl sm:text-4xl font-extrabold leading-none mt-1">İstatistikler</h2>
             </div>
 
             {{-- Sezon seçimi: varsayılan içinde bulunulan sezon --}}
@@ -21,9 +21,9 @@
         {{-- Sezon başlığı + önde gidenler / şampiyonlar --}}
         @if ($season)
             @php $bitti = ! $season->isCurrent(); @endphp
-            <div class="bg-pitch-surface border {{ $bitti ? 'border-gold/40' : 'border-pitch-line' }} rounded-xl p-4 sm:p-6">
+            <div class="bg-pitch-surface border {{ $bitti ? 'border-gold/40' : 'border-pitch-line' }} rounded-3xl p-4 sm:p-6">
                 <div class="flex items-baseline justify-between gap-2 flex-wrap mb-3">
-                    <h3 class="font-display uppercase tracking-wider text-lg font-semibold {{ $bitti ? 'text-gold' : '' }}">
+                    <h3 class="font-display uppercase tracking-wider text-xl font-bold {{ $bitti ? 'text-gold' : '' }}">
                         {{ $bitti ? '🏆 '.$season->name().' Şampiyonları' : '🏁 '.$season->name().' — Önde Gidenler' }}
                     </h3>
                     <span class="text-xs text-pitch-muted">
@@ -72,7 +72,7 @@
         @endif
 
         {{-- Oyuncu arama --}}
-        <div class="bg-pitch-surface border border-pitch-line rounded-xl p-3">
+        <div class="bg-pitch-surface border border-pitch-line rounded-2xl p-3">
             <div class="flex items-center gap-2">
                 <span class="text-pitch-muted text-sm shrink-0">🔍</span>
                 <input type="search" wire:model.live.debounce.300ms="search" placeholder="Oyuncu ara…"
@@ -87,8 +87,8 @@
             <div class="space-y-6 min-w-0">
                 
                 {{-- Gol krallığı --}}
-                <div class="min-w-0 bg-pitch-surface border border-pitch-line rounded-xl p-4 sm:p-6">
-                    <h3 class="font-display uppercase tracking-wider text-lg font-semibold mb-3">👑 Gol Krallığı</h3>
+                <div class="min-w-0 bg-pitch-surface border border-pitch-line rounded-3xl p-4 sm:p-6">
+                    <h3 class="font-display uppercase tracking-wider text-xl font-bold mb-3">👑 Gol Krallığı</h3>
                     @if ($topScorers->isEmpty())
                         <p class="text-pitch-muted text-sm">Henüz gol kaydı yok — maç sonucu girerken golleri atanları da işaretle.</p>
                     @else
@@ -118,8 +118,8 @@
                 </div>
 
                 {{-- Takım kimyası --}}
-                <div class="min-w-0 bg-pitch-surface border border-pitch-line rounded-xl p-4 sm:p-6">
-                    <h3 class="font-display uppercase tracking-wider text-lg font-semibold mb-1">🧪 Takım Kimyası</h3>
+                <div class="min-w-0 bg-pitch-surface border border-pitch-line rounded-3xl p-4 sm:p-6">
+                    <h3 class="font-display uppercase tracking-wider text-xl font-bold mb-1">🧪 Takım Kimyası</h3>
                     <p class="text-xs text-pitch-muted mb-3">Aynı takımda en çok kazanan ikililer (en az {{ \App\Services\TeamChemistry::MIN_TOGETHER }} ortak maç).</p>
                     @if ($chemistry->isEmpty())
                         <p class="text-pitch-muted text-sm">Henüz yeterli veri yok — ikililer aynı takımda {{ \App\Services\TeamChemistry::MIN_TOGETHER }} maç oynayınca burada belirir.</p>
@@ -143,8 +143,8 @@
                 </div>
 
                 {{-- Oyuncu istatistikleri --}}
-                <div class="min-w-0 bg-pitch-surface border border-pitch-line rounded-xl p-4 sm:p-6">
-                    <h3 class="font-display uppercase tracking-wider text-lg font-semibold mb-3">Oyuncu İstatistikleri</h3>
+                <div class="min-w-0 bg-pitch-surface border border-pitch-line rounded-3xl p-4 sm:p-6">
+                    <h3 class="font-display uppercase tracking-wider text-xl font-bold mb-3">Oyuncu İstatistikleri</h3>
                     @if ($playerStats->isEmpty())
                         <p class="text-pitch-muted text-sm">Henüz istatistik yok — ilk maç sonucu kaydedildiğinde burası dolacak.</p>
                     @else
@@ -182,8 +182,8 @@
             </div>
 
             {{-- Maç geçmişi --}}
-            <div class="min-w-0 bg-pitch-surface border border-pitch-line rounded-xl p-4 sm:p-6">
-                <h3 class="font-display uppercase tracking-wider text-lg font-semibold mb-3">Maç Geçmişi <span class="text-xs text-pitch-muted font-normal tracking-widest">{{ $totalMatches }} MAÇ</span></h3>
+            <div class="min-w-0 bg-pitch-surface border border-pitch-line rounded-3xl p-4 sm:p-6">
+                <h3 class="font-display uppercase tracking-wider text-xl font-bold mb-3">Maç Geçmişi <span class="text-xs text-pitch-muted font-normal tracking-widest">{{ $totalMatches }} MAÇ</span></h3>
                 @if ($matches->isEmpty())
                     <p class="text-pitch-muted text-sm">Kayıtlı maç yok. Maç sayfasında takımları kurup maç sonrası skoru kaydet.</p>
                 @endif

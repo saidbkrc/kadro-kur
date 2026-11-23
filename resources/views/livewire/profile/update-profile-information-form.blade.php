@@ -1,4 +1,4 @@
-﻿<?php
+<?php
 
 use App\Models\User;
 use Illuminate\Support\Facades\Auth;
@@ -64,7 +64,7 @@ new class extends Component
 
 <section>
     <header>
-        <h2 class="text-lg font-medium text-pitch-ink">
+        <h2 class="font-display uppercase tracking-wider text-xl font-bold text-pitch-ink">
             {{ __('Profile Information') }}
         </h2>
 

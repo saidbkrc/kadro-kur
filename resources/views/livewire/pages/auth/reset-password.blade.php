@@ -1,4 +1,4 @@
-﻿<?php
+<?php
 
 use Illuminate\Auth\Events\PasswordReset;
 use Illuminate\Support\Facades\Hash;

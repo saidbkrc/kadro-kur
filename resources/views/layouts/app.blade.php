@@ -8,7 +8,7 @@
         <title>{{ config('app.name', 'Kadro Kur') }}</title>
 
         {{-- PWA: ana ekrana ekle --}}
-        <meta name="theme-color" content="#0F1F41">
+        <meta name="theme-color" content="#0A0E1A">
         <meta name="mobile-web-app-capable" content="yes">
         <meta name="apple-mobile-web-app-capable" content="yes">
         <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
@@ -20,7 +20,7 @@
 
         <!-- Fonts -->
         <link rel="preconnect" href="https://fonts.bunny.net">
-        <link href="https://fonts.bunny.net/css?family=figtree:400,500,600,700|barlow-condensed:500,600,700&display=swap" rel="stylesheet" />
+        <link href="https://fonts.bunny.net/css?family=figtree:400,500,600,700|barlow-condensed:500,600,700,800&display=swap" rel="stylesheet" />
 
         <!-- Scripts -->
         @vite(['resources/css/app.css', 'resources/js/app.js'])
@@ -84,13 +84,17 @@
         </script>
     </head>
     <body class="font-sans antialiased text-pitch-ink overflow-x-hidden">
-        <div class="min-h-screen overflow-x-hidden bg-pitch-bg bg-[radial-gradient(1200px_500px_at_50%_-10%,rgba(40,173,85,.14),transparent_60%)]">
+        <div class="min-h-screen overflow-x-hidden bg-pitch-bg bg-[radial-gradient(1200px_520px_at_50%_-12%,rgba(200,240,75,.10),transparent_60%)]">
             <livewire:layout.navigation />
 
             <!-- Page Content -->
-            <main>
+            <main class="@auth pb-24 sm:pb-0 @endauth">
                 {{ $slot }}
             </main>
+
+            @auth
+                <x-bottom-nav />
+            @endauth
         </div>
     </body>
 </html>

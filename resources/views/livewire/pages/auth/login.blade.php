@@ -1,4 +1,4 @@
-﻿<?php
+<?php
 
 use App\Livewire\Forms\LoginForm;
 use Illuminate\Support\Facades\Session;
@@ -51,7 +51,7 @@ new #[Layout('layouts.guest')] class extends Component
         <!-- Remember Me -->
         <div class="block mt-4">
             <label for="remember" class="inline-flex items-center">
-                <input wire:model="form.remember" id="remember" type="checkbox" class="rounded border-gray-300 text-indigo-600 shadow-sm focus:ring-gold" name="remember">
+                <input wire:model="form.remember" id="remember" type="checkbox" class="rounded border-pitch-line bg-pitch-bg text-bibB shadow-sm focus:ring-gold" name="remember">
                 <span class="ms-2 text-sm text-pitch-muted">{{ __('Remember me') }}</span>
             </label>
         </div>

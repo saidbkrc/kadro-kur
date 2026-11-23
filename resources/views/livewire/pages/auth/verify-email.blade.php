@@ -1,4 +1,4 @@
-﻿<?php
+<?php
 
 use App\Livewire\Actions\Logout;
 use Illuminate\Support\Facades\Auth;

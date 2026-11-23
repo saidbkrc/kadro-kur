@@ -3,7 +3,7 @@
     use App\Support\CimShop;
 @endphp
 
-<div class="py-10">
+<div class="py-6 sm:py-10">
     <div class="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 space-y-6">
 
         <x-group-nav :group="$group" active="kehanet" />
@@ -11,11 +11,11 @@
         <x-announcements :group="$group" />
 
         {{-- Başlık + bakiye --}}
-        <div class="bg-pitch-surface border border-pitch-line rounded-xl p-4 sm:p-6">
+        <div class="bg-pitch-surface border border-pitch-line rounded-3xl p-4 sm:p-6">
             <div class="flex items-center justify-between gap-3 flex-wrap">
                 <div class="min-w-0">
                     <a href="{{ route('groups.show', $group) }}" wire:navigate class="text-sm text-bibB hover:underline">← {{ $group->name }}</a>
-                    <h2 class="font-display uppercase tracking-wider text-2xl font-bold mt-1">🔮 Kehanet</h2>
+                    <h2 class="font-display uppercase tracking-wide text-3xl sm:text-4xl font-extrabold leading-none mt-1">🔮 Kehanet</h2>
                 </div>
                 <div class="text-end shrink-0">
                     <div class="font-display text-3xl font-bold text-bibB">{{ number_format($balance) }}</div>
@@ -68,7 +68,7 @@
             }
         @endphp
 
-        <div class="bg-pitch-surface border border-pitch-line rounded-xl p-2">
+        <div class="bg-pitch-surface border border-pitch-line rounded-2xl p-2">
             <div class="grid grid-cols-3 sm:grid-cols-{{ $isAdmin ? '7' : '6' }} gap-2">
                 @foreach ($sekmeler as $anahtar => [$ikon, $etiket, $rozet])
                     <button type="button" wire:click="setTab('{{ $anahtar }}')"
@@ -90,9 +90,9 @@
         {{-- Kombine sepeti --}}
         @if ($tab === 'kupon' && $parlay)
             @php $toplamOran = array_product(array_column($parlay, 'odds')); @endphp
-            <div class="bg-pitch-surface border border-bibB/50 rounded-xl p-4 sm:p-6 space-y-3">
+            <div class="bg-pitch-surface border border-bibB/50 rounded-3xl p-4 sm:p-6 space-y-3">
                 <div class="flex items-baseline justify-between gap-2 flex-wrap">
-                    <h3 class="font-display uppercase tracking-wider text-lg font-semibold text-bibB">🎰 Kombine Kupon</h3>
+                    <h3 class="font-display uppercase tracking-wider text-xl font-bold text-bibB">🎰 Kombine Kupon</h3>
                     <span class="text-xs text-pitch-muted">{{ count($parlay) }} tahmin · hepsi tutmalı</span>
                 </div>
 
@@ -145,9 +145,9 @@
             $bekleyenAdet = $bekleyenGruplar->flatten()->count();
         @endphp
         @if ($bekleyenAdet > 0)
-            <div class="bg-pitch-surface border border-gold/40 rounded-xl p-4 sm:p-6 space-y-3">
+            <div class="bg-pitch-surface border border-gold/40 rounded-3xl p-4 sm:p-6 space-y-3">
                 <div class="flex items-baseline justify-between gap-2 flex-wrap">
-                    <h3 class="font-display uppercase tracking-wider text-lg font-semibold text-gold">⏳ Bekleyen Tahminlerin</h3>
+                    <h3 class="font-display uppercase tracking-wider text-xl font-bold text-gold">⏳ Bekleyen Tahminlerin</h3>
                     <span class="text-xs text-pitch-muted">
                         {{ $bekleyenAdet }} kupon · {{ number_format($bekleyenGruplar->flatten()->sum('stake')) }} Çim riskte
                     </span>
@@ -191,9 +191,9 @@
                 $benimOyuncuId = $squad->firstWhere('user_id', auth()->id())?->id;   // seçeneklerde "SEN" etiketi
             @endphp
 
-            <div class="bg-pitch-surface border border-pitch-line rounded-xl p-4 sm:p-6 space-y-4">
+            <div class="bg-pitch-surface border border-pitch-line rounded-3xl p-4 sm:p-6 space-y-4">
                 <div class="flex items-baseline justify-between gap-2 flex-wrap">
-                    <h3 class="font-display uppercase tracking-wider text-lg font-semibold">{{ $match->title }}</h3>
+                    <h3 class="font-display uppercase tracking-wider text-xl font-bold">{{ $match->title }}</h3>
                     <span class="text-xs text-pitch-muted">{{ $match->starts_at->translatedFormat('d F, l H:i') }}</span>
                 </div>
 
@@ -385,7 +385,7 @@
                 </div>
             </div>
         @empty
-            <div class="bg-pitch-surface border border-pitch-line rounded-xl p-6 text-center text-pitch-muted">
+            <div class="bg-pitch-surface border border-pitch-line rounded-3xl p-5 sm:p-6 text-center text-pitch-muted">
                 <div class="text-4xl mb-2">🔮</div>
                 Kupon yapılabilecek maç yok — yaklaşan maç açılınca burada belirir.
             </div>
@@ -394,8 +394,8 @@
 
         {{-- Başkan: maç olayları girişi --}}
         @if ($tab === 'olaylar' && $isAdmin && $pendingMatches->isNotEmpty())
-            <div class="bg-pitch-surface border border-gold/40 rounded-xl p-4 sm:p-6 space-y-4">
-                <h3 class="font-display uppercase tracking-wider text-lg font-semibold text-gold">🎬 Maç Olayları <span class="text-xs text-pitch-muted font-normal tracking-normal">(başkan)</span></h3>
+            <div class="bg-pitch-surface border border-gold/40 rounded-3xl p-4 sm:p-6 space-y-4">
+                <h3 class="font-display uppercase tracking-wider text-xl font-bold text-gold">🎬 Maç Olayları <span class="text-xs text-pitch-muted font-normal tracking-normal">(başkan)</span></h3>
                 <p class="text-xs text-pitch-muted">Bu olayları işaretleyince ilgili kuponlar otomatik sonuçlanır. Dokunmadığın olay beklemede kalır.</p>
 
                 @foreach ($pendingMatches as $match)
@@ -430,8 +430,8 @@
 
         {{-- Mağaza: biriken Çim'i harcama yeri (yalnızca görünüm, oyun avantajı yok) --}}
         @if ($tab === 'magaza')
-            <div class="bg-pitch-surface border border-pitch-line rounded-xl p-4 sm:p-6">
-                <h3 class="font-display uppercase tracking-wider text-lg font-semibold">🛒 Çim Mağazası</h3>
+            <div class="bg-pitch-surface border border-pitch-line rounded-3xl p-4 sm:p-6">
+                <h3 class="font-display uppercase tracking-wider text-xl font-bold">🛒 Çim Mağazası</h3>
                 <p class="text-xs text-pitch-muted mt-1">
                     Biriken Çim'ini kart görünümüne harca. Satın aldıkların kalıcıdır ve istediğin zaman değiştirebilirsin —
                     <strong class="text-pitch-ink">hiçbiri oyun içi avantaj sağlamaz</strong>, sadece görünüm.
@@ -446,8 +446,8 @@
 
             {{-- Hediye geçmişi: gelenler ve gönderdiklerin --}}
             @if ($giftsReceived->isNotEmpty() || $giftsSent->isNotEmpty())
-                <div class="bg-pitch-surface border border-gold/40 rounded-xl p-4 sm:p-6">
-                    <h3 class="font-display uppercase tracking-wider text-lg font-semibold text-gold mb-3">🎁 Hediyeler</h3>
+                <div class="bg-pitch-surface border border-gold/40 rounded-3xl p-4 sm:p-6">
+                    <h3 class="font-display uppercase tracking-wider text-xl font-bold text-gold mb-3">🎁 Hediyeler</h3>
                     <div class="grid sm:grid-cols-2 gap-4">
                         <div>
                             <div class="text-[11px] tracking-[.14em] text-pitch-muted mb-1.5">GELEN</div>
@@ -481,7 +481,7 @@
 
             @foreach (CimShop::grouped() as $tur => $urunler)
                 @php $turBilgi = CimShop::TYPES[$tur]; @endphp
-                <div class="bg-pitch-surface border border-pitch-line rounded-xl p-4 sm:p-6">
+                <div class="bg-pitch-surface border border-pitch-line rounded-3xl p-4 sm:p-6">
                     <div class="flex items-baseline justify-between gap-2 mb-3 flex-wrap">
                         <div>
                             <div class="text-[11px] tracking-[.14em] text-pitch-muted">{{ $turBilgi['icon'] }} {{ mb_strtoupper($turBilgi['name'], 'UTF-8') }}</div>
@@ -605,9 +605,9 @@
                 ];
             @endphp
 
-            <div class="bg-pitch-surface border border-pitch-line rounded-xl p-4 sm:p-6">
+            <div class="bg-pitch-surface border border-pitch-line rounded-3xl p-4 sm:p-6">
                 <div class="flex items-baseline justify-between gap-2 flex-wrap mb-1">
-                    <h3 class="font-display uppercase tracking-wider text-lg font-semibold">🎁 Ödüller</h3>
+                    <h3 class="font-display uppercase tracking-wider text-xl font-bold">🎁 Ödüller</h3>
                     <span class="text-sm">Toplam kazandığın: <strong class="font-display text-xl text-gold">{{ number_format($kazanilanToplam) }}</strong> Çim</span>
                 </div>
                 <p class="text-xs text-pitch-muted">Kupon oynamadan da Çim kazanırsın — sahadaki ve uygulamadaki katkının karşılığı. Misafir oyuncular hesapsız olduğu için ödül alamaz.</p>
@@ -616,7 +616,7 @@
             @foreach ($gruplar as $scope => [$baslik, $altBaslik])
                 @php $liste = collect(\App\Services\CimRewards::AWARDS)->where('scope', $scope); @endphp
                 @if ($liste->isNotEmpty())
-                    <div class="bg-pitch-surface border border-pitch-line rounded-xl p-4 sm:p-6">
+                    <div class="bg-pitch-surface border border-pitch-line rounded-3xl p-4 sm:p-6">
                         <div class="text-[11px] tracking-[.14em] text-pitch-muted mb-0.5">{{ $baslik }}</div>
                         <p class="text-[11px] text-pitch-muted/70 mb-3">{{ $altBaslik }}</p>
 
@@ -658,8 +658,8 @@
 
         {{-- Ayın Kâhini --}}
         @if ($tab === 'kahin')
-        <div class="bg-pitch-surface border border-pitch-line rounded-xl p-4 sm:p-6">
-            <h3 class="font-display uppercase tracking-wider text-lg font-semibold mb-1">👑 Ayın Kâhini</h3>
+        <div class="bg-pitch-surface border border-pitch-line rounded-3xl p-4 sm:p-6">
+            <h3 class="font-display uppercase tracking-wider text-xl font-bold mb-1">👑 Ayın Kâhini</h3>
             <p class="text-xs text-pitch-muted mb-3">{{ now()->translatedFormat('F Y') }} — net kazanç sıralaması</p>
 
             @if ($leaders->isEmpty())
@@ -688,8 +688,8 @@
 
         {{-- Kombine kuponlarım --}}
         @if ($tab === 'kuponlarim' && $mySlips->isNotEmpty())
-            <div class="bg-pitch-surface border border-pitch-line rounded-xl p-4 sm:p-6">
-                <h3 class="font-display uppercase tracking-wider text-lg font-semibold mb-3">🎰 Kombine Kuponlarım</h3>
+            <div class="bg-pitch-surface border border-pitch-line rounded-3xl p-4 sm:p-6">
+                <h3 class="font-display uppercase tracking-wider text-xl font-bold mb-3">🎰 Kombine Kuponlarım</h3>
                 <div class="space-y-2">
                     @foreach ($mySlips as $slip)
                         @php
@@ -729,8 +729,8 @@
 
         {{-- Kuponlarım --}}
         @if ($tab === 'kuponlarim')
-        <div class="bg-pitch-surface border border-pitch-line rounded-xl p-4 sm:p-6">
-            <h3 class="font-display uppercase tracking-wider text-lg font-semibold mb-3">🎫 Kuponlarım</h3>
+        <div class="bg-pitch-surface border border-pitch-line rounded-3xl p-4 sm:p-6">
+            <h3 class="font-display uppercase tracking-wider text-xl font-bold mb-3">🎫 Kuponlarım</h3>
 
             @if ($myBets->isEmpty())
                 <p class="text-sm text-pitch-muted">Henüz kupon yapmadın.</p>
@@ -796,8 +796,8 @@
 
         {{-- Çim hareket geçmişi --}}
         @if ($tab === 'cim' && $transactions->isNotEmpty())
-            <div class="bg-pitch-surface border border-pitch-line rounded-xl p-4 sm:p-6">
-                <h3 class="font-display uppercase tracking-wider text-lg font-semibold mb-3">💸 Çim Hareketleri</h3>
+            <div class="bg-pitch-surface border border-pitch-line rounded-3xl p-4 sm:p-6">
+                <h3 class="font-display uppercase tracking-wider text-xl font-bold mb-3">💸 Çim Hareketleri</h3>
                 <div class="divide-y divide-pitch-line">
                     @foreach ($transactions as $hareket)
                         <div class="flex items-center justify-between gap-3 py-2 text-sm">

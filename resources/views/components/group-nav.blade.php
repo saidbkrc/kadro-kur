@@ -22,7 +22,7 @@
     $dead = 'bg-pitch-bg border-pitch-line text-pitch-muted opacity-50 cursor-default';
 @endphp
 
-<div class="bg-pitch-surface border border-pitch-line rounded-xl p-2">
+<div class="hidden sm:block bg-pitch-surface border border-pitch-line rounded-2xl p-2">
     <div class="grid grid-cols-5 gap-1.5">
 
         {{-- Yaklaşan maç --}}
