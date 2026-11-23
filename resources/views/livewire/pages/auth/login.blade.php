@@ -67,6 +67,13 @@ new #[Layout('layouts.guest')] class extends Component
                 {{ __('Log in') }}
             </x-primary-button>
         </div>
+
+        @if (Route::has('register'))
+            <p class="text-sm text-pitch-muted text-center mt-6">
+                Hesabın yok mu?
+                <a href="{{ route('register') }}" wire:navigate class="font-semibold text-bibB hover:underline">Kayıt Ol</a>
+            </p>
+        @endif
     </form>
 </div>
 
