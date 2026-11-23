@@ -147,6 +147,7 @@ class GroupResource extends Resource
     public static function getRelations(): array
     {
         return [
+            GroupResource\RelationManagers\MembersRelationManager::class,
             GroupResource\RelationManagers\PlayersRelationManager::class,
         ];
     }

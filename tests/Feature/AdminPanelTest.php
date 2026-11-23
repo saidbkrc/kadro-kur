@@ -53,6 +53,41 @@ class AdminPanelTest extends TestCase
         $this->get(ManageSettings::getUrl())->assertOk();
     }
 
+    public function test_genel_bakis_widgetlari_ve_iliski_tablolari_render_olur(): void
+    {
+        $admin = $this->admin();
+        $group = Group::create(['owner_id' => $admin->id, 'name' => 'Salı Grubu']);
+        $group->members()->attach($admin->id, ['role' => 'owner']);
+        $player = $group->ensurePlayerFor($admin);
+        $match = $group->matches()->create([
+            'created_by' => $admin->id,
+            'title' => 'Widget maçı',
+            'starts_at' => now()->subDay(),
+            'capacity' => 14,
+            'status' => 'completed',
+            'team_a_score' => 3,
+            'team_b_score' => 2,
+        ]);
+        $match->rsvps()->create(['player_id' => $player->id, 'status' => 'going', 'team' => 'A']);
+
+        $this->actingAs($admin);
+
+        Livewire::test(\App\Filament\Widgets\StatsOverview::class)->assertSee('Toplam Gol')->assertSee('Kehanet');
+        Livewire::test(\App\Filament\Widgets\LatestMatches::class)->assertSee('Widget maçı')->assertSee('1 / 14')->assertSee('3 - 2');
+        Livewire::test(\App\Filament\Widgets\ActiveGroups::class)->assertSee('Salı Grubu');
+
+        $this->get(GroupResource::getUrl('edit', ['record' => $group]))->assertOk();
+        $this->get(MatchResource::getUrl('edit', ['record' => $match]))->assertOk();
+
+        Livewire::test(GroupResource\RelationManagers\MembersRelationManager::class, [
+            'ownerRecord' => $group, 'pageClass' => GroupResource\Pages\EditGroup::class,
+        ])->assertSee($admin->email)->assertSee('Başkan');
+
+        Livewire::test(MatchResource\RelationManagers\RsvpsRelationManager::class, [
+            'ownerRecord' => $match, 'pageClass' => MatchResource\Pages\EditMatch::class,
+        ])->assertSee('Geliyor')->assertSee('Turuncu');
+    }
+
     public function test_admin_yetkisi_panelden_verilir(): void
     {
         $admin = $this->admin();

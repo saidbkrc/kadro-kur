@@ -158,6 +158,13 @@ class MatchResource extends Resource
             ->defaultSort('starts_at', 'desc');
     }
 
+    public static function getRelations(): array
+    {
+        return [
+            MatchResource\RelationManagers\RsvpsRelationManager::class,
+        ];
+    }
+
     public static function getEloquentQuery(): Builder
     {
         return parent::getEloquentQuery()->with('group');
